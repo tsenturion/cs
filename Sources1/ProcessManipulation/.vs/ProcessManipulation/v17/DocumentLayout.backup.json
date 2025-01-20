@@ -14,21 +14,17 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 0,
           "Children": [
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{e5c86464-96be-4d7c-9a8b-abcb3bbf5f92}"
-            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "MainWindow.cs",
               "DocumentMoniker": "C:\\Users\\\u0415\u0444\u0438\u043C\u043E\u0432\\Downloads\\cs\\Sources1\\ProcessManipulation\\ProcessManipulation\\MainWindow.cs",
               "RelativeDocumentMoniker": "ProcessManipulation\\MainWindow.cs",
-              "ToolTip": "C:\\Users\\\u0415\u0444\u0438\u043C\u043E\u0432\\Downloads\\cs\\Sources1\\ProcessManipulation\\ProcessManipulation\\MainWindow.cs",
-              "RelativeToolTip": "ProcessManipulation\\MainWindow.cs",
-              "ViewState": "AgIAAFcAAAAAAAAAAAAgwHIAAAAJAAAAAAAAAA==",
+              "ToolTip": "C:\\Users\\\u0415\u0444\u0438\u043C\u043E\u0432\\Downloads\\cs\\Sources1\\ProcessManipulation\\ProcessManipulation\\MainWindow.cs*",
+              "RelativeToolTip": "ProcessManipulation\\MainWindow.cs*",
+              "ViewState": "AgIAACEAAAAAAAAAAAAYwA4AAAAdAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-01-20T14:30:20.399Z",
               "EditorCaption": ""

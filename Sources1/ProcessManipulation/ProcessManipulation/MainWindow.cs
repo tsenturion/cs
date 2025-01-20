@@ -96,17 +96,20 @@ namespace ProcessManipulation
         {
             Process proc = sender as Process;
             //убираем процесс из списка запущенных приложений
-            StartedAssemblies.Items.Remove(proc.ProcessName);
-            //добавляем процесс в список доступных приложений
-            AvailableAssemblies.Items.Add(proc.ProcessName);
-            //убираем процесс из списка дочерних процессов
-            Processes.Remove(proc);
-            //уменьшаем счётчик дочерних процессов на 1
-            Counter--;
-            int index = 0;
-            /*меняем текст для главных окон всех дочерних процессов*/
-            foreach (var p in Processes)
-                SetChildWindowText(p.MainWindowHandle, "Child process #" + ++index);
+            this.Invoke((MethodInvoker)delegate
+            {
+                StartedAssemblies.Items.Remove(proc.ProcessName);
+                //добавляем процесс в список доступных приложений
+                AvailableAssemblies.Items.Add(proc.ProcessName);
+                //убираем процесс из списка дочерних процессов
+                Processes.Remove(proc);
+                //уменьшаем счётчик дочерних процессов на 1
+                Counter--;
+                int index = 0;
+                /*меняем текст для главных окон всех дочерних процессов*/
+                foreach (var p in Processes)
+                    SetChildWindowText(p.MainWindowHandle, "Child process #" + ++index);
+            });
         }
         //объявление делегата, принимающего параметр типа Process
         delegate void ProcessDelegate(Process proc);
