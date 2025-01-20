@@ -1,0 +1,33 @@
+using System.Diagnostics;
+
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+        
+
+        char usersChar = ' ';
+
+        int CheckIterator = 0;
+
+        while ((int)usersChar!=78) 
+        {
+            if (CheckIterator % 2 == 0) Console.Clear();
+            var sw = new Stopwatch();
+
+            sw.Start();
+            Console.WriteLine($"check ur reaction No.{CheckIterator};\nfor exit put 0");
+
+            usersChar = Console.ReadKey().Key.ToString()[0];
+            sw.Stop();
+            Console.WriteLine(sw.Elapsed);
+
+            CheckIterator++;
+
+        };
+
+
+
+       
+    }
+}
