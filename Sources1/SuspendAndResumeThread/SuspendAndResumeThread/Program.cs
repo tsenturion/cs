@@ -10,13 +10,28 @@ namespace SuspendAndResumeThread
             ThreadStart ts = new ThreadStart(Method);
             Thread t = new Thread(ts);
             t.Start(); // Запуск потока.
-            Console.WriteLine("Нажмите любую клавишу для остановки");
-            Console.ReadKey();
-            t.Suspend(); // Приостановка потока.
-            Console.WriteLine("Поток остановлен!");
-            Console.WriteLine("Нажмите любую клавишу для возобновления");
-            Console.ReadKey();
-            t.Resume(); // Возобновление работы.
+
+            ConsoleKey key = new ConsoleKey();
+            bool flag= true;
+
+            while (key != ConsoleKey.Escape)
+            {
+                key = Console.ReadKey(true).Key;
+                if (flag)
+                {
+                    t.Suspend(); // Приостановка потока.
+                    Console.WriteLine("Поток остановлен!");
+                    Console.WriteLine("Нажмите любую клавишу для возобновления");
+                    flag = false;
+                }
+                else
+                {
+                  t.Resume(); // Возобновление работы.
+                  Console.WriteLine("Нажмите любую клавишу для остановки");
+                    flag = true;
+                }
+            }
+            t.Interrupt();
         }
 
         static void Method()
