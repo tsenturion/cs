@@ -1,0 +1,15 @@
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\bin\Debug\net8.0\SP_HW_Modul_01_1589199648.exe
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\bin\Debug\net8.0\SP_HW_Modul_01_1589199648.deps.json
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\bin\Debug\net8.0\SP_HW_Modul_01_1589199648.runtimeconfig.json
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\bin\Debug\net8.0\SP_HW_Modul_01_1589199648.dll
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\bin\Debug\net8.0\SP_HW_Modul_01_1589199648.pdb
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\SP_HW_Modul_01_1589199648.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\SP_HW_Modul_01_1589199648.AssemblyInfoInputs.cache
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\SP_HW_Modul_01_1589199648.AssemblyInfo.cs
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\SP_HW_Modul_01_1589199648.csproj.CoreCompileInputs.cache
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\SP_HW_Modul_01_1589199648.sourcelink.json
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\SP_HW_Modul_01_1589199648.dll
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\refint\SP_HW_Modul_01_1589199648.dll
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\SP_HW_Modul_01_1589199648.pdb
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\SP_HW_Modul_01_1589199648.genruntimeconfig.cache
+C:\Users\Nout\Desktop\Sourse\cs\20.01\SP_HW_Modul_01_1589199648\SP_HW_Modul_01_1589199648\obj\Debug\net8.0\ref\SP_HW_Modul_01_1589199648.dll
