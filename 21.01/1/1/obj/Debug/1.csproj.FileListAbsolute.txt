@@ -1,0 +1,6 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\21.01\1\1\bin\Debug\1.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\21.01\1\1\bin\Debug\1.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\21.01\1\1\obj\Debug\1.csproj.AssemblyReference.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\21.01\1\1\obj\Debug\1.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\21.01\1\1\obj\Debug\1.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\21.01\1\1\obj\Debug\1.pdb
