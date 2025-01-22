@@ -10,7 +10,7 @@ namespace SuspendAndResumeThread
 		static void Main(string[] args)
 		{
 			/*
-			* реализовать возможность множественной приостановки и продолжения!!!
+			* реализовать возможность множественной приостановки и продолжения!!
 			* */ 
 			ThreadStart ts = new ThreadStart(Method);
 			Thread t = new Thread(ts);
