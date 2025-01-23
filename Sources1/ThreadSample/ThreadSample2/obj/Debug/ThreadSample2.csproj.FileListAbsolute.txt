@@ -1,0 +1,6 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\ThreadSample\ThreadSample2\bin\Debug\ThreadSample2.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\ThreadSample\ThreadSample2\bin\Debug\ThreadSample2.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\ThreadSample\ThreadSample2\obj\Debug\ThreadSample2.csproj.AssemblyReference.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\ThreadSample\ThreadSample2\obj\Debug\ThreadSample2.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\ThreadSample\ThreadSample2\obj\Debug\ThreadSample2.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\ThreadSample\ThreadSample2\obj\Debug\ThreadSample2.pdb

@@ -1,0 +1,6 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\StaticThread\StaticThread\bin\Debug\StaticThread.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\StaticThread\StaticThread\bin\Debug\StaticThread.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\StaticThread\StaticThread\obj\Debug\StaticThread.csproj.AssemblyReference.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\StaticThread\StaticThread\obj\Debug\StaticThread.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\StaticThread\StaticThread\obj\Debug\StaticThread.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Sources1\StaticThread\StaticThread\obj\Debug\StaticThread.pdb
