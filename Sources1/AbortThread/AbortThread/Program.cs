@@ -7,14 +7,14 @@ namespace AbortThread
     {
         static void Main(string[] args)
         {
-            //ThreadStart ts = new ThreadStart(Method);
-            //Thread t = new Thread(ts);
-            //t.Start();
-            //Console.WriteLine("Нажмите кнопку для завершения потока");
-            //Console.ReadKey();
-            //t.Abort(); // Принудительное завершение работы потока.
-            //Console.WriteLine("Нажмите кнопку для завершения потока");
-            //Console.ReadKey();
+            ThreadStart ts = new ThreadStart(Method);
+            Thread t = new Thread(ts);
+            t.Start();
+            Console.WriteLine("Нажмите кнопку для завершения потока");
+            Console.ReadKey();
+            t.Abort(); // Принудительное завершение работы потока.
+            Console.WriteLine("Нажмите кнопку для завершения потока");
+            Console.ReadKey();
         }
         static void Method()
         {
