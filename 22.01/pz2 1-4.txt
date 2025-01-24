@@ -73,19 +73,46 @@ namespace topCS
                 }
             }
         }
-// Кнопка 3: Закрытие окна Блокнота
-private void buttonCloseNotepad_Click(object sender, EventArgs e)
-{
-    // Поиск окна Блокнота
-    IntPtr hWnd = FindWindow("Notepad", null);
-    if (hWnd != IntPtr.Zero)
-    {
-        // Отправка сообщения о закрытии окна
-        SendMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
-        MessageBox.Show("Окно Блокнота закрыто.");
-    }
-    else
-    {
-        MessageBox.Show("Окно Блокнота не найдено.");
+
+        // Кнопка 3: Закрытие окна Блокнота
+        private void buttonCloseNotepad_Click(object sender, EventArgs e)
+        {
+            // Поиск окна Блокнота
+            IntPtr hWnd = FindWindow("Notepad", null);
+            if (hWnd != IntPtr.Zero)
+            {
+                // Отправка сообщения о закрытии окна
+                SendMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                MessageBox.Show("Окно Блокнота закрыто.");
+            }
+            else
+            {
+                MessageBox.Show("Окно Блокнота не найдено.");
+            }
+        }
+
+        // Кнопка 4: Обновление заголовка окна Блокнота текущим временем
+        private void buttonUpdateNotepadTitle_Click(object sender, EventArgs e)
+        {
+            // Поиск окна Блокнота
+            IntPtr hWnd = FindWindow("Notepad", null);
+            if (hWnd != IntPtr.Zero)
+            {
+                // Запуск таймера для обновления заголовка
+                new Thread(() =>
+                {
+                    while (true)
+                    {
+                        string currentTime = DateTime.Now.ToString("HH:mm:ss");
+                        SendMessage(hWnd, WM_SETTEXT, IntPtr.Zero, Marshal.StringToHGlobalUni(currentTime));
+                        Thread.Sleep(1000); // Пауза 1 секунда
+                    }
+                }).Start();
+            }
+            else
+            {
+                MessageBox.Show("Окно Блокнота не найдено.");
+            }
+        }
     }
 }
