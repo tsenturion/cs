@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "SP_Practice_Modul_02_1589199732/1.0.0": {
+        "runtime": {
+          "SP_Practice_Modul_02_1589199732.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "SP_Practice_Modul_02_1589199732/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

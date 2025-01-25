@@ -1,0 +1,5 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\24.01\SP_Practice_Modul_02_1589199732\test\obj\Debug\test.csproj.AssemblyReference.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\24.01\SP_Practice_Modul_02_1589199732\test\obj\Debug\test.Form1.resources
+E:\Пользователи\Desktop\academy\source\repos\cs\24.01\SP_Practice_Modul_02_1589199732\test\obj\Debug\test.Properties.Resources.resources
+E:\Пользователи\Desktop\academy\source\repos\cs\24.01\SP_Practice_Modul_02_1589199732\test\obj\Debug\test.csproj.GenerateResource.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\24.01\SP_Practice_Modul_02_1589199732\test\obj\Debug\test.csproj.CoreCompileInputs.cache
