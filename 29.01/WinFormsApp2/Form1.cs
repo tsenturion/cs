@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
 using System.Threading;
-
+using System.Windows.Forms;
 
 namespace WinFormsApp2
 {
@@ -21,15 +21,40 @@ namespace WinFormsApp2
 
         private void buttonStartLetters_Click(object sender, EventArgs e)
         {
-
+            Thread letterThread = new Thread(GenerateLetters);
+            letterThread.Priority = (ThreadPriority)Enum.Parse(typeof(ThreadPriority), comboBoxLetterPriority.SelectedItem.ToString());
+            letterThread.Start();
         }
 
 
         private void buttonStartSymbols_Click(object sender, EventArgs e)
         {
-
+            Thread symbolThread = new Thread(GenerateSymbols);
+            symbolThread.Priority = (ThreadPriority)Enum.Parse(typeof(ThreadPriority), comboBoxSymbolPriority.SelectedItem.ToString());
+            symbolThread.Start();
         }
 
+        private void GenerateLetters()
+        {
+            Random random = new Random();
+            for (int i = 0; i < 100; i++)
+            {
+                char letter = (char)random.Next('A', 'Z' + 1); // Генерация заглавной буквы
+                UpdateTextBox($"Letter: {letter}");
+                Thread.Sleep(100); // Имитация длительности вычислений
+            }
+        }
+        private void GenerateSymbols()
+        {
+            Random random = new Random();
+            string symbols = "!@#$%^&*()";
+            for (int i = 0; i < 100; i++)
+            {
+                char symbol = symbols[random.Next(0, symbols.Length)]; // Генерация случайного символа
+                UpdateTextBox($"Symbol: {symbol}");
+                Thread.Sleep(100); // Имитация длительности вычислений
+            }
+        }
         private void GenerateNumbers()
         {
             Random random = new Random();
