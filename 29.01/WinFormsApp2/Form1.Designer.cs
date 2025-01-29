@@ -45,6 +45,7 @@
             buttonStartNumbers.TabIndex = 0;
             buttonStartNumbers.Text = "button1";
             buttonStartNumbers.UseVisualStyleBackColor = true;
+            buttonStartNumbers.Click += buttonStartNumbers_Click;
             // 
             // buttonStartLetters
             // 
@@ -73,7 +74,6 @@
             comboBoxNumberPriority.Name = "comboBoxNumberPriority";
             comboBoxNumberPriority.Size = new Size(242, 40);
             comboBoxNumberPriority.TabIndex = 3;
-            comboBoxNumberPriority.Click += comboBoxNumberPriority_Click;
             // 
             // comboBoxLetterPriority
             // 

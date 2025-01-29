@@ -10,8 +10,7 @@ namespace WinFormsApp2
         {
             InitializeComponent();
         }
-
-        private void comboBoxNumberPriority_Click(object sender, EventArgs e)
+        private void buttonStartNumbers_Click(object sender, EventArgs e)
         {
             Thread numberThread = new Thread(GenerateNumbers);
             numberThread.Priority = (ThreadPriority)Enum.Parse(typeof(ThreadPriority),
@@ -22,7 +21,7 @@ namespace WinFormsApp2
 
         private void buttonStartLetters_Click(object sender, EventArgs e)
         {
-            
+
         }
 
 
@@ -34,7 +33,7 @@ namespace WinFormsApp2
         private void GenerateNumbers()
         {
             Random random = new Random();
-            for(int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; i++)
             {
                 int number = random.Next(0, 100);
                 UpdateTextBox($"Number: {number}");
@@ -63,5 +62,7 @@ namespace WinFormsApp2
             comboBoxLetterPriority.SelectedIndex = 2;
             comboBoxSymbolPriority.SelectedIndex = 2;
         }
+
+        
     }
 }
