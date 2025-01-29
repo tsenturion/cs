@@ -1,0 +1,17 @@
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\bin\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.exe
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\bin\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.deps.json
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\bin\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.runtimeconfig.json
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\bin\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.dll
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\bin\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.pdb
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.Form1.resources
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.csproj.GenerateResource.cache
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.AssemblyInfoInputs.cache
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.AssemblyInfo.cs
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.csproj.CoreCompileInputs.cache
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.sourcelink.json
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.dll
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\refint\SP_HW_Modul_03_cast__02_1589199815.dll
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.pdb
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\SP_HW_Modul_03_cast__02_1589199815.genruntimeconfig.cache
+C:\Users\Nout\source\repos\cs\27.01\SP_HW_Modul_03_cast__02_1589199815\SP_HW_Modul_03_cast__02_1589199815\obj\Debug\net8.0-windows\ref\SP_HW_Modul_03_cast__02_1589199815.dll
