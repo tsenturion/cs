@@ -6,7 +6,7 @@
 		{
 			static Random rand;
 			static int objectCount = 0;
-			public int Index { get; set; }
+			public int ID { get; set; }
 			//public string Name { get; set; }
 			public int Money { get; set; }
 			private int betNumber;
@@ -32,7 +32,7 @@
 				rand = new Random((int)DateTime.Now.Ticks);
 				IsActive = false;
 				objectCount++;
-				Index = objectCount;
+				ID = objectCount;
 				//thread = new Thread(PlaceBet);
 				//thread.
 			}
@@ -55,6 +55,7 @@
 			Random rand = new Random((int)DateTime.Now.Ticks);
 			int PlayersCount { get; set; }
 			Player[] Players = null;
+			int RoundCount
 			public RouletteTable()
 			{
 				PlayersCount = 5;
@@ -69,21 +70,22 @@
 
 				//foreach
 				//Player{player.Index} bet
-				for (int i = 0; i < PlayersCount; i++)
+				//for (int i = 0; i < PlayersCount; i++)
+				foreach(Player player in Players)
 				{
-					for (int j = 0; j < PlayersCount; j++)ThreadPool.QueueUserWorkItem(Players[i].PlaceBet);
+					for (int j = 0; j < PlayersCount; j++)ThreadPool.QueueUserWorkItem(Players[j].PlaceBet);
 					//int[] PlayerBet = Players[i].PlaceBet();
-					while (!Players[i].IsActive) Thread.Sleep(20);
-					Console.WriteLine($"Player{i} bet: {Players[i].BetNumber}. Money: {Players[i].BetMoney}");
-					if (Players[i].BetNumber == WinNumber)
+					while (!player.IsActive) Thread.Sleep(20);
+					Console.WriteLine($"Player{player.ID} bet: {player.BetNumber}. Money: {player.BetMoney}");
+					if (player.BetNumber == WinNumber)
 					{
-						Players[i].Money += Players[i].BetMoney * 2;
-						Console.WriteLine($"Player{i} won! His bank is: {Players[i].Money}");
+						player.Money += player.BetMoney * 2;
+						Console.WriteLine($"Player{player.ID} won! His bank is: {player.Money}");
 					}
 					else
 					{
-						Players[i].Money -= Players[i].BetMoney;
-						Console.WriteLine($"Player{i} lost! His bank is: {Players[i].Money}");
+						player.Money -= player.BetMoney;
+						Console.WriteLine($"Player{player.ID} lost! His bank is: {player.Money}");
 					}
 
 					//int[] PlayerBet = Players[i].PlaceBet();
