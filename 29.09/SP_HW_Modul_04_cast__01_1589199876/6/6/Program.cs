@@ -5,7 +5,8 @@
 		class Player
 		{
 			static Random rand;
-			static int objectCount = 0;
+			//static int objectCount = 0;
+			public static int ObjectCount { get; set; }
 			public int ID { get; set; }
 			//public string Name { get; set; }
 			public int Money { get; set; }
@@ -31,17 +32,18 @@
 				Money = 1000;
 				rand = new Random((int)DateTime.Now.Ticks);
 				IsActive = false;
-				objectCount++;
-				ID = objectCount;
+				ObjectCount++;
+				ID = ObjectCount;
 				//thread = new Thread(PlaceBet);
 				//thread.
 			}
+			~Player() { }
 			public void PlaceBet(object a)
 			{
 				IsActive = false;
-				Thread.Sleep(rand.Next(100, 500));
+				//Thread.Sleep(rand.Next(100, 500));
 				BetNumber = rand.Next(0, 33);
-				BetMoney = rand.Next(1, 1000);
+				BetMoney = rand.Next(100, 1000);
 				IsActive = true;
 			}
 			//public int[] PlaceBet()
@@ -50,63 +52,69 @@
 			//	return [rand.Next(0, 33), rand.Next(1, Money)];
 			//}
 		}
+
 		class RouletteTable
 		{
 			Random rand = new Random((int)DateTime.Now.Ticks);
-			int PlayersCount { get; set; }
+			int TablePlayersCount { get; set; }
+			int dayPlayersCount;
+			public int DayPlayersCount { get; set; }
 			Player[] Players = null;
-			int RoundCount
+			int roundCount = 0;
 			public RouletteTable()
 			{
-				PlayersCount = 5;
-				Players = new Player[PlayersCount];
-				for (int i = 0; i < PlayersCount; i++)
+				TablePlayersCount = 5;
+				Players = new Player[TablePlayersCount];
+				for (int i = 0; i < TablePlayersCount; i++)
 					Players[i] = new Player();
+				DayPlayersCount = rand.Next(20, 101);
 			}
 			public void PlayRound()
 			{
+				StreamWriter sr = new StreamWriter($"PlayDay.txt", true);
 				int WinNumber = rand.Next(0, 33);
 				Console.WriteLine($"WinNumber: {WinNumber}");
 
-				//foreach
-				//Player{player.Index} bet
-				//for (int i = 0; i < PlayersCount; i++)
-				foreach(Player player in Players)
-				{
-					for (int j = 0; j < PlayersCount; j++)ThreadPool.QueueUserWorkItem(Players[j].PlaceBet);
-					//int[] PlayerBet = Players[i].PlaceBet();
-					while (!player.IsActive) Thread.Sleep(20);
-					Console.WriteLine($"Player{player.ID} bet: {player.BetNumber}. Money: {player.BetMoney}");
-					if (player.BetNumber == WinNumber)
+				//foreach(Player player in Players)
+				//while(dayPlayersCount > Player.ObjectCount)
+				//{
+					for (int i = 0; i < TablePlayersCount; i++)
 					{
-						player.Money += player.BetMoney * 2;
-						Console.WriteLine($"Player{player.ID} won! His bank is: {player.Money}");
+						for (int j = 0; j < TablePlayersCount; j++)ThreadPool.QueueUserWorkItem(Players[j].PlaceBet);
+						//int[] PlayerBet = Players[i].PlaceBet();
+						if (Players[i].Money > 0)
+						{
+							while (!Players[i].IsActive) Thread.Sleep(20);
+							Console.WriteLine($"Player{Players[i].ID} bet: {Players[i].BetNumber}. Money: {Players[i].BetMoney}");
+							if (Players[i].BetNumber == WinNumber)
+							{
+								Players[i].Money += Players[i].BetMoney * 2;
+								Console.WriteLine($"Player{Players[i].ID} won! His bank is: {Players[i].Money}");
+							}
+							else
+							{
+								Players[i].Money -= Players[i].BetMoney;
+								Console.WriteLine($"Player{Players[i].ID} lost! His bank is: {Players[i].Money}");
+							}
+						}
+						else
+						{
+						//записывать начальную сумму
+							sr.WriteLine($"Игрок {Players[i].ID}: Было 1000$, стало {Players[i].Money}");
+							Players[i] = new Player();
+						}
 					}
-					else
-					{
-						player.Money -= player.BetMoney;
-						Console.WriteLine($"Player{player.ID} lost! His bank is: {player.Money}");
-					}
-
-					//int[] PlayerBet = Players[i].PlaceBet();
-					//Console.WriteLine($"Player{i} bet: {PlayerBet[0]}. Money: {PlayerBet[1]}");
-					//if (PlayerBet[0] == WinNumber)
-					//{
-					//	Players[i].Money += PlayerBet[1] * 2;
-					//	Console.WriteLine($"Player{i} won! His bank is: {Players[i].Money}");
-					//}
-					//else
-					//{
-					//	Players[i].Money -= PlayerBet[1];
-					//	Console.WriteLine($"Player{i} lost! His bank is: {Players[i].Money}");
-					//}
-				}
+					roundCount++;
+				//}
+				sr.Close();
 			}
 		}
 		static void Main()
 		{
 			RouletteTable table = new();
-			table.PlayRound();
+			Console.WriteLine($"Сегодня играют {table.DayPlayersCount} человек");
+			while(table.DayPlayersCount > Player.ObjectCount)table.PlayRound();
+			Console.WriteLine("День окончен! Всем спасибо за денежки");
 		}
 	}
 }
