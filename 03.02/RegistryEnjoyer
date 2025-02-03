@@ -16,7 +16,12 @@ internal class Program
         newSubKey.SetValue("", "Это тестовый ключ");
         newSubKey.SetValue("TestString", "Hello, World!", RegistryValueKind.String);
         newSubKey.SetValue("TestInt", 42, RegistryValueKind.DWord);
-        string path = newSubKey.ToString();
+        
+        Console.WriteLine($"Value in branch {newSubKey.Name}:");
+
+        Console.WriteLine($"Value default {(string)(newSubKey.GetValue("") != null ? newSubKey.GetValue("") : "нет указанного значения")}");        
+        Console.WriteLine($"Value TestString {(string)(newSubKey.GetValue("TestString") != null ? newSubKey.GetValue("TestString") : "нет указанного значения")}");
+        Console.WriteLine($"Value TestInt {(newSubKey.GetValue("TestInt") != null ? newSubKey.GetValue("TestInt") : "нет указанного значения").ToString()}");
 
         newSubKey.Close();
 
