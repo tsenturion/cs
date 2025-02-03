@@ -23,6 +23,18 @@ internal class Program
         Console.WriteLine($"Value TestString {(string)(newSubKey.GetValue("TestString") != null ? newSubKey.GetValue("TestString") : "нет указанного значения")}");
         Console.WriteLine($"Value TestInt {(newSubKey.GetValue("TestInt") != null ? newSubKey.GetValue("TestInt") : "нет указанного значения").ToString()}");
 
+        newSubKey.SetValue("TestString", "Измененное значение", RegistryValueKind.String);
+        newSubKey.SetValue("TestInt", 100, RegistryValueKind.DWord);
+
+        Console.WriteLine($"Value in branch {newSubKey.Name}:");
+
+        Console.WriteLine($"Value TestString {(string)(newSubKey.GetValue("TestString") != null ? newSubKey.GetValue("TestString") : "нет указанного значения")}");
+        Console.WriteLine($"Value TestInt {(newSubKey.GetValue("TestInt") != null ? newSubKey.GetValue("TestInt") : "нет указанного значения").ToString()}");
+
+        newSubKey.DeleteValue("TestString");
+
+        Console.WriteLine($"Value TestString after delete {(string)(newSubKey.GetValue("TestString") != null ? newSubKey.GetValue("TestString") : "нет указанного значения")}");
+
         newSubKey.Close();
 
         // Удаление
