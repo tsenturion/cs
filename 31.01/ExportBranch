@@ -1,0 +1,50 @@
+using System;
+using Microsoft.Win32;
+using static System.Console;
+using System.ServiceProcess;
+using System.Diagnostics;
+
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+        ExportBranch();
+    }
+    public static void ExportBranch()
+    {
+        
+            try
+            {
+                //бекап ветки реестра    
+
+                RegistryKey brachBackup = Registry.Users.OpenSubKey(".DEFAULT\\Environment");
+
+                string pathToSave = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders").GetValue("Desktop").ToString();
+
+                Process backupProc = Process.Start("regedit.exe", "/e " + pathToSave + "\\Backup_registry_branch.reg" + " " + brachBackup.ToString());
+
+                backupProc.WaitForExit();
+                
+
+            }
+            catch (System.Security.SecurityException e)
+            {
+                WriteLine($"{e.Message} - необходимо запускать приложение под правами администратора системы");
+
+                
+
+            }
+            catch (Exception e)
+            {
+                WriteLine($"Неизвестное исключение {e.Message}");
+
+                
+
+            }
+
+            WriteLine("\nНажмите любую клавишу для продолжения...");
+            ReadKey();       
+
+    }
+
+}
