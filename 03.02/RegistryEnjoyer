@@ -1,0 +1,32 @@
+using System;
+using Microsoft.Win32;
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+        CreateTestBranch();
+    }
+
+    public static void CreateTestBranch()
+    {
+        RegistryKey brachSoftware = Registry.CurrentUser.OpenSubKey("Software", true);
+
+        RegistryKey newSubKey = brachSoftware.CreateSubKey("MyRegistryTest");
+
+        newSubKey.SetValue("", "Это тестовый ключ");
+        newSubKey.SetValue("TestString", "Hello, World!", RegistryValueKind.String);
+        newSubKey.SetValue("TestInt", 42, RegistryValueKind.DWord);
+        string path = newSubKey.ToString();
+
+        newSubKey.Close();
+
+        // Удаление
+        Registry.CurrentUser.DeleteSubKey("Software\\MyRegistryTest");
+
+
+
+
+
+    }
+
+}
