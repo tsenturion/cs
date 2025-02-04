@@ -43,6 +43,27 @@ namespace WinFormsApp2
             symbolThread.Start();
         }
 
+        private void GenerateLetters()
+        {
+            Random random = new Random();
+            for (int i = 0; i < 100; i++)
+            {
+                char letter = (char)random.Next('A', 'Z' + 1); // Генерация заглавной буквы
+                UpdateTextBox($"Letter: {letter}");
+                Thread.Sleep(100); // Имитация длительности вычислений
+            }
+        }
+        private void GenerateSymbols()
+        {
+            Random random = new Random();
+            string symbols = "!@#$%^&*()";
+            for (int i = 0; i < 100; i++)
+            {
+                char symbol = symbols[random.Next(0, symbols.Length)]; // Генерация случайного символа
+                UpdateTextBox($"Symbol: {symbol}");
+                Thread.Sleep(100); // Имитация длительности вычислений
+            }
+        }
         private void GenerateNumbers()
         {
             Random random = new Random();
