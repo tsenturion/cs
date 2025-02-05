@@ -1,0 +1,17 @@
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\bin\Debug\net8.0-windows\1-3.exe
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\bin\Debug\net8.0-windows\1-3.deps.json
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\bin\Debug\net8.0-windows\1-3.runtimeconfig.json
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\bin\Debug\net8.0-windows\1-3.dll
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\bin\Debug\net8.0-windows\1-3.pdb
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\_1_3.Form1.resources
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\1-3.csproj.GenerateResource.cache
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\1-3.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\1-3.AssemblyInfoInputs.cache
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\1-3.AssemblyInfo.cs
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\1-3.csproj.CoreCompileInputs.cache
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\1-3.sourcelink.json
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\1-3.dll
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\refint\1-3.dll
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\1-3.pdb
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\1-3.genruntimeconfig.cache
+C:\Users\Nout\source\repos\cs\03.02\SP_HW_Modul_05_cast__01_1589199985\1-3\obj\Debug\net8.0-windows\ref\1-3.dll
