@@ -1,0 +1,15 @@
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\bin\Debug\net8.0\Registry.exe
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\bin\Debug\net8.0\Registry.deps.json
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\bin\Debug\net8.0\Registry.runtimeconfig.json
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\bin\Debug\net8.0\Registry.dll
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\bin\Debug\net8.0\Registry.pdb
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\Registry.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\Registry.AssemblyInfoInputs.cache
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\Registry.AssemblyInfo.cs
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\Registry.csproj.CoreCompileInputs.cache
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\Registry.sourcelink.json
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\Registry.dll
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\refint\Registry.dll
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\Registry.pdb
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\Registry.genruntimeconfig.cache
+C:\Users\Nout\source\repos\cs\03.02\PZ\Registry\obj\Debug\net8.0\ref\Registry.dll

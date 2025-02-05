@@ -1,0 +1,78 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Nout\\source\\repos\\cs\\03.02\\PZ\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{E304325C-40F5-4734-8F23-FF1382A16DB1}|Tasks\\Tasks.csproj|c:\\users\\nout\\source\\repos\\cs\\03.02\\pz\\tasks\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E304325C-40F5-4734-8F23-FF1382A16DB1}|Tasks\\Tasks.csproj|solutionrelative:tasks\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2E66BF9C-9AD7-462B-B855-9FD6B5581C31}|Registry\\Registry.csproj|c:\\users\\nout\\source\\repos\\cs\\03.02\\pz\\registry\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{2E66BF9C-9AD7-462B-B855-9FD6B5581C31}|Registry\\Registry.csproj|solutionrelative:registry\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 1,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedHeight": 384,
+          "SelectedChildIndex": 6,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{e5c86464-96be-4d7c-9a8b-abcb3bbf5f92}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:130:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\Nout\\source\\repos\\cs\\03.02\\PZ\\Tasks\\Program.cs",
+              "RelativeDocumentMoniker": "Tasks\\Program.cs",
+              "ToolTip": "C:\\Users\\Nout\\source\\repos\\cs\\03.02\\PZ\\Tasks\\Program.cs",
+              "RelativeToolTip": "Tasks\\Program.cs",
+              "ViewState": "AgIAACkAAAAAAAAAAAAgwDMAAAANAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-03T17:04:19.013Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\Nout\\source\\repos\\cs\\03.02\\PZ\\Registry\\Program.cs",
+              "RelativeDocumentMoniker": "Registry\\Program.cs",
+              "ToolTip": "C:\\Users\\Nout\\source\\repos\\cs\\03.02\\PZ\\Registry\\Program.cs",
+              "RelativeToolTip": "Registry\\Program.cs",
+              "ViewState": "AgIAAAcAAAAAAAAAAAAgwAoAAAAbAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-03T16:34:13.574Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

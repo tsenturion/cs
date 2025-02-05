@@ -1,0 +1,15 @@
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\bin\Debug\net8.0\Tasks.exe
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\bin\Debug\net8.0\Tasks.deps.json
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\bin\Debug\net8.0\Tasks.runtimeconfig.json
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\bin\Debug\net8.0\Tasks.dll
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\bin\Debug\net8.0\Tasks.pdb
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\Tasks.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\Tasks.AssemblyInfoInputs.cache
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\Tasks.AssemblyInfo.cs
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\Tasks.csproj.CoreCompileInputs.cache
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\Tasks.sourcelink.json
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\Tasks.dll
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\refint\Tasks.dll
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\Tasks.pdb
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\Tasks.genruntimeconfig.cache
+C:\Users\Nout\source\repos\cs\03.02\PZ\Tasks\obj\Debug\net8.0\ref\Tasks.dll
