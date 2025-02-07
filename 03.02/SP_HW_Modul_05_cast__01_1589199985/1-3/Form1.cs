@@ -7,13 +7,18 @@ namespace _1_3
 	{
 		const string DEFAULT_TEXT = "Ќа краю дороги сто€л дуб. ¬еро€тно, в дес€ть раз старше берез, составл€вших лес, он был в дес€ть раз толще, и в два раза выше каждой березы. Ёто был огромный, в два обхвата дуб, с обломанными, давно, видно, суками и с обломанной корой, заросшей старыми бол€чками. — огромными своими неуклюже, несимметрично растопыренными кор€выми руками и пальцами, он старым, сердитым и презрительным уродом сто€л между улыбающимис€ березами. “олько он один не хотел подчин€тьс€ оба€нию весны и не хотел видеть ни весны, ни солнца.";
 		Action countWords;
+		CancellationTokenSource cts;
+		CancellationToken ct;
 		
 		public Form1()
 		{
 			InitializeComponent();
 			richTextBox1.Text = DEFAULT_TEXT;
 			countWords = new Action(delegate { ChangeLabelSentences(""); });
+			cts = new CancellationTokenSource();
+			ct = cts.Token;
 		}
+		string GetText() { return richTextBox1.Text; }
 		void ChangeLabelSentences(string text)
 		{
 			labelSentences.Text = text;
@@ -26,7 +31,7 @@ namespace _1_3
 			labelWords.Invoke(delegate { labelWords.Text = " оличество слов: " + temp; });
 		});
 
-		Task countSentencesTask = new Task(delegate
+		Task countSentencesTask = new Task(() =>
 		{
 			string temp = "";
 			temp = DEFAULT_TEXT.Split(['.', '!', '?'], StringSplitOptions.RemoveEmptyEntries).Length.ToString();
