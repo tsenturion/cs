@@ -1,0 +1,15 @@
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\bin\Debug\net8.0\Parallel 4.exe
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\bin\Debug\net8.0\Parallel 4.deps.json
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\bin\Debug\net8.0\Parallel 4.runtimeconfig.json
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\bin\Debug\net8.0\Parallel 4.dll
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\bin\Debug\net8.0\Parallel 4.pdb
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\Parallel 4.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\Parallel 4.AssemblyInfoInputs.cache
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\Parallel 4.AssemblyInfo.cs
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\Parallel 4.csproj.CoreCompileInputs.cache
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\Parallel 4.sourcelink.json
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\Parallel 4.dll
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\refint\Parallel 4.dll
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\Parallel 4.pdb
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\Parallel 4.genruntimeconfig.cache
+C:\Users\Nout\source\repos\cs\07.02\PZ\Parallel 4\obj\Debug\net8.0\ref\Parallel 4.dll
