@@ -17,7 +17,7 @@ namespace TestClient
         {
             InitializeComponent();
         }
-
+        
         private void button1_Click(object sender, EventArgs e)
         {
             IPAddress ip = Dns.GetHostAddresses("microsoft.com")[0];
