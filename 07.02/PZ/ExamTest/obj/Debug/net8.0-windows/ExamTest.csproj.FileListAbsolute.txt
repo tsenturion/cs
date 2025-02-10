@@ -1,0 +1,17 @@
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\bin\Debug\net8.0-windows\ExamTest.exe
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\bin\Debug\net8.0-windows\ExamTest.deps.json
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\bin\Debug\net8.0-windows\ExamTest.runtimeconfig.json
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\bin\Debug\net8.0-windows\ExamTest.dll
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\bin\Debug\net8.0-windows\ExamTest.pdb
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.Form1.resources
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.csproj.GenerateResource.cache
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.AssemblyInfoInputs.cache
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.AssemblyInfo.cs
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.csproj.CoreCompileInputs.cache
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.sourcelink.json
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.dll
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\refint\ExamTest.dll
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.pdb
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ExamTest.genruntimeconfig.cache
+C:\Users\Nout\source\repos\cs\07.02\PZ\ExamTest\obj\Debug\net8.0-windows\ref\ExamTest.dll
