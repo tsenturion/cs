@@ -1,0 +1,9 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\1_2\TestClient\bin\Debug\TestClient.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\1_2\TestClient\bin\Debug\TestClient.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\1_2\TestClient\obj\Debug\TestClient.csproj.AssemblyReference.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\1_2\TestClient\obj\Debug\TestClient.Form1.resources
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\1_2\TestClient\obj\Debug\TestClient.Properties.Resources.resources
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\1_2\TestClient\obj\Debug\TestClient.csproj.GenerateResource.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\1_2\TestClient\obj\Debug\TestClient.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\1_2\TestClient\obj\Debug\TestClient.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\1_2\TestClient\obj\Debug\TestClient.pdb
