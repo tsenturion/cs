@@ -76,16 +76,26 @@ namespace TestUDP
             }
             catch (SocketException ex)
             { 
+                // Выводим информацию об ошибке
+                MessageBox.Show(ex.Message);
             }
 
         }
         private void button2_Click(object sender, EventArgs e)
         {
+            // Отключаем прием данных на сокете
             socket.Shutdown(SocketShutdown.Receive);
+
+            // Закрываем сокет, освобождая связанные с ним системные ресурсы
             socket.Close();
+
+            // Устанавливаем переменную socket в null, указывая, что сокет больше не используется
             socket = null;
+
+            // Очищаем содержимое текстового поля
             textBox1.Text = "";
         }
+
         private void button3_Click(object sender, EventArgs e)
         {
             textBox1.Text = "";

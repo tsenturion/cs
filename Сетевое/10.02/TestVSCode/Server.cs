@@ -9,32 +9,69 @@ namespace TestVSCode
     {
         static void Main(string[] args)
         {
-            string ipAddress = "127.0.0.1";
-            int port = 12345;
-
-            Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-            IPEndPoint ipEndPoint = new IPEndPoint(IPAddress.Parse(ipAddress), port);
-            serverSocket.Bind(ipEndPoint);
-
-            serverSocket.Listen(1);
-            Console.WriteLine("Ожидаю подключения клиента...");
-
-            Socket clientSocket = serverSocket.Accept();
-            Console.WriteLine("Клиент подключен: " + clientSocket.RemoteEndPoint.ToString());
-
-            byte[] buffer = new byte[1024];
-            int receivedBytes = clientSocket.Receive(buffer);
-            string receivedMessage = Encoding.ASCII.GetString(buffer, 0, receivedBytes);
-
-            Console.WriteLine($"Сервер:\nВ {DateTime.Now:HH:mm} от {clientSocket.RemoteEndPoint} получена строка: {receivedMessage}");
-
-            string response = "hi, client!";
-            clientSocket.Send(Encoding.ASCII.GetBytes(response));
-
-            clientSocket.Shutdown(SocketShutdown.Both);
-            clientSocket.Close();
-            serverSocket.Close();
+            TcpListener server = new TcpListener(IPAddress.Any, 5000);
+            server.Start();
+            Console.WriteLine("Server started on port 5000...");
+            while (true)
+            {
+                TcpClient client = server.AcceptTcpClient();
+                Thread clientThread = new Thread(HandleClient);
+                clientThread.Start(client);
+            }
+    
         }
+        
+        private static void HandleClient(object obj)
+        {
+            TcpClient client = (TcpClient)obj;
+            string clientEndPoint = client.Client.RemoteEndPoint.ToString();
+            DateTime connectedTime = DateTime.Now;
+            lock (logLock)
+            {
+                connectionLogs.Add($"[{connectedTime.ToShortTimeString()}] {clientEndPoint} connected.");
+                Console.WriteLine($"[{connectedTime.ToShortTimeString()}] {clientEndPoint} connected.");
+            }
+            
+            NetworkStream stream = client.GetStream();
+            StreamWriter writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
+            StreamReader reader = new StreamReader(stream, Encoding.UTF8);
+        
+            try{
+                string request;
+                while ((request = reader.ReadLine())!= null)
+                {
+                    if (request.ToLower() == "exit")
+                    {
+                        break;
+                    }
+                    Random rand = new Random();
+                    string quote = quotes[rand.Next(quotes.Count)];
+                    writer.WriteLine(quote);
+                }
+            }
+            finally
+            {
+                DateTime disconnectedTime = DateTime.Now;
+                lock (logLock)
+                {
+                    connectionLogs.Add($"[{disconnectedTime.ToShortTimeString()}] {clientEndPoint} disconnected.");
+                    Console.WriteLine($"[{disconnectedTime.ToShortTimeString()}] {clientEndPoint} disconnected.");
+                }
+                
+                Console.WriteLine("Client disconnected...");
+                client.Close();
+            }
+        }
+        
+        private static List<string> quotes = new List<string>
+        {
+            "The future belongs to those who believe in the beauty of their dreams.",
+            "Believe you can and you're halfway there.",
+            "Success is not final, failure is not fatal: It is the courage to continue that counts."
+        };
+
+        private static List<string> connectionLogs = new List<string>();
+        
+        private static readonly object logLock = new object();
     }
 }
