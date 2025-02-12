@@ -8,6 +8,9 @@ namespace TestVSCode
     class Program
     {
         private static int MaxQuotesCount = 5;
+
+        private const int MaxConnections = 3;
+        private static int currentConnections = 0;
         static void Main(string[] args)
         {
             TcpListener server = new TcpListener(IPAddress.Any, 5000);
@@ -16,6 +19,16 @@ namespace TestVSCode
             while (true)
             {
                 TcpClient client = server.AcceptTcpClient();
+                if (currentConnections >= MaxConnections)
+                {
+                    NetworkStream stream = client.GetStream();
+                    StreamWriter writer = new StreamWriter(stream, Encoding.UTF8) {AutoFlush = true};
+                    writer.WriteLine("Server is full. Please try again later.");
+                    client.Close();
+                    continue;
+                }
+                Interlocked.Increment(ref currentConnections);
+
                 Thread clientThread = new Thread(HandleClient);
                 clientThread.Start(client);
             }
@@ -66,7 +79,7 @@ namespace TestVSCode
                     connectionLogs.Add($"[{disconnectedTime.ToShortTimeString()}] {clientEndPoint} disconnected.");
                     Console.WriteLine($"[{disconnectedTime.ToShortTimeString()}] {clientEndPoint} disconnected.");
                 }
-                
+                Interlocked.Decrement(ref currentConnections);
                 Console.WriteLine("Client disconnected...");
                 client.Close();
             }
