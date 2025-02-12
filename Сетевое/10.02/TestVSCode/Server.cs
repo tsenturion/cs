@@ -7,6 +7,7 @@ namespace TestVSCode
 {
     class Program
     {
+        private static int MaxQuotesCount = 5;
         static void Main(string[] args)
         {
             TcpListener server = new TcpListener(IPAddress.Any, 5000);
@@ -35,13 +36,20 @@ namespace TestVSCode
             NetworkStream stream = client.GetStream();
             StreamWriter writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
             StreamReader reader = new StreamReader(stream, Encoding.UTF8);
-        
+
+            int quoteCount = 0;
+
             try{
                 string request;
                 while ((request = reader.ReadLine())!= null)
                 {
                     if (request.ToLower() == "exit")
                     {
+                        break;
+                    }
+                    if (quoteCount >= MaxQuotesCount)
+                    {
+                        writer.WriteLine("Quotes limit reached. Please try again later.");
                         break;
                     }
                     Random rand = new Random();

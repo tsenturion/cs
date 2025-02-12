@@ -107,6 +107,11 @@ namespace TestVSCode2
                     }
                     
                     string quote = reader.ReadLine();
+                    if (quote == "Quotes limit reached. Please try again later.")
+                    {
+                        Console.WriteLine(quote);
+                        break;
+                    }
                     Console.WriteLine($"Received quote: {quote}");
                 }
                 
