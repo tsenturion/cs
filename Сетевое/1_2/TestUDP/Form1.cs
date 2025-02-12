@@ -30,7 +30,7 @@ namespace TestUDP
         // Метод для добавления текста в textBox1
         void AddText(String text)
         {
-            textBox1.Text += text;
+            textBox1.AppendText(text);
         }
 
         // Функция приема сообщений, выполняемая в отдельном потоке
@@ -46,6 +46,9 @@ namespace TestUDP
                 String strClientIP = ((IPEndPoint)ep).Address.ToString();
                 String str = String.Format("\nReceived from {0}\r\n{1}\r\n", 
                     strClientIP, System.Text.Encoding.Unicode.GetString(buffer, 0, l));
+
+                Console.WriteLine(str);
+
                 textBox1.BeginInvoke(new AddTextDelegate(AddText), str);
             } while (true);
         }
@@ -58,7 +61,7 @@ namespace TestUDP
 
             // Создание и настройка сокета
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.IP);
-            socket.Bind(new IPEndPoint(IPAddress.Parse("10.2.21.129"), 100));
+            socket.Bind(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 100));
 
             // Запуск потока для приема сообщений
             thread = new System.Threading.Thread(RecivFunction);
@@ -91,7 +94,7 @@ namespace TestUDP
         {
             // Отправка сообщения через UDP
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.IP);
-            socket.SendTo(System.Text.Encoding.Unicode.GetBytes(textBox2.Text), new IPEndPoint(IPAddress.Parse("10.2.21.255"), 100));
+            socket.SendTo(System.Text.Encoding.Unicode.GetBytes(textBox2.Text), new IPEndPoint(IPAddress.Parse("127.0.0.1"), 100));
             socket.Shutdown(SocketShutdown.Send);
             socket.Close();
         }
