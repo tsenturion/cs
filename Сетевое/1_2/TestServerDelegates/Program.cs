@@ -67,7 +67,8 @@ namespace TestServerDelegates
                     socket = null;
                 }
                 catch (SocketException ex)
-                { 
+                {
+                    Console.WriteLine(ex.Message);
                 }
             }
         }
