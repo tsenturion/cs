@@ -55,6 +55,7 @@ namespace TestVSCode
                     Random rand = new Random();
                     string quote = quotes[rand.Next(quotes.Count)];
                     writer.WriteLine(quote);
+                    quoteCount++;
                 }
             }
             finally
