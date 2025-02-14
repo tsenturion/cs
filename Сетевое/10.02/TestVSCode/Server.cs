@@ -7,6 +7,9 @@ namespace TestVSCode
 {
     class Program
     {
+        static Dictionary<string, DateTime> clientLastActivity = new Dictionary<string, DateTime>();
+        static TimeSpan inactivityLimit = TimeSpan.FromMinutes(10);
+        static int maxConcurrentClients = 5;
         static Dictionary<string, List<DateTime>> clientsRequests = new Dictionary<string, List<DateTime>>();
         static int maxRequestedPerHour = 10;
         static TimeSpan timeFrame = TimeSpan.FromHours(1);
@@ -16,16 +19,26 @@ namespace TestVSCode
             UdpClient udpServer = new UdpClient(port);
             Console.WriteLine("server active");
             IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, port);
+            Thread inactivityCheckThread = new Thread(CheckForInactiveClients);
+            inactivityCheckThread.IsBackground = true;
+            inactivityCheckThread.Start();
             while (true)
             {
                 try{
+                    string clientAddress = remoteEndPoint.ToString();
                     byte[] recivedBytes = udpServer.Receive(ref remoteEndPoint);
                     string recivedData = Encoding.UTF8.GetString(recivedBytes);
                     Console.WriteLine("Received from {0}:{1}: {2}", remoteEndPoint.Address, remoteEndPoint.Port, recivedData);
                     
-                    if (!isRequestAllowed(remoteEndPoint.ToString()))
+                    if (!IsRequestAllowed(remoteEndPoint.ToString()))
                     {
                         string response = "limit is out of range";
+                        byte[] responseBytes = Encoding.UTF8.GetBytes(response);
+                        udpServer.Send(responseBytes, responseBytes.Length, remoteEndPoint);
+                        Console.WriteLine("Sent to {0}:{1}: {2}", remoteEndPoint.Address, remoteEndPoint.Port, response);
+                    }
+                    else if (!IsClentAllowed(clientAddress)) {
+                        string response = "limit is exceeded for this client";
                         byte[] responseBytes = Encoding.UTF8.GetBytes(response);
                         udpServer.Send(responseBytes, responseBytes.Length, remoteEndPoint);
                         Console.WriteLine("Sent to {0}:{1}: {2}", remoteEndPoint.Address, remoteEndPoint.Port, response);
@@ -43,8 +56,45 @@ namespace TestVSCode
                 }
             }
         }
+        
+        static bool IsClentAllowed(string clientAddress)
+        {
+            if (!clientLastActivity.ContainsKey(clientAddress))
+            {
+                clientLastActivity[clientAddress] = DateTime.Now;
+                return true;
+            }
+            if (clientLastActivity.Count >= maxConcurrentClients)
+            {
+                return false;
+            }
+            return true;
+        }
 
-        static bool isRequestAllowed(string clientAddress)
+        static void CheckForInactiveClients()
+        {
+            while (true)
+            {
+                try {
+                    foreach (var clint in new List<string>(clientLastActivity.Keys))
+                    {
+                        if (DateTime.Now - clientLastActivity[clint] > inactivityLimit)
+                        {
+                            clientLastActivity.Remove(clint);
+                            clientsRequests.Remove(clint);
+                            Console.WriteLine($"Client {clint} inactive. Removed from list.");
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+                Thread.Sleep(10000); // check every 10 seconds
+            }
+        }
+
+        static bool IsRequestAllowed(string clientAddress)
         {
             if (!clientsRequests.ContainsKey(clientAddress))
             {
