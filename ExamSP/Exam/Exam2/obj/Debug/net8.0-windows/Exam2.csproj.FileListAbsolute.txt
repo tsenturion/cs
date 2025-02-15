@@ -1,0 +1,17 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\bin\Debug\net8.0-windows\Exam2.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\bin\Debug\net8.0-windows\Exam2.deps.json
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\bin\Debug\net8.0-windows\Exam2.runtimeconfig.json
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\bin\Debug\net8.0-windows\Exam2.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\bin\Debug\net8.0-windows\Exam2.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.Form1.resources
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.csproj.GenerateResource.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.GeneratedMSBuildEditorConfig.editorconfig
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.AssemblyInfoInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.AssemblyInfo.cs
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.sourcelink.json
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\refint\Exam2.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\Exam2.genruntimeconfig.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\ExamSP\Exam\Exam2\obj\Debug\net8.0-windows\ref\Exam2.dll
