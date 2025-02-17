@@ -4,7 +4,6 @@ using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using Collections.Generic;
 
 namespace TestVSCode
 {
@@ -14,6 +13,7 @@ namespace TestVSCode
         static string infoMessage = "infoMessage";
         static string wariningMessage = "wariningMessage";
         static string urgentMessage = "urgentMessage";
+        static Dictionary<Socket, List<MessageType>> clientSubscriptions = new Dictionary<Socket, List<MessageType>>();
         enum MessageType 
         {
             Information,
@@ -24,46 +24,46 @@ namespace TestVSCode
         static int interval = 5000;
         static void Main(string[] args)
         {
-            Thread sendThread = new Thread(SendMulticastMessage);
-            sendThread.IsBackground = true;
-            sendThread.Start();
-            Console.ReadKey();
-        }
-        
-        static void SendMulticastMessage() {
+            Socket listenerSocket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram, ProtocolType.Udp);
+            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Any, 4567);
+            listenerSocket.Bind(localEndPoint);
+            Console.WriteLine("server started");
             while (true)
             {
-                Thread.Sleep(interval);
-                string messageToSend = infoMessage;
-                Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 2);
-                IPAddress multicastAddress = IPAddress.Parse("224.5.5.5");
-                IPEndPoint endPoint = new IPEndPoint(multicastAddress, 4567);
-                byte[] messageBytes = Encoding.Default.GetBytes(messageToSend);
-                socket.SendTo(messageBytes, endPoint);
-                socket.Close();
-                Console.WriteLine($"Sent: {messageToSend}");
+                Socket clientSocket = listenerSocket.Accept();
+                List<MessageType> subscription = new List<MessageType> { MessageType.Information, MessageType.Warning};
+                SubscribeClient(clientSocket, subscription);
+                Console.WriteLine("client subscribed");
+                SendMessageToClient(clientSocket, infoMessage);
+                SendMessageToClient(clientSocket, wariningMessage);
+                SendUrgentMessage(urgentMessage);
             }
         }
-
-        static void SubscribeClient(Socket clientSocket, MessageType subsctiptionType)
+        static void SendMessageToClient(Socket clientSocket, string message)
         {
-            clients.Add(clientSocket);
-            if (subsctiptionType == MessageType.Urgent)
+            List<MessageType> subsctiptions = clientSubscriptions[clientSocket];
+            if (message == "urgentMessage" || subsctiptions.Contains(MessageType.Information))
             {
-                SendUrgentMessage(clientSocket);
+                byte[] messageBytes = Encoding.Default.GetBytes(message);
+                clientSocket.Send(messageBytes);
+                Console.WriteLine($"sent message {message} to client");
             }
         }
 
-        static void SendUrgentMessage(Socket clientSocket)
+        static void SubscribeClient(Socket clientSocket, List<MessageType> subsctiptionTypes)
         {
-            string urgentMessage = "urgentMessage";
+            clientSubscriptions[clientSocket] = subsctiptionTypes;
+        }
+
+        static void SendUrgentMessage(string urgentMessage)
+        {
             byte[] messageBytes = Encoding.Default.GetBytes(urgentMessage);
-            foreach (var clint in clients)
+
+            foreach (var clint in clientSubscriptions.Keys)
             {
                 clint.Send(messageBytes);
             }
-            Console.WriteLine("Sent urgent message");
+            Console.WriteLine("Sent urgent message for all");
         }
             
     }
