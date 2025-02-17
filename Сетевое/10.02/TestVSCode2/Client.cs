@@ -9,28 +9,22 @@ namespace TestVSCode2
     {
         static void Main(string[] args)
         {
-            string serverAdress = "127.0.0.1";
-            int port = 11000;
-            UdpClient udpClient = new UdpClient();
-            IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Parse(serverAdress), port);
+            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Any, 4567);
+            socket.Bind(localEndPoint);
+
+            IPAddress multicastAddress = IPAddress.Parse("224.5.5.5");
+            socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddress, IPAddress.Any));
+            byte[] buffer = new byte[1024];
             
-            Console.WriteLine("client active, enter query");
+            Console.WriteLine("client start");
+
             while (true)
             {
-                Console.Write("query");
-                string query = Console.ReadLine();
-                if (query == "exit")
-                {
-                    break;
-                }
-                byte[] requestedBytes = Encoding.UTF8.GetBytes(query);
-                udpClient.Send(requestedBytes, requestedBytes.Length, serverEndPoint);
-
-                byte[] responseBytes = udpClient.Receive(ref serverEndPoint);
-                string response = Encoding.UTF8.GetString(responseBytes);
-                Console.WriteLine($"Server response: {response}");
+                int bytesReceived = socket.Receive(buffer);
+                string message = Encoding.Default.GetString(buffer, 0, bytesReceived);
+                Console.WriteLine($"Received: {message}");
             }
-            udpClient.Close();
         }
     }
 }
