@@ -13,11 +13,13 @@ namespace MailSender
 {
     public partial class Form1 : Form
     {
+        string server="100.30.0.30";// sets the server address
+
         public Form1()
         {
             InitializeComponent();
         }
-        string server="100.30.0.30";// sets the server address
+        
         private void button2_Click(object sender, EventArgs e)
         {
            // create a message object
@@ -40,6 +42,10 @@ namespace MailSender
         private void button3_Click(object sender, EventArgs e)
         {
             // here you need to clear all fields of the form and the content of the MailMessage object
+            fromBpx.Clear();
+            toBox.Clear();
+            themeBox.Clear();
+            bodyBox.Clear();
         }
     }
 }
