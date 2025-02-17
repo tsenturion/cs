@@ -1,6 +1,8 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35521.163 d17.12
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MulticastServer", "MulticastServer\MulticastServer.csproj", "{D6AE3C9F-0B4D-4EFC-87F9-D99E924E7F7F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MulticastClient", "MulticastClient\MulticastClient.csproj", "{0CC1BF65-E629-4C0D-804B-7D09BE02155A}"
