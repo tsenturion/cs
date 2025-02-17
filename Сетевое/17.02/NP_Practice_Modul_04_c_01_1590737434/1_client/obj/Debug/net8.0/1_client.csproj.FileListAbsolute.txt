@@ -1,0 +1,15 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\bin\Debug\net8.0\1_client.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\bin\Debug\net8.0\1_client.deps.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\bin\Debug\net8.0\1_client.runtimeconfig.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\bin\Debug\net8.0\1_client.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\bin\Debug\net8.0\1_client.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\1_client.GeneratedMSBuildEditorConfig.editorconfig
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\1_client.AssemblyInfoInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\1_client.AssemblyInfo.cs
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\1_client.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\1_client.sourcelink.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\1_client.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\refint\1_client.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\1_client.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\1_client.genruntimeconfig.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1_client\obj\Debug\net8.0\ref\1_client.dll

@@ -1,0 +1,15 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\bin\Debug\net8.0\1_server.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\bin\Debug\net8.0\1_server.deps.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\bin\Debug\net8.0\1_server.runtimeconfig.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\bin\Debug\net8.0\1_server.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\bin\Debug\net8.0\1_server.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\1_server.GeneratedMSBuildEditorConfig.editorconfig
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\1_server.AssemblyInfoInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\1_server.AssemblyInfo.cs
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\1_server.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\1_server.sourcelink.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\1_server.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\refint\1_server.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\1_server.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\1_server.genruntimeconfig.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\17.02\NP_Practice_Modul_04_c_01_1590737434\1\obj\Debug\net8.0\ref\1_server.dll
