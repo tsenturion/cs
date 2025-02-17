@@ -28,17 +28,54 @@ namespace TestVSCode
             IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Any, 4567);
             listenerSocket.Bind(localEndPoint);
             Console.WriteLine("server started");
+            Thread clienListenerThread = new Thread (() =>
+            {
+                while (true)
+                {
+                    Socket clientSocket = listenerSocket.Accept();
+                    List<MessageType> subscription = new List<MessageType> { MessageType.Information, MessageType.Warning};
+                    SubscribeClient(clientSocket, subscription);
+                    Console.WriteLine("client subscribed");
+                    SendMessageToClient(clientSocket, infoMessage);
+                    SendMessageToClient(clientSocket, wariningMessage);
+                    SendUrgentMessage(urgentMessage);
+                }
+            });
+            clienListenerThread.Start();
             while (true)
             {
-                Socket clientSocket = listenerSocket.Accept();
-                List<MessageType> subscription = new List<MessageType> { MessageType.Information, MessageType.Warning};
-                SubscribeClient(clientSocket, subscription);
-                Console.WriteLine("client subscribed");
-                SendMessageToClient(clientSocket, infoMessage);
-                SendMessageToClient(clientSocket, wariningMessage);
-                SendUrgentMessage(urgentMessage);
+                Console.WriteLine("clientSocket to remove or exit");
+                string input = Console.ReadLine();
+                if (input == "exit")
+                {
+                    break;
+                }
+                if (RemoveClintFromSubscription(input))
+                {
+                    Console.WriteLine("client removed");
+                }
+                else{
+                    Console.WriteLine("client not found");
+                }
+
             }
+        
         }
+        static bool RemoveClintFromSubscription(string clientAddress)
+        {
+            foreach (var client in clientSubscriptions.Keys)
+            {
+                IPEndPoint clientEndPoint = (IPEndPoint)client.RemoteEndPoint;
+                if (clientEndPoint.Address.ToString() == clientAddress)
+                {
+                    clientSubscriptions.Remove(client);
+                    client.Close();
+                    return true;
+                }
+            }
+            return false;
+        }
+        
         static void SendMessageToClient(Socket clientSocket, string message)
         {
             List<MessageType> subsctiptions = clientSubscriptions[clientSocket];
