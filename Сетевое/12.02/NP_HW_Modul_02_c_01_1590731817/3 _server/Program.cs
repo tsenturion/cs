@@ -4,15 +4,15 @@ using System.Text;
 
 namespace Server
 { 
+	enum MessageMode
+	{
+		Human_Human,
+		Human_Server,
+		Computer_Human,
+		Computer_Server
+	};
 	class Server
 	{
-		enum MessageModes
-		{
-			Human_Human,
-			Human_Server,
-			Computer_Human,
-			Computer_Server
-		};
 		static string[] answers = { "Hi", "How are you", "Helo word", "HH", "What a day to be alive", "Bye" };
 		static Random r = new();
 		static void Main()
@@ -56,5 +56,9 @@ namespace Server
 				}
 			}
 		}
+	}
+	class Program
+	{
+
 	}
 }

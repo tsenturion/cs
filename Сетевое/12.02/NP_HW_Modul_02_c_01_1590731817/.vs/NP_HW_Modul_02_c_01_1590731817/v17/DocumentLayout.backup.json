@@ -3,6 +3,18 @@
   "WorkspaceRootPath": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\NP_HW_Modul_02_c_01_1590731817\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{6CBB5BC1-84FC-4E25-B14E-CB560BE3F45E}|3\\3.csproj|e:\\\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\desktop\\academy\\source\\repos\\cs\\\u0441\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\np_hw_modul_02_c_01_1590731817\\3\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{6CBB5BC1-84FC-4E25-B14E-CB560BE3F45E}|3\\3.csproj|solutionrelative:3\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{6CBB5BC1-84FC-4E25-B14E-CB560BE3F45E}|3\\3.csproj|e:\\\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\desktop\\academy\\source\\repos\\cs\\\u0441\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\np_hw_modul_02_c_01_1590731817\\3\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{6CBB5BC1-84FC-4E25-B14E-CB560BE3F45E}|3\\3.csproj|solutionrelative:3\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{6CBB5BC1-84FC-4E25-B14E-CB560BE3F45E}|3\\3.csproj|e:\\\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\desktop\\academy\\source\\repos\\cs\\\u0441\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\np_hw_modul_02_c_01_1590731817\\3\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{6CBB5BC1-84FC-4E25-B14E-CB560BE3F45E}|3\\3.csproj|solutionrelative:3\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{DB516383-33AF-494C-9968-6EBAEF5B7743}|3 _server\\3 _server.csproj|e:\\\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\desktop\\academy\\source\\repos\\cs\\\u0441\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\np_hw_modul_02_c_01_1590731817\\3 _server\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{DB516383-33AF-494C-9968-6EBAEF5B7743}|3 _server\\3 _server.csproj|solutionrelative:3 _server\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
@@ -14,7 +26,7 @@
       "DocumentGroups": [
         {
           "DockedHeight": 384,
-          "SelectedChildIndex": 7,
+          "SelectedChildIndex": 8,
           "Children": [
             {
               "$type": "Bookmark",
@@ -46,13 +58,51 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Program.cs",
+              "DocumentMoniker": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\NP_HW_Modul_02_c_01_1590731817\\3\\Program.cs",
+              "RelativeDocumentMoniker": "3\\Program.cs",
+              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\NP_HW_Modul_02_c_01_1590731817\\3\\Program.cs",
+              "RelativeToolTip": "3\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-17T14:35:47.309Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Form1.cs",
+              "DocumentMoniker": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\NP_HW_Modul_02_c_01_1590731817\\3\\Form1.cs",
+              "RelativeDocumentMoniker": "3\\Form1.cs",
+              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\NP_HW_Modul_02_c_01_1590731817\\3\\Form1.cs",
+              "RelativeToolTip": "3\\Form1.cs",
+              "ViewState": "AgIAABMAAAAAAAAAAAA9wBgAAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-17T14:35:40.694Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Form1.cs [Design]",
+              "DocumentMoniker": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\NP_HW_Modul_02_c_01_1590731817\\3\\Form1.cs",
+              "RelativeDocumentMoniker": "3\\Form1.cs",
+              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\NP_HW_Modul_02_c_01_1590731817\\3\\Form1.cs [Design]",
+              "RelativeToolTip": "3\\Form1.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-17T14:35:13.607Z",
+              "EditorCaption": " [Design]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
               "Title": "Program.cs",
               "DocumentMoniker": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\NP_HW_Modul_02_c_01_1590731817\\3 _server\\Program.cs",
               "RelativeDocumentMoniker": "3 _server\\Program.cs",
               "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\12.02\\NP_HW_Modul_02_c_01_1590731817\\3 _server\\Program.cs",
               "RelativeToolTip": "3 _server\\Program.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAABgAAAAAAAAAAAAswD8AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-02-12T19:14:10.8Z",
               "EditorCaption": ""
