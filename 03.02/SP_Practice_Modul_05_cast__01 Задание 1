@@ -1,0 +1,24 @@
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+        Task tempTask = new Task(Task_1);
+
+        tempTask.Start();
+
+        while (!tempTask.IsCompleted) { Thread.Sleep(100); }//без этой строки консоль завершает работу до вывода даты, а с этой строкой почему-то выводятся и нижестоящие таски 
+
+        Task.Factory.StartNew(Task_1);
+
+        Task.Run(Task_1);
+
+    }
+
+    public static void Task_1()
+    {        
+
+            Console.WriteLine(DateTime.Now);       
+            
+    }
+
+}
