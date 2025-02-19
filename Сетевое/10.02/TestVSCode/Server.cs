@@ -1,23 +1,10 @@
 ﻿using System;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
-using System.Reflection.Metadata;
-using System.Text.Encodings.Web;
 
-/*
-Создайте консольное приложение, которое позволит, 
-отобразить 100 самых популярных книг из библиотеки 
-Гуттенберга. По нажатию наназвание книги нужно отобразить
- текст этой книги
-*/
-
-namespace TestVSCode
+namespace TestVSCode2
 {
     class Program
     {
@@ -37,13 +24,13 @@ namespace TestVSCode
             {
                 if (int.TryParse(input, out int bookNumber) && bookNumber > 0 && bookNumber <= books.Count)
                 {
-                    string bookText = await DownloadBookTextAsync(books[bookNumber - 1].Url);
+                    string bookText = await DownloadBookTextAsync(books[bookNumber - 1].Url, books[bookNumber - 1].DownloadUrl);
                     Console.Clear();
-                    Console.WriteLine($"текст {books[bookNumber - 1].Title}\n");
+                    Console.WriteLine($"Текст {books[bookNumber - 1].Title}\n");
                     Console.WriteLine(bookText);
-
                 }
-                else{
+                else
+                {
                     Console.WriteLine("Неверный ввод! Введите номер книги или exit:");
                 }
                 Console.WriteLine("Введите номер книги для получения текста:");
@@ -53,12 +40,12 @@ namespace TestVSCode
 
         private static async Task<List<Book>> FetchPopularBooksAsync()
         {
-            string url = "http://www.gutenberg.org/ebooks/bookshelf/13";
+            string url = "https://www.gutenberg.org/ebooks/bookshelf/13";
             List<Book> bookList = new List<Book>();
 
             using (HttpClient client = new HttpClient())
             {
-                try 
+                try
                 {
                     string html = await client.GetStringAsync(url);
                     HtmlDocument document = new HtmlDocument();
@@ -70,13 +57,16 @@ namespace TestVSCode
                         foreach (var bookNode in bookNodes)
                         {
                             var linkNode = bookNode.SelectSingleNode(".//a[@class='link']");
-                            
-                            if (linkNode!= null)
+
+                            if (linkNode != null)
                             {
                                 string title = HtmlEntity.DeEntitize(linkNode.SelectSingleNode(".//span[@class='title']").InnerText.Trim());
                                 string relativeUrl = linkNode.GetAttributeValue("href", "");
-                                string absoluteUrl = $"http://www.gutenberg.org{relativeUrl}";
-                                bookList.Add(new Book { Title = title, Url = absoluteUrl });
+                                string absoluteUrl = $"https://www.gutenberg.org{relativeUrl}";
+
+                                string downloadUrl = $"https://www.gutenberg.org/cache/epub/{relativeUrl.Split('/')[2]}/pg{relativeUrl.Split('/')[2]}.txt"; 
+
+                                bookList.Add(new Book { Title = title, Url = absoluteUrl, DownloadUrl = downloadUrl });
                             }
                         }
                     }
@@ -86,17 +76,22 @@ namespace TestVSCode
                     Console.WriteLine($"Error fetching popular books: {ex.Message}");
                 }
             }
-            //return bookList.OrderByDescending(b => b.Title).Take(100).ToList();
             return bookList;
         }
-        private static async Task<string> DownloadBookTextAsync(string url)
+
+        private static async Task<string> DownloadBookTextAsync(string bookUrl, string downloadUrl)
         {
             using (HttpClient client = new HttpClient())
             {
-                HttpResponseMessage response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                string bookText = await response.Content.ReadAsStringAsync();
-                return bookText;
+                try
+                {
+                    return await client.GetStringAsync(downloadUrl);
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine($"Error downloading book text: {ex.Message}");
+                    return "Не удалось загрузить текст книги";
+                }
             }
         }
 
@@ -104,7 +99,7 @@ namespace TestVSCode
         {
             public string Title { get; set; }
             public string Url { get; set; }
+            public string DownloadUrl { get; set; } 
         }
-    
     }
- }
+}
