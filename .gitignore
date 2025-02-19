@@ -1,4 +1,6 @@
 
+*.opendb
+*.vsidx
 Sources1/ProcessManipulation/.vs/ProcessManipulation/FileContentIndex/61bbfa93-86e7-4234-971e-5d5483ae5acf.vsidx
 Sources1/ProcessManipulation/.vs/ProcessManipulation/FileContentIndex/e10155da-e096-4d73-8433-7be6c407816b.vsidx
 Sources1/ProcessManipulation/.vs/ProcessManipulation/FileContentIndex/bd2d0bc9-da20-4728-93c2-7a4d48e56897.vsidx

@@ -13,11 +13,13 @@ namespace MailSender
 {
     public partial class Form1 : Form
     {
+        string server="100.30.0.30";// sets the server address
+
         public Form1()
         {
             InitializeComponent();
         }
-        string server="100.30.0.30";// sets the server address
+        
         private void button2_Click(object sender, EventArgs e)
         {
            // create a message object
@@ -35,11 +37,25 @@ namespace MailSender
         {
             // here you need to add a file selection dialog box and add the selected file to the MailMessage
             // attachment collection and to the list on the form
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Title = "выберите файлы для вложения";
+            openFileDialog.Filer = "все файлы (*.*)|*.*";
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                string filePath = openFileDialog.FileName;
+                MailMessage message = new MailMessage(fromBox.Text, toBox.Text, themeBox.Text, bodyBox.Text);
+                message.Attachments.Add(new Attachment(filePath));
+                attachmentsListBox.Items.Add(filePath);
+            }
         }
 
         private void button3_Click(object sender, EventArgs e)
         {
             // here you need to clear all fields of the form and the content of the MailMessage object
+            fromBpx.Clear();
+            toBox.Clear();
+            themeBox.Clear();
+            bodyBox.Clear();
         }
     }
 }
