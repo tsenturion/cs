@@ -29,14 +29,14 @@ namespace TestVSCode
                 HtmlDocument document = new HtmlDocument();
                 document.LoadHtml(html);
 
-                HtmlNodeCollection resultNodes = document.DocumentNode.SelectNodes("//li[@class='booklink']/a[@class['link']]");
+                HtmlNodeCollection resultNodes = document.DocumentNode.SelectNodes("//li[@class='booklink']/a[@class='link']");
 
                 if (resultNodes!= null && resultNodes.Count > 0)
                 {
                     Console.WriteLine("результаты");
                     foreach (HtmlNode resultNode in resultNodes)
                     {
-                        string title = HtmlEntity.DeEntitize(resultNode.SelectSingleNode(".//span[@class'title']").InnerHtml.Trim());
+                        string title = HtmlEntity.DeEntitize(resultNode.SelectSingleNode(".//span[@class='title']").InnerHtml.Trim());
                         string relativeUrl = resultNode.GetAttributeValue("href", "");
                         string absoluteUrl = $"{gutenbergBaseUrl}{relativeUrl}";
                         Console.WriteLine($"название: {title}, url {absoluteUrl}");
