@@ -3,103 +3,55 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
+using System.Web;
 
-namespace TestVSCode2
+namespace TestVSCode
 {
     class Program
     {
+        private static readonly HttpClient client = new HttpClient();
+
+        private static readonly string gutenbergBaseUrl = "https://www.gutenberg.org";
         static async Task Main(string[] args)
         {
-            List<Book> books = await FetchPopularBooksAsync();
+            Console.WriteLine("введите текст для поиска (название книги)");
+            string searchText = Console.ReadLine();
 
-            Console.WriteLine("100");
-            for (int i = 0; i < books.Count; i++)
-            {
-                Console.WriteLine($"{i + 1}. {books[i].Title}");
-            }
-            Console.WriteLine("Введите номер книги для получения текста:");
-            string input = Console.ReadLine();
+            await SearchGutenberg(searchText);
+        }
 
-            while (input.ToLower() != "exit")
-            {
-                if (int.TryParse(input, out int bookNumber) && bookNumber > 0 && bookNumber <= books.Count)
+        static async Task SearchGutenberg(string searchText)
+        {
+            try {
+                string searchUrl = $"{gutenbergBaseUrl}/ebooks/search/?query={HttpUtility.HtmlEncode(searchText)}";
+
+                string html = await client.GetStringAsync(searchUrl);
+                HtmlDocument document = new HtmlDocument();
+                document.LoadHtml(html);
+
+                HtmlNodeCollection resultNodes = document.DocumentNode.SelectNodes("//li[@class='booklink']/a[@class['link']]");
+
+                if (resultNodes!= null && resultNodes.Count > 0)
                 {
-                    string bookText = await DownloadBookTextAsync(books[bookNumber - 1].Url, books[bookNumber - 1].DownloadUrl);
-                    Console.Clear();
-                    Console.WriteLine($"Текст {books[bookNumber - 1].Title}\n");
-                    Console.WriteLine(bookText);
+                    Console.WriteLine("результаты");
+                    foreach (HtmlNode resultNode in resultNodes)
+                    {
+                        string title = HtmlEntity.DeEntitize(resultNode.SelectSingleNode(".//span[@class'title']").InnerHtml.Trim());
+                        string relativeUrl = resultNode.GetAttributeValue("href", "");
+                        string absoluteUrl = $"{gutenbergBaseUrl}{relativeUrl}";
+                        Console.WriteLine($"название: {title}, url {absoluteUrl}");
+                    }
                 }
                 else
                 {
-                    Console.WriteLine("Неверный ввод! Введите номер книги или exit:");
+                    Console.WriteLine("не найдено");
                 }
-                Console.WriteLine("Введите номер книги для получения текста:");
-                input = Console.ReadLine();
             }
-        }
-
-        private static async Task<List<Book>> FetchPopularBooksAsync()
-        {
-            string url = "https://www.gutenberg.org/ebooks/bookshelf/13";
-            List<Book> bookList = new List<Book>();
-
-            using (HttpClient client = new HttpClient())
+            catch (HttpRequestException ex)
             {
-                try
-                {
-                    string html = await client.GetStringAsync(url);
-                    HtmlDocument document = new HtmlDocument();
-                    document.LoadHtml(html);
-
-                    var bookNodes = document.DocumentNode.SelectNodes("//li[@class='booklink']");
-                    if (bookNodes != null)
-                    {
-                        foreach (var bookNode in bookNodes)
-                        {
-                            var linkNode = bookNode.SelectSingleNode(".//a[@class='link']");
-
-                            if (linkNode != null)
-                            {
-                                string title = HtmlEntity.DeEntitize(linkNode.SelectSingleNode(".//span[@class='title']").InnerText.Trim());
-                                string relativeUrl = linkNode.GetAttributeValue("href", "");
-                                string absoluteUrl = $"https://www.gutenberg.org{relativeUrl}";
-
-                                string downloadUrl = $"https://www.gutenberg.org/cache/epub/{relativeUrl.Split('/')[2]}/pg{relativeUrl.Split('/')[2]}.txt"; 
-
-                                bookList.Add(new Book { Title = title, Url = absoluteUrl, DownloadUrl = downloadUrl });
-                            }
-                        }
-                    }
-                }
-                catch (HttpRequestException ex)
-                {
-                    Console.WriteLine($"Error fetching popular books: {ex.Message}");
-                }
+                Console.WriteLine($"ошибка загрузки страницы: {ex.Message}");
             }
-            return bookList;
-        }
 
-        private static async Task<string> DownloadBookTextAsync(string bookUrl, string downloadUrl)
-        {
-            using (HttpClient client = new HttpClient())
-            {
-                try
-                {
-                    return await client.GetStringAsync(downloadUrl);
-                }
-                catch (HttpRequestException ex)
-                {
-                    Console.WriteLine($"Error downloading book text: {ex.Message}");
-                    return "Не удалось загрузить текст книги";
-                }
             }
-        }
-
-        class Book
-        {
-            public string Title { get; set; }
-            public string Url { get; set; }
-            public string DownloadUrl { get; set; } 
-        }
     }
 }
