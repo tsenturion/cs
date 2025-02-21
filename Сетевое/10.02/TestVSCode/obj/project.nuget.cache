@@ -1,8 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "mZ5+arMVSIk=",
+  "dgSpecHash": "y+X9W5ZGzF4=",
   "success": true,
   "projectFilePath": "C:\\Users\\Ефимов\\Downloads\\cs\\Сетевое\\10.02\\TestVSCode\\TestVSCode.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\Ефимов\\.nuget\\packages\\htmlagilitypack\\1.11.72\\htmlagilitypack.1.11.72.nupkg.sha512",
+    "C:\\Users\\Ефимов\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512"
+  ],
   "logs": []
 }

@@ -1,131 +1,106 @@
-﻿/*
-using System;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Sockets;
+﻿using System;
+using System.Net.Http;
 using System.Text;
-using System.Threading;
-using Collections.Generic;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
-namespace TestVSCode
+class TestVSCode2
 {
-    class Program
+    private static readonly HttpClient client = new HttpClient();
+    private const string apiKey = "93907408-f04d-4491-9442-450c3f0a62f7"; // Замените на ваш API ключ
+
+    static async Task Main(string[] args)
     {
+        Console.WriteLine("Выберите режим игры: 1 - Человек против человека, 2 - Человек против компьютера");
+        string choice = Console.ReadLine();
 
-        static string infoMessage = "infoMessage";
-        static string wariningMessage = "wariningMessage";
-        static string urgentMessage = "urgentMessage";
-        enum MessageType 
+        if (choice == "1")
         {
-            Information,
-            Warning,
-            Urgent
+            await PlayerVsPlayer();
         }
-        static List<Socket> clients = new List<Socket>();
-        static int interval = 5000;
-        static void Main(string[] args)
+        else if (choice == "2")
         {
-            Thread sendThread = new Thread(SendMulticastMessage);
-            sendThread.IsBackground = true;
-            sendThread.Start();
-            Console.ReadKey();
+            await PlayerVsComputer();
         }
-        
-        static void SendMulticastMessage() {
-            while (true)
-            {
-                Thread.Sleep(interval);
-                string messageToSend = infoMessage;
-                Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 2);
-                IPAddress multicastAddress = IPAddress.Parse("224.5.5.5");
-                IPEndPoint endPoint = new IPEndPoint(multicastAddress, 4567);
-                byte[] messageBytes = Encoding.Default.GetBytes(messageToSend);
-                socket.SendTo(messageBytes, endPoint);
-                socket.Close();
-                Console.WriteLine($"Sent: {messageToSend}");
-            }
-        }
-
-        static void SubscribeClient(Socket clientSocket, MessageType subsctiptionType)
+        else
         {
-            clients.Add(clientSocket);
-            if (subsctiptionType == MessageType.Urgent)
-            {
-                SendUrgentMessage(clientSocket);
-            }
+            Console.WriteLine("Неверный выбор.");
         }
-
-        static void SendUrgentMessage(Socket clientSocket)
-        {
-            string urgentMessage = "urgentMessage";
-            byte[] messageBytes = Encoding.Default.GetBytes(urgentMessage);
-            foreach (var clint in clients)
-            {
-                clint.Send(messageBytes);
-            }
-            Console.WriteLine("Sent urgent message");
-        }
-            
     }
+
+    private static async Task PlayerVsPlayer()
+    {
+        Console.WriteLine("Игрок 1, нажмите Enter, чтобы бросить кости.");
+        Console.ReadLine();
+        int player1Roll = await RollDice();
+        Console.WriteLine($"Игрок 1 бросил: {player1Roll}");
+
+        Console.WriteLine("Игрок 2, нажмите Enter, чтобы бросить кости.");
+        Console.ReadLine();
+        int player2Roll = await RollDice();
+        Console.WriteLine($"Игрок 2 бросил: {player2Roll}");
+
+        DetermineWinner(player1Roll, player2Roll);
+    }
+
+    private static async Task PlayerVsComputer()
+    {
+        Console.WriteLine("Нажмите Enter, чтобы бросить кости.");
+        Console.ReadLine();
+        int playerRoll = await RollDice();
+        Console.WriteLine($"Вы бросили: {playerRoll}");
+
+        Random rnd = new Random();
+        int computerRoll = rnd.Next(1, 7); // Симуляция броска компьютера
+        Console.WriteLine($"Компьютер бросил: {computerRoll}");
+
+        DetermineWinner(playerRoll, computerRoll);
+    }
+
+private static async Task<int> RollDice()
+{
+    // Создаем объект JObject для параметров запроса
+    JObject requestParams = new JObject
+    {
+        ["apiKey"] = apiKey,
+        ["n"] = 1,
+        ["min"] = 1,
+        ["max"] = 6,
+        ["replacement"] = true
+    };
+
+    // Создаем основной объект запроса
+    JObject requestBody = new JObject
+    {
+        ["jsonrpc"] = "2.0",
+        ["method"] = "generateIntegers",
+        ["params"] = requestParams,
+        ["id"] = 42
+    };
+
+    // Преобразуем объект в JSON строку
+    string jsonBody = requestBody.ToString(Newtonsoft.Json.Formatting.None);
+
+    var response = await client.PostAsync(
+        "https://api.random.org/json-rpc/4/invoke",
+        new StringContent(jsonBody, Encoding.UTF8, "application/json")
+    );
+
+    var resultJson = await response.Content.ReadAsStringAsync();
+    dynamic result = JsonConvert.DeserializeObject(resultJson);
+
+    return result.result.random.data[0];
 }
 
-*/
-using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
 
-namespace TestVSCode2
-{
-    enum MessageType 
-        {
-            Information,
-            Warning,
-            Urgent
-        }
-    class Program
+    private static void DetermineWinner(int roll1, int roll2)
     {
-        static void Main(string[] args)
-        {
-            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Any, 4567);
-            socket.Bind(localEndPoint);
-
-            IPAddress multicastAddress = IPAddress.Parse("224.5.5.5");
-            socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddress, IPAddress.Any));
-            byte[] buffer = new byte[1024];
-            
-            Console.WriteLine("choose");
-            Console.WriteLine("1 - subscribe info");
-            Console.WriteLine("2 - subscribe warning");
-            Console.WriteLine("3 - subscribe urgent");
-
-            int choice = int.Parse(Console.ReadLine());
-            MessageType selectedType = (MessageType)(choice - 1);
-
-            while (true)
-            {
-                int bytesReceived = socket.Receive(buffer);
-                string message = Encoding.Default.GetString(buffer, 0, bytesReceived);
-                
-                if (selectedType == MessageType.Urgent && message == "urgentMessage")
-                {
-                    Console.WriteLine("urgent message received");
-                }
-                else if (message == "infoMessage" && selectedType == MessageType.Information)
-                {
-                    Console.WriteLine("info message received");
-                }
-                else if (message == "wariningMessage" && selectedType == MessageType.Warning)
-                {
-                    Console.WriteLine("warning message received");
-                }
-                else
-                {
-                    Console.WriteLine("received message: " + message);
-                }
-            }
-        }
+        if (roll1 > roll2)
+            Console.WriteLine("Первый игрок выиграл!");
+        else if (roll2 > roll1)
+            Console.WriteLine("Второй игрок выиграл!");
+        else
+            Console.WriteLine("Ничья!");
     }
 }

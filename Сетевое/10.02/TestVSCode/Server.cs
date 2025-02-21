@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Text;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using System.Web;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace TestVSCode
 {
@@ -11,68 +14,96 @@ namespace TestVSCode
     {
         private static readonly HttpClient client = new HttpClient();
 
-        private static readonly string gutenbergBaseUrl = "https://www.gutenberg.org";
+        private const string apiKey = "";        
         static async Task Main(string[] args)
         {
-            Console.WriteLine("введите фамилию имя для поиска");
-            string authorName = Console.ReadLine();
-            await SearchAndDownloadBooks(authorName);
+            Console.WriteLine("1 - человек / 2 - бот");
+            string choice = Console.ReadLine();
+
+            if (choice == "1")
+            {
+                await PlayerVsPlayer();
+            }
+            else if (choice == "2") {
+                await BotVsPlayer();
+            }
+            else{
+                Console.WriteLine("Неправильный ввод. Попробуйте еще раз.");
+            }
+            Console.ReadKey();
         }
         
-        private static async Task SearchAndDownloadBooks(string authorName)
+        private static async Task PlayerVsPlayer()
         {
-            try{
-                string searchUrl = $"{gutenbergBaseUrl}/ebooks/search/?querry={HttpUtility.HtmlEncode(authorName)}";
-                string html = await client.GetStringAsync(searchUrl);
-                HtmlDocument document = new HtmlDocument();
-                document.LoadHtml(html);
-                
-                HtmlNodeCollection resultNodes = document.DocumentNode.SelectNodes("//li[@class='booklink']//a[@class='link']");
-
-                if(resultNodes != null || resultNodes.Count == 0)
-                {
-                    Console.WriteLine("Ничего не найдено.");
-                    foreach (HtmlNode resultNode in resultNodes)
-                    {
-                        string title = HtmlEntity.DeEntitize(resultNode.SelectSingleNode(".//span[@class='title']").InnerText.Trim());
-                        string relativeUrl = resultNode.GetAttributeValue("href", "");
-                        string absoluteUrl = $"{gutenbergBaseUrl}{relativeUrl}";
-                        Console.WriteLine($"Название книги: {title}, Абсолютная ссылка: {absoluteUrl}");
-                    }
-                    Console.WriteLine("Y/n");
-                    string userInput = Console.ReadLine();
-
-                    if (userInput.Equals("Y", StringComparison.OrdinalIgnoreCase))
-                    {
-                        foreach (HtmlNode resultNode in resultNodes)
-                        {
-                            string title = HtmlEntity.DeEntitize(resultNode.SelectSingleNode(".//span[@class='title']").InnerText.Trim());
-                            string relativeUrl = resultNode.GetAttributeValue("href", "");
-                            string bookId = relativeUrl.Split('/')[2];
-                            string downloadUrl = $"{gutenbergBaseUrl}/cache/epub/{bookId}/pg{bookId}.txt";
-                            Console.WriteLine($"Название книги: {title}, Абсолютная ссылка: {downloadUrl}");
-                            try
-                            {
-                                byte[] bookContent = await client.GetByteArrayAsync(downloadUrl);
-                                string fileName = $"{title}.txt";
-                                await File.WriteAllBytesAsync(fileName, bookContent);
-                                Console.WriteLine($"книга {title}, в файл {fileName}");
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"Ошибка скачивания книги: {ex.Message}");
-                            }
-                        }
-                    }
-                    else{
-                        Console.WriteLine("Прервано пользователем.");
-                    }  
-                }
-            }
-            catch (Exception ex)
+            Console.WriteLine("человек человек");
+            Console.WriteLine("для броска человек 1 enter");
+            Console.ReadLine();
+            int player1roll = await RollDice();
+            Console.WriteLine($"Кубик выпал: {player1roll}");
+            Console.WriteLine("для броска человек 2 enter");
+            Console.ReadLine();
+            int player2roll = await RollDice();
+            Console.WriteLine($"Кубик выпал: {player2roll}");
+            DetermineWinner(player1roll, player2roll);
+        }
+        
+        private static async Task<int> RollDice()
+        {
+            JObject requestParams = new JObject
             {
-                Console.WriteLine($"Ошибка при поиске: {ex.Message}");
+                ["apiKey"] = apiKey,
+                ["n"] = 1,
+                ["min"] = 1,
+                ["max"] = 6,
+                ["replacement"] = true
+            };
+            JObject requestBody = new JObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["method"] = "generateIntegers",
+                ["params"] = requestParams,
+                ["id"] = 1
+            };
+
+            string jsonBody = requestBody.ToString(Formatting.None);
+
+            var response = await client.PostAsync(
+                "https://api.random.org/json-rpc/4/invoke",
+                new StringContent(jsonBody, Encoding.UTF8, "application/json")
+            );
+
+            var resultJson = await response.Content.ReadAsStringAsync();
+            dynamic result = JsonConvert.DeserializeObject(resultJson);
+            return result.result.random.data[0];
+        }
+        
+        private static void DetermineWinner(int roll1, int roll2)
+        {
+            if (roll1 > roll2)
+            {
+                Console.WriteLine("первый выиграл");
             }
+            else if (roll1 < roll2)
+            {
+                Console.WriteLine("второй выиграл");
+            }
+            else
+            {
+                Console.WriteLine("ничья");
+            }
+        }
+        
+        private static async Task BotVsPlayer()
+        {
+            Console.WriteLine("человек бот");
+            Console.WriteLine("для броска человека 1 enter");
+            Console.ReadLine();
+            int player1roll = await RollDice();
+            Console.WriteLine($"Кубик выпал: {player1roll}");
+            Random random = new Random();
+            int botRoll = random.Next(1, 7);
+            Console.WriteLine($"Кубик выпал бота: {botRoll}");
+            DetermineWinner(player1roll, botRoll);
         }
     }
 }
