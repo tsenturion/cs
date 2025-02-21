@@ -14,44 +14,56 @@ namespace TestVSCode
         private static readonly string gutenbergBaseUrl = "https://www.gutenberg.org";
         static async Task Main(string[] args)
         {
-            Console.WriteLine("введите текст для поиска (название книги)");
-            string searchText = Console.ReadLine();
-
-            await SearchGutenberg(searchText);
+            Console.WriteLine("введите фамилию имя для поиска");
+            string authorName = Console.ReadLine();
+            await SearchAndDownloadBooks(authorName);
         }
-
-        static async Task SearchGutenberg(string searchText)
+        
+        private static async Task SearchAndDownloadBooks(string authorName)
         {
-            try {
-                string searchUrl = $"{gutenbergBaseUrl}/ebooks/search/?query={HttpUtility.HtmlEncode(searchText)}";
-
+            try{
+                string searchUrl = $"{gutenbergBaseUrl}/ebooks/search/?querry={HttpUtility.HtmlEncode(authorName)}";
                 string html = await client.GetStringAsync(searchUrl);
                 HtmlDocument document = new HtmlDocument();
                 document.LoadHtml(html);
+                
+                HtmlNodeCollection resultNodes = document.DocumentNode.SelectNodes("//li[@class='booklink']//a[@class='link']");
 
-                HtmlNodeCollection resultNodes = document.DocumentNode.SelectNodes("//li[@class='booklink']/a[@class='link']");
-
-                if (resultNodes!= null && resultNodes.Count > 0)
+                if(resultNodes != null || resultNodes.Count == 0)
                 {
-                    Console.WriteLine("результаты");
+                    Console.WriteLine("Ничего не найдено.");
                     foreach (HtmlNode resultNode in resultNodes)
                     {
-                        string title = HtmlEntity.DeEntitize(resultNode.SelectSingleNode(".//span[@class='title']").InnerHtml.Trim());
+                        string title = HtmlEntity.DeEntitize(resultNode.SelectSingleNode(".//span[@class='title']").InnerText.Trim());
                         string relativeUrl = resultNode.GetAttributeValue("href", "");
                         string absoluteUrl = $"{gutenbergBaseUrl}{relativeUrl}";
-                        Console.WriteLine($"название: {title}, url {absoluteUrl}");
+                        Console.WriteLine($"Название книги: {title}, Абсолютная ссылка: {absoluteUrl}");
                     }
-                }
-                else
-                {
-                    Console.WriteLine("не найдено");
-                }
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.WriteLine($"ошибка загрузки страницы: {ex.Message}");
-            }
+                    Console.WriteLine("Y/n");
+                    string userInput = Console.ReadLine();
 
+                    if (userInput.Equals("Y", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (HtmlNode resultNode in resultNodes)
+                        {
+                            string title = HtmlEntity.DeEntitize(resultNode.SelectSingleNode(".//span[@class='title']").InnerText.Trim());
+                            string relativeUrl = resultNode.GetAttributeValue("href", "");
+                            string downloadUrl = $"{gutenbergBaseUrl}{relativeUrl}";
+                            Console.WriteLine($"Название книги: {title}, Абсолютная ссылка: {downloadUrl}");
+                            //поправить
+                            var bookContent = await client.GetByteArrayAsync(downloadUrl);
+                            await File.WriteAllBytesAsync($"{title}.txt", bookContent);
+                        }
+                    }
+                    else{
+                        Console.WriteLine("Прервано пользователем.");
+                    }  
+                }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при поиске: {ex.Message}");
+            }
+        }
     }
 }
