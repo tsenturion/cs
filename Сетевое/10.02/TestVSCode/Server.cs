@@ -48,11 +48,20 @@ namespace TestVSCode
                         {
                             string title = HtmlEntity.DeEntitize(resultNode.SelectSingleNode(".//span[@class='title']").InnerText.Trim());
                             string relativeUrl = resultNode.GetAttributeValue("href", "");
-                            string downloadUrl = $"{gutenbergBaseUrl}{relativeUrl}";
+                            string bookId = relativeUrl.Split('/')[2];
+                            string downloadUrl = $"{gutenbergBaseUrl}/cache/epub/{bookId}/pg{bookId}.txt";
                             Console.WriteLine($"Название книги: {title}, Абсолютная ссылка: {downloadUrl}");
-                            //поправить
-                            var bookContent = await client.GetByteArrayAsync(downloadUrl);
-                            await File.WriteAllBytesAsync($"{title}.txt", bookContent);
+                            try
+                            {
+                                byte[] bookContent = await client.GetByteArrayAsync(downloadUrl);
+                                string fileName = $"{title}.txt";
+                                await File.WriteAllBytesAsync(fileName, bookContent);
+                                Console.WriteLine($"книга {title}, в файл {fileName}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Ошибка скачивания книги: {ex.Message}");
+                            }
                         }
                     }
                     else{
