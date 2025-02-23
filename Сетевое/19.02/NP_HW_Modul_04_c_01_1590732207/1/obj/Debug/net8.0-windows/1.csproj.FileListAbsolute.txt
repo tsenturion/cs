@@ -1,0 +1,17 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\bin\Debug\net8.0-windows\1.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\bin\Debug\net8.0-windows\1.deps.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\bin\Debug\net8.0-windows\1.runtimeconfig.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\bin\Debug\net8.0-windows\1.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\bin\Debug\net8.0-windows\1.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\_1.Form1.resources
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.csproj.GenerateResource.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.GeneratedMSBuildEditorConfig.editorconfig
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.AssemblyInfoInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.AssemblyInfo.cs
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.sourcelink.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\refint\1.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.genruntimeconfig.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\ref\1.dll
