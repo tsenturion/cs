@@ -19,24 +19,40 @@ namespace TestVSCode
             string url = "https://www.gutenberg.org/";
             string searchText = "book";
             int maxTimeSeconds = 10;
+            int maxConcurrency = 5;
 
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(maxTimeSeconds));
-            var task = GetHtmlAsync(url, cts.Token);
-            Console.WriteLine("p - pause, r - resume, c - cansel");
-            while (true)
+            var semaphore = new SemaphoreSlim(maxConcurrency);
+            var urlsToParse = new List<string> { url };
+            var results = new List<string>();
+            Console.WriteLine(" + для добавления, - для удаления, c - cansel");
+            var tasks = new List<Task>();
+            while (urlsToParse.Count > 0 || tasks.Count > 0)
             {
+                if (urlsToParse.Count > 0  && semaphore.CurrentCount > 0)
+                {
+                    var currentUrl = urlsToParse[0];
+                    urlsToParse.RemoveAt(0);
+                    tasks.Add(ParseUrlAsync(currentUrl, semaphore, cts.Token, results));
+                    Console.WriteLine($"Парсинг {currentUrl}");
+                }
                 var key = Console.ReadKey(true);
                 switch (key.KeyChar.ToString().ToLower())
                 {
-                    case "p":
-                        cts.Cancel();
-                        Console.WriteLine("Paused.");
+                    case "+":
+                        if (maxConcurrency < 10)
+                        {
+                            maxConcurrency++;
+                            semaphore.Release();
+                            Console.WriteLine($"Max concurrency increased to {maxConcurrency}");
+                        }
                         break;
-                    case "r":
-                        cts.Dispose();
-                        cts = new CancellationTokenSource(TimeSpan.FromSeconds(maxTimeSeconds));
-                        task = GetHtmlAsync(url, cts.Token);
-                        Console.WriteLine("Resumed.");
+                    case "-":
+                        if (maxConcurrency > 1)
+                        {
+                            maxConcurrency--;
+                            Console.WriteLine($"concurrency decreased to {maxConcurrency}");
+                        }
                         break;
                     case "c":
                         cts.Cancel();
@@ -45,74 +61,56 @@ namespace TestVSCode
                     default:
                         break;
                 }
-                if (task.IsCompleted)
-                {
-                    break;
-                }
+                await Task.Delay(100);
             }
 
-            if (task.IsCanceled)
+            foreach (var result in results)
             {
-                Console.WriteLine("Task cancelled.");
-            }
-            else if (task.IsFaulted)
-            {
-                Console.WriteLine($"Task failed: {task.Exception.Flatten().Message}");
-            }
-            else
-            {
-                var html = await task;
-                if (html != null)
+                if (result.Contains(searchText))
                 {
-                    if (html.Contains(searchText))
-                    {
-                        Console.WriteLine("Text found on the page.");
-                        int index = html.IndexOf(searchText);
-                        int fragmentStart = Math.Max(0, index - 50);
-                        int fragmentEnd = Math.Min(100, html.Length - fragmentStart);
-                        string fragment = html.Substring(fragmentStart, fragmentEnd);
-                        Console.WriteLine($"Fragment: {fragment}");
-                    }
-                    else
-                    {
-                        Console.WriteLine("Text not found on the page.");
-                    }
-                    // reader.Close();
-                    // dataStream.Close();
-                    // response.Close();
+                    Console.WriteLine("Text found on the page.");
+                    int index = result.IndexOf(searchText);
+                    int fragmentStart = Math.Max(0, index - 50);
+                    int fragmentEnd = Math.Min(100, result.Length - fragmentStart);
+                    string fragment = result.Substring(fragmentStart, fragmentEnd);
+                    Console.WriteLine($"Fragment: {fragment}");
                 }
-                else{
-                    Console.WriteLine("Failed to get HTML content за 10 секунд.");
+                else
+                {
+                    Console.WriteLine("Text not found on the page.");
                 }
-                // WebRequest request = WebRequest.Create(url);
-                // HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-
-                // Stream dataStream = response.GetResponseStream();
-                // StreamReader reader = new StreamReader(dataStream);
-                //string html = reader.ReadToEnd();
             }
         }
         
-        static async Task<string> GetHtmlAsync(string url, CancellationToken cancellationToken)
+        static async Task ParseUrlAsync(string url, SemaphoreSlim semaphore, CancellationToken cancellationToken, List<string> results)
         {
-            try{
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
                 using var httpClient = new HttpClient();
                 var response = await httpClient.GetAsync(url, cancellationToken);
-                if(response.IsSuccessStatusCode){
-                    return await response.Content.ReadAsStringAsync(cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    var html = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                    var htmlString = Encoding.UTF8.GetString(html);
+                    results.Add(htmlString);
                 }
-                else{
-                    Console.WriteLine($"Failed to get HTML content: {response.StatusCode}");
-                    return null;
+                else
+                {
+                    Console.WriteLine($"Failed to get page: {url} - {response.StatusCode}");
                 }
             }
-            catch(OperationCanceledException ex){
+            catch (OperationCanceledException ex)
+            {
                 Console.WriteLine($"Task cancelled: {ex.Message}");
-                return null;
             }
-            catch(Exception ex){
+            catch (Exception ex)
+            {
                 Console.WriteLine($"An error occurred: {ex.Message}");
-                return null;
+            }
+            finally
+            {
+                semaphore.Release();
             }
         }
     }
