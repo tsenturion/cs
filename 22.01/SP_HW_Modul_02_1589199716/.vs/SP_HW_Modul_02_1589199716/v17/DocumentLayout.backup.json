@@ -3,6 +3,14 @@
   "WorkspaceRootPath": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\22.01\\SP_HW_Modul_02_1589199716\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{C5786D39-7332-49CE-ABB9-A3AD9CD352E3}|4\\4.csproj|e:\\\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\desktop\\academy\\source\\repos\\cs\\22.01\\sp_hw_modul_02_1589199716\\4\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{C5786D39-7332-49CE-ABB9-A3AD9CD352E3}|4\\4.csproj|solutionrelative:4\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\22.01\\SP_HW_Modul_02_1589199716\\2\\Program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:2\\Program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{861D1CE3-DBE3-4229-88C0-454481C27ABC}|1\\1.csproj|e:\\\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\desktop\\academy\\source\\repos\\cs\\22.01\\sp_hw_modul_02_1589199716\\1\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{861D1CE3-DBE3-4229-88C0-454481C27ABC}|1\\1.csproj|solutionrelative:1\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
@@ -48,14 +56,37 @@
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "Program.cs",
+              "DocumentMoniker": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\22.01\\SP_HW_Modul_02_1589199716\\4\\Program.cs",
+              "RelativeDocumentMoniker": "4\\Program.cs",
+              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\22.01\\SP_HW_Modul_02_1589199716\\4\\Program.cs",
+              "RelativeToolTip": "4\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAAkAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-24T16:18:14.568Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Program.cs",
+              "DocumentMoniker": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\22.01\\SP_HW_Modul_02_1589199716\\2\\Program.cs",
+              "RelativeDocumentMoniker": "2\\Program.cs",
+              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\22.01\\SP_HW_Modul_02_1589199716\\2\\Program.cs",
+              "RelativeToolTip": "2\\Program.cs",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-24T16:14:55.626Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Program.cs",
               "DocumentMoniker": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\22.01\\SP_HW_Modul_02_1589199716\\1\\Program.cs",
               "RelativeDocumentMoniker": "1\\Program.cs",
-              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\22.01\\SP_HW_Modul_02_1589199716\\1\\Program.cs*",
-              "RelativeToolTip": "1\\Program.cs*",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAADAAAAAAAAAA==",
+              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\22.01\\SP_HW_Modul_02_1589199716\\1\\Program.cs",
+              "RelativeToolTip": "1\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-02-24T16:09:39.446Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-02-24T16:09:39.446Z"
             }
           ]
         }
