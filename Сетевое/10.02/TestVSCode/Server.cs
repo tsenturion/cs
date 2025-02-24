@@ -25,15 +25,16 @@ namespace TestVSCode
             var semaphore = new SemaphoreSlim(maxConcurrency);
             var urlsToParse = new List<string> { url };
             var results = new List<string>();
-            Console.WriteLine(" + для добавления, - для удаления, c - cansel");
+            Console.WriteLine(" + для добавления, - для удаления, c - cansel, p - пауза, r - resume");
+            bool isPaused = false;
             var tasks = new List<Task>();
             while (urlsToParse.Count > 0 || tasks.Count > 0)
             {
-                if (urlsToParse.Count > 0  && semaphore.CurrentCount > 0)
+                if (urlsToParse.Count > 0  && semaphore.CurrentCount > 0 && !isPaused)
                 {
                     var currentUrl = urlsToParse[0];
                     urlsToParse.RemoveAt(0);
-                    tasks.Add(ParseUrlAsync(currentUrl, semaphore, cts.Token, results));
+                    tasks.Add(ParseUrlAsync(currentUrl, semaphore, cts.Token, results, searchText));
                     Console.WriteLine($"Парсинг {currentUrl}");
                 }
                 var key = Console.ReadKey(true);
@@ -58,31 +59,26 @@ namespace TestVSCode
                         cts.Cancel();
                         Console.WriteLine("Cancelling.");
                         return;
+                    case "p":
+                        isPaused = true;
+                        Console.WriteLine("Paused.");
+                        break;
+                    case "r":
+                        isPaused = false;
+                        Console.WriteLine("Resumed.");
+                        break;
                     default:
                         break;
                 }
                 await Task.Delay(100);
             }
-
             foreach (var result in results)
             {
-                if (result.Contains(searchText))
-                {
-                    Console.WriteLine("Text found on the page.");
-                    int index = result.IndexOf(searchText);
-                    int fragmentStart = Math.Max(0, index - 50);
-                    int fragmentEnd = Math.Min(100, result.Length - fragmentStart);
-                    string fragment = result.Substring(fragmentStart, fragmentEnd);
-                    Console.WriteLine($"Fragment: {fragment}");
-                }
-                else
-                {
-                    Console.WriteLine("Text not found on the page.");
-                }
+                Console.WriteLine(result.ToString());
             }
         }
         
-        static async Task ParseUrlAsync(string url, SemaphoreSlim semaphore, CancellationToken cancellationToken, List<string> results)
+        static async Task ParseUrlAsync(string url, SemaphoreSlim semaphore, CancellationToken cancellationToken, List<string> results, string searchText)
         {
             await semaphore.WaitAsync(cancellationToken);
             try
@@ -93,7 +89,14 @@ namespace TestVSCode
                 {
                     var html = await response.Content.ReadAsByteArrayAsync(cancellationToken);
                     var htmlString = Encoding.UTF8.GetString(html);
-                    results.Add(htmlString);
+                    if (htmlString.Contains(searchText))
+                    {
+                        int index = htmlString.IndexOf(searchText);
+                        int fragmentStart = Math.Max(0, index - 50);
+                        int fragmentEnd = Math.Min(100, htmlString.Length - fragmentStart);
+                        string fragment = htmlString.Substring(fragmentStart, fragmentEnd);
+                        results.Add($"{url} - {fragment}");
+                    }
                 }
                 else
                 {
@@ -112,6 +115,17 @@ namespace TestVSCode
             {
                 semaphore.Release();
             }
+        }
+    }
+    
+    public class SearchResult
+    {
+        public string Url { get; set; }
+        public string Fragment { get; set; }
+        
+        public override string ToString()
+        {
+            return $"URL: {Url}\nFragment: {Fragment}\n";
         }
     }
 }
