@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "drM/TcvWWm0=",
+  "success": true,
+  "projectFilePath": "E:\\Пользователи\\Desktop\\academy\\source\\repos\\cs\\Сетевое\\24.02\\NP_Practice_Modul_05_c_02_1591082226\\4\\4.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Comp\\.nuget\\packages\\htmlagilitypack\\1.11.72\\htmlagilitypack.1.11.72.nupkg.sha512",
+    "C:\\Users\\Comp\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}
