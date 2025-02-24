@@ -1,0 +1,15 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\bin\Debug\net8.0\1.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\bin\Debug\net8.0\1.deps.json
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\bin\Debug\net8.0\1.runtimeconfig.json
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\bin\Debug\net8.0\1.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\bin\Debug\net8.0\1.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\1.GeneratedMSBuildEditorConfig.editorconfig
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\1.AssemblyInfoInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\1.AssemblyInfo.cs
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\1.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\1.sourcelink.json
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\1.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\refint\1.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\1.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\1.genruntimeconfig.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\22.01\SP_HW_Modul_02_1589199716\1\obj\Debug\net8.0\ref\1.dll
