@@ -20,10 +20,48 @@ namespace TestVSCode
             string searchText = "book";
             int maxTimeSeconds = 10;
 
-            try
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(maxTimeSeconds));
+            var task = GetHtmlAsync(url, cts.Token);
+            Console.WriteLine("p - pause, r - resume, c - cansel");
+            while (true)
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(maxTimeSeconds));
-                var html = await GetHtmlAsync(url, cts.Token);
+                var key = Console.ReadKey(true);
+                switch (key.KeyChar.ToString().ToLower())
+                {
+                    case "p":
+                        cts.Cancel();
+                        Console.WriteLine("Paused.");
+                        break;
+                    case "r":
+                        cts.Dispose();
+                        cts = new CancellationTokenSource(TimeSpan.FromSeconds(maxTimeSeconds));
+                        task = GetHtmlAsync(url, cts.Token);
+                        Console.WriteLine("Resumed.");
+                        break;
+                    case "c":
+                        cts.Cancel();
+                        Console.WriteLine("Cancelling.");
+                        return;
+                    default:
+                        break;
+                }
+                if (task.IsCompleted)
+                {
+                    break;
+                }
+            }
+
+            if (task.IsCanceled)
+            {
+                Console.WriteLine("Task cancelled.");
+            }
+            else if (task.IsFaulted)
+            {
+                Console.WriteLine($"Task failed: {task.Exception.Flatten().Message}");
+            }
+            else
+            {
+                var html = await task;
                 if (html != null)
                 {
                     if (html.Contains(searchText))
@@ -52,17 +90,7 @@ namespace TestVSCode
                 // Stream dataStream = response.GetResponseStream();
                 // StreamReader reader = new StreamReader(dataStream);
                 //string html = reader.ReadToEnd();
-                
             }
-            catch (OperationCanceledException)
-            {
-                Console.WriteLine("Operation cancelled.");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Error: " + e.Message);
-            }
-            
         }
         
         static async Task<string> GetHtmlAsync(string url, CancellationToken cancellationToken)
@@ -77,6 +105,10 @@ namespace TestVSCode
                     Console.WriteLine($"Failed to get HTML content: {response.StatusCode}");
                     return null;
                 }
+            }
+            catch(OperationCanceledException ex){
+                Console.WriteLine($"Task cancelled: {ex.Message}");
+                return null;
             }
             catch(Exception ex){
                 Console.WriteLine($"An error occurred: {ex.Message}");
