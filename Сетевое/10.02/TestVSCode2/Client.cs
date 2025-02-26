@@ -45,13 +45,19 @@ namespace TestVSCode2
         {
             using var client = new HttpClient();
             var response = await client.GetAsync(url);
+            
             if (!response.IsSuccessStatusCode)
             {
+                Console.WriteLine($"Запрос завершился с ошибкой: {response.StatusCode}");
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Содержимое ошибки: {errorContent}");
                 throw new HttpRequestException($"Запрос завершился с ошибкой: {response.StatusCode}");
             }
+            
             var data = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<WeatherResponse>(data);
         }
+
 
         static async Task<OneCallResponse> GetForecastData(string url)
         {

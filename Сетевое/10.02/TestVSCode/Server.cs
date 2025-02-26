@@ -92,7 +92,7 @@ namespace TestVSCode
                 string filePath = CreateResultFile(json);
                 string senderEmail = "";
                 string senderPassword = "";
-                string smtpServer = "smpt.gmail.com";
+                string smtpServer = "smtp.gmail.com";
                 int smtpPort = 587;
 
                 MailMessage message = new MailMessage();
