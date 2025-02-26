@@ -10,47 +10,62 @@ namespace TestVSCode
     class Program
     {
         /*
-        Создайте приложение, которое позволит искать изо
-        бражения в поисковой системе. Пользователь вводит 
-        текст для поиска изображения, приложение отображает 
-        картинки с первой страницы результатов поиска. В ка
-        честве поисковой системы можно использовать любую 
-        систему на ваш выбор. Например, Google или Bing.
+         Создайте приложение для отображения информации о 
+        фильме. Пользователь вводит название фильма, приложение 
+        отображает информацию о нём. Для поиска информации 
+        о фильме используйте http://www.omdbapi.com/.
         */
+        private const string ApiKey = "f360ac11";
+
+        private const string ApiUrl = "http://www.omdbapi.com/";
         static async Task Main(string[] args)
         {
-            Console.WriteLine("Enter search query for img:");
-            string query = Console.ReadLine();
-            string apiKey = "";
-            string searchId = "";
-            string apiUrl = $"https://customsearch.googleapis.com/customsearch/v1?cx={searchId}&key={apiKey}&q={query}&searchType=image&start=0";
+            Console.WriteLine("Enter movie title:");
+            string movieTitle = Console.ReadLine();
+            if (!string.IsNullOrEmpty(movieTitle))
+            {
+                await GetMovieInfo(movieTitle);
+            }
+            else{
+                Console.WriteLine("Invalid title!");
+            }
+        }
+        
+        private static async Task GetMovieInfo(string title)
+        {
             try{
-                using (var client = new HttpClient())
+                using (HttpClient client = new HttpClient())
                 {
-                    var response = await client.GetAsync(apiUrl);
-                    if (response.IsSuccessStatusCode)
+                    string requstUrl = $"{ApiUrl}?t={title}&apikey={ApiKey}";
+                    HttpResponseMessage response = await client.GetAsync(requstUrl);
+                    response.EnsureSuccessStatusCode();
+                    string jsonString = await response.Content.ReadAsStringAsync();
+                    JObject json = JObject.Parse(jsonString);
+                    if(json["Response"].Value<string>() == "True")
                     {
-                        var content = await response.Content.ReadAsStringAsync();
-                        JObject jResponse = JObject.Parse(content);
-                        foreach (var result in jResponse["items"])
-                        {
-                            Console.WriteLine($"Title: {result["title"]}");
-                            Console.WriteLine($"Link: {result["link"]}");
-                            Console.WriteLine($"Snippet: {result["snippet"]}");
-                            Console.WriteLine();
-                        }
+                        Console.WriteLine($"Title: {json["Title"]}");
+                        Console.WriteLine($"Year: {json["Year"]}");
+                        Console.WriteLine($"Rated: {json["Rated"]}");
+                        Console.WriteLine($"Genre: {string.Join(", ", json["Genre"])}");
+                        Console.WriteLine($"Director: {json["Director"]}");
+                        Console.WriteLine($"Actors: {json["Actors"]}");
+                        Console.WriteLine($"Plot: {json["Plot"]}");
                     }
                     else
                     {
-                        Console.WriteLine($"Error: {response.StatusCode}");
+                        Console.WriteLine($"Error: {json["Error"]}");
                     }
+    
                 }
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Error connecting to the API: {ex.Message}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
             }
-            
         }
     }
 }
