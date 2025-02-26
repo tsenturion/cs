@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using HtmlAgilityPack;
 
 namespace TestVSCode
 {
@@ -18,37 +19,48 @@ namespace TestVSCode
         static async Task Main(string[] args)
         {
             Console.WriteLine("Enter search query:");
-            string query = Console.ReadLine();
-            string apiKey = "";
-            string searchId = "";
-            string apiUrl = $"https://customsearch.googleapis.com/customsearch/v1?cx={searchId}&key={apiKey}&q={query}&start=0";
+            string searchTerm = Console.ReadLine();
+            string url = $"https://www.google.com/search?q={Uri.EscapeDataString(searchTerm)}";
             try{
-                using (var client = new HttpClient())
+                using (HttpClient client = new HttpClient())
                 {
-                    var response = await client.GetAsync(apiUrl);
-                    if (response.IsSuccessStatusCode)
+                    var response = await client.GetStringAsync(url);
+
+                    var htmlDoc = new HtmlDocument();
+                    htmlDoc.LoadHtml(response);
+                    var results = htmlDoc.DocumentNode.SelectNodes("//div[@class='g']");
+                    if (results != null)
                     {
-                        var content = await response.Content.ReadAsStringAsync();
-                        JObject jResponse = JObject.Parse(content);
-                        foreach (var result in jResponse["items"])
+                        foreach (var result in results)
                         {
-                            Console.WriteLine($"Title: {result["title"]}");
-                            Console.WriteLine($"Link: {result["link"]}");
-                            Console.WriteLine($"Snippet: {result["snippet"]}");
-                            Console.WriteLine();
+                            var titleNode = result.SelectSingleNode(".//h3");
+                            var linkNode = result.SelectSingleNode(".//a");
+                            var snippetNode = result.SelectSingleNode(".//span[@class='aCOpRe']");
+                            if (titleNode!= null && linkNode!= null && snippetNode!= null)
+                            {
+                                string title = titleNode.InnerText;
+                                string link = linkNode.GetAttributeValue("href", "");
+                                string snippet = snippetNode.InnerText;
+                                Console.WriteLine($"Title: {title}");
+                                Console.WriteLine($"Link: {link}");
+                                Console.WriteLine($"Snippet: {snippet}");
+                                Console.WriteLine("--------------------------------");
+                            }
                         }
                     }
-                    else
-                    {
-                        Console.WriteLine($"Error: {response.StatusCode}");
+                    else{
+                        Console.WriteLine("No results found.");
                     }
                 }
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Error connecting to the API: {ex.Message}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
             }
-            
         }
     }
 }
