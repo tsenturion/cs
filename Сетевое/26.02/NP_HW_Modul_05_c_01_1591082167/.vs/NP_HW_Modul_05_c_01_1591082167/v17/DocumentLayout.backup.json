@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\26.02\\NP_HW_Modul_05_c_01_1591082167\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{3A91C1A2-C686-4201-95EF-8ABA66E82792}|2\\2.csproj|e:\\\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\desktop\\academy\\source\\repos\\cs\\\u0441\u0435\u0442\u0435\u0432\u043E\u0435\\26.02\\np_hw_modul_05_c_01_1591082167\\2\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3A91C1A2-C686-4201-95EF-8ABA66E82792}|2\\2.csproj|solutionrelative:2\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{33B71A2B-CF2B-45F8-B621-66B1B34AD6A1}|1\\1.csproj|e:\\\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\desktop\\academy\\source\\repos\\cs\\\u0441\u0435\u0442\u0435\u0432\u043E\u0435\\26.02\\np_hw_modul_05_c_01_1591082167\\1\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{33B71A2B-CF2B-45F8-B621-66B1B34AD6A1}|1\\1.csproj|solutionrelative:1\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
@@ -48,11 +52,24 @@
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "Program.cs",
+              "DocumentMoniker": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\26.02\\NP_HW_Modul_05_c_01_1591082167\\2\\Program.cs",
+              "RelativeDocumentMoniker": "2\\Program.cs",
+              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\26.02\\NP_HW_Modul_05_c_01_1591082167\\2\\Program.cs",
+              "RelativeToolTip": "2\\Program.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAACAAAAANAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-26T16:21:01.595Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Program.cs",
               "DocumentMoniker": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\26.02\\NP_HW_Modul_05_c_01_1591082167\\1\\Program.cs",
               "RelativeDocumentMoniker": "1\\Program.cs",
-              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\26.02\\NP_HW_Modul_05_c_01_1591082167\\1\\Program.cs*",
-              "RelativeToolTip": "1\\Program.cs*",
-              "ViewState": "AgIAAAYAAAAAAAAAAAAAABAAAAAcAAAAAAAAAA==",
+              "ToolTip": "E:\\\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438\\Desktop\\academy\\source\\repos\\cs\\\u0421\u0435\u0442\u0435\u0432\u043E\u0435\\26.02\\NP_HW_Modul_05_c_01_1591082167\\1\\Program.cs",
+              "RelativeToolTip": "1\\Program.cs",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAAABsAAAAkAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-02-26T15:41:59.815Z",
               "EditorCaption": ""
