@@ -11,125 +11,52 @@ namespace TestVSCode
 {
     class Program
     {
-        /*
-        Создайте приложение для отображения информации о 
-        фильме. Пользователь вводит название фильма, приложение 
-        отображает информацию о нём. Для поиска информации 
-        о фильме используйте http://www.omdbapi.com/.
-        Добавьте возможность отсылки 
-        письма с полученными результатами поиска. Для отсылки 
-        письма нужно будет указать адресата, заголовок, текст пись
-        ма, результаты поиска прикрепляются отдельным файлом
-        */
-        private const string ApiKey = "f360ac11";
-
-        private const string ApiUrl = "http://www.omdbapi.com/";
         static async Task Main(string[] args)
         {
-            Console.WriteLine("Enter movie title:");
-            string movieTitle = Console.ReadLine();
-            if (!string.IsNullOrEmpty(movieTitle))
-            {
-                await GetMovieInfo(movieTitle);
-            }
-            else{
-                Console.WriteLine("Invalid title!");
-            }
-        }
-        
-        private static async Task GetMovieInfo(string title)
-        {
-            try{
-                using (HttpClient client = new HttpClient())
-                {
-                    string requstUrl = $"{ApiUrl}?t={title}&apikey={ApiKey}";
-                    HttpResponseMessage response = await client.GetAsync(requstUrl);
-                    response.EnsureSuccessStatusCode();
-                    string jsonString = await response.Content.ReadAsStringAsync();
-                    JObject json = JObject.Parse(jsonString);
-                    if(json["Response"].Value<string>() == "True")
-                    {
-                        Console.WriteLine($"Title: {json["Title"]}");
-                        Console.WriteLine($"Year: {json["Year"]}");
-                        Console.WriteLine($"Rated: {json["Rated"]}");
-                        Console.WriteLine($"Genre: {string.Join(", ", json["Genre"])}");
-                        Console.WriteLine($"Director: {json["Director"]}");
-                        Console.WriteLine($"Actors: {json["Actors"]}");
-                        Console.WriteLine($"Plot: {json["Plot"]}");
-                        Console.WriteLine($"отправить письмо?");
-                        string answer = Console.ReadLine();
-                        if(answer.ToLower() == "да")
-                        {
-                            await SendEmail(json);
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Error: {json["Error"]}");
-                    }
-    
-                }
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.WriteLine($"Error connecting to the API: {ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
-            }
-        }
-        
-        private static async Task SendEmail(JObject json)
-        {
-            try{
-                Console.WriteLine("адрес получателя");
-                string recipientEmail = Console.ReadLine();
-                Console.WriteLine("заголовок письма");
-                string subject = Console.ReadLine();
-                Console.WriteLine("текст письма");
-                string body = Console.ReadLine();
-                string filePath = CreateResultFile(json);
-                string senderEmail = "";
-                string senderPassword = "";
-                string smtpServer = "smtp.gmail.com";
-                int smtpPort = 587;
+            //теория
+            //команды почты
 
-                MailMessage message = new MailMessage();
-                message.From = new MailAddress(senderEmail);
-                message.To.Add(recipientEmail);
-                message.Subject = subject;
-                message.Body = body;
-                message.Attachments.Add(new Attachment(filePath));
+            // отправка письма с использованием SmtpClient
+            // mail from <адрес отправителя> отправитель указывается в формате email
+            // rcpt to:<адрес получателя> получатель указывается в формате email
+            // data начинается письмом и заканчивается двумя пустыми строками
 
-                SmtpClient smtpClient = new SmtpClient(smtpServer, smtpPort);
-                smtpClient.Credentials = new System.Net.NetworkCredential(senderEmail, senderPassword);
-                smtpClient.EnableSsl = true;
+
+            // hello/helo индентификация smtp клиента
+            // quit завершает работу с smtp клиентом
+
+
+            // body текст письма
+
+            //практика
+            MailMessage message = new MailMessage();
+
+            message.From = new MailAddress("sender@example.com");
+            message.To.Add("receiver@example.com");
+
+            message.Subject = "Test email";
+            message.Body = "This is a test email.";
+
+            message.IsBodyHtml = false;
+
+            Attachment attachment = new Attachment(@"C:\file.jpg");
+            message.Attachments.Add(attachment);
+
+            //SmtpClient smtpClient = new SmtpClient("smtp.gmail.com", 587);
+            SmtpClient smtpClient = new SmtpClient();
+            smtpClient.Host = "smtp.gmail.com";
+            smtpClient.Port = 587;
+
+            smtpClient.Credentials = new System.Net.NetworkCredential("sender@example.com", "password");
+            smtpClient.EnableSsl = true;
+
+            try {
                 smtpClient.Send(message);
-                Console.WriteLine("Email sent successfully!");
+                Console.WriteLine("Email sent successfully.");
             }
-            catch (Exception ex)
-            {
+            catch (Exception ex) {
                 Console.WriteLine($"Error sending email: {ex.Message}");
             }
         }
-        
-        private static string CreateResultFile(JObject json)
-        {
-            string fileName = $"{json["Title"]}_{DateTime.Now.Ticks}.txt";
-            string filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), fileName);
-            using (StreamWriter writer = File.CreateText(filePath))
-            {
-                writer.WriteLine($"Title: {json["Title"]}");
-                writer.WriteLine($"Year: {json["Year"]}");
-                writer.WriteLine($"Rated: {json["Rated"]}");
-                writer.WriteLine($"Genre: {string.Join(", ", json["Genre"])}");
-                writer.WriteLine($"Director: {json["Director"]}");
-                writer.WriteLine($"Actors: {json["Actors"]}");
-                writer.WriteLine($"Plot: {json["Plot"]}");
-            }
-            return filePath;
-        }
-    
     }
 }
