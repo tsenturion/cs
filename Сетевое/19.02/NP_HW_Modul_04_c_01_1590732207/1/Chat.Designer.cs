@@ -103,6 +103,7 @@
 			Controls.Add(richTextBox1);
 			Name = "ChatForm";
 			Text = "Chat";
+			Load += ChatForm_Load;
 			ResumeLayout(false);
 			PerformLayout();
 		}
