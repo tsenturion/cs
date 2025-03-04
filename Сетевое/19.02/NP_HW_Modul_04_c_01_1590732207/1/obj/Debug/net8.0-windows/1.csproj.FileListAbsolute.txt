@@ -16,3 +16,6 @@ E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02
 E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\ref\1.dll
 E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\_1.ChatForm.resources
 E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\_1.LogInForm.resources
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\bin\Debug\net8.0-windows\Newtonsoft.Json.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.csproj.AssemblyReference.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\19.02\NP_HW_Modul_04_c_01_1590732207\1\obj\Debug\net8.0-windows\1.csproj.Up2Date

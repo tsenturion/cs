@@ -32,7 +32,7 @@
 			buttonSend = new Button();
 			textBoxMessage = new TextBox();
 			label1 = new Label();
-			comboBox1 = new ComboBox();
+			comboBoxChats = new ComboBox();
 			buttonNewChat = new Button();
 			SuspendLayout();
 			// 
@@ -54,6 +54,7 @@
 			buttonSend.TabIndex = 4;
 			buttonSend.Text = "Send";
 			buttonSend.UseVisualStyleBackColor = true;
+			buttonSend.Click += buttonSend_Click;
 			// 
 			// textBoxMessage
 			// 
@@ -61,6 +62,7 @@
 			textBoxMessage.Name = "textBoxMessage";
 			textBoxMessage.Size = new Size(176, 23);
 			textBoxMessage.TabIndex = 5;
+			textBoxMessage.TextChanged += textBoxMessage_TextChanged;
 			// 
 			// label1
 			// 
@@ -72,13 +74,14 @@
 			label1.TabIndex = 6;
 			label1.Text = "Select chat";
 			// 
-			// comboBox1
+			// comboBoxChats
 			// 
-			comboBox1.FormattingEnabled = true;
-			comboBox1.Location = new Point(119, 14);
-			comboBox1.Name = "comboBox1";
-			comboBox1.Size = new Size(212, 20);
-			comboBox1.TabIndex = 7;
+			comboBoxChats.FormattingEnabled = true;
+			comboBoxChats.Location = new Point(119, 14);
+			comboBoxChats.Name = "comboBoxChats";
+			comboBoxChats.Size = new Size(212, 20);
+			comboBoxChats.TabIndex = 7;
+			comboBoxChats.SelectedIndexChanged += comboBoxChats_SelectedIndexChanged;
 			// 
 			// buttonNewChat
 			// 
@@ -96,7 +99,7 @@
 			AutoScaleMode = AutoScaleMode.Font;
 			ClientSize = new Size(343, 389);
 			Controls.Add(buttonNewChat);
-			Controls.Add(comboBox1);
+			Controls.Add(comboBoxChats);
 			Controls.Add(label1);
 			Controls.Add(textBoxMessage);
 			Controls.Add(buttonSend);
@@ -113,7 +116,7 @@
 		private Button buttonSend;
 		private TextBox textBoxMessage;
 		private Label label1;
-		private ComboBox comboBox1;
+		private ComboBox comboBoxChats;
 		private Button buttonNewChat;
 	}
 }

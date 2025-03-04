@@ -11,6 +11,7 @@ using System.Net.Sockets;
 
 namespace _1
 {
+	
 	public partial class LogInForm : Form
 	{
 		ChatForm chat = null;
@@ -31,12 +32,13 @@ namespace _1
 			Socket userSocket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 			await userSocket.ConnectAsync(Server.IPEnd);
 
+			//!!!
 			//Серверу отправляется логин и пароль, он их проверяет и на основе этого дает подключение, либо нет
-			await userSocket.SendAsync(Encoding.UTF8.GetBytes(textBoxLogin.Text));
+			//await userSocket.SendAsync(Encoding.UTF8.GetBytes("/log_in,pass"));
 
 			if (userSocket.Connected)
 			{
-				chat = new(this.labelLogin.Text, userSocket, this);
+				chat = new(this.textBoxLogin.Text, userSocket, this);
 				chat.Show();
 			}
 			else MessageBox.Show("Не удалось подключиться", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
