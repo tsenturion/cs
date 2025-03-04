@@ -1,0 +1,15 @@
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\bin\Debug\net8.0\SMTP.exe
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\bin\Debug\net8.0\SMTP.deps.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\bin\Debug\net8.0\SMTP.runtimeconfig.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\bin\Debug\net8.0\SMTP.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\bin\Debug\net8.0\SMTP.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\SMTP.GeneratedMSBuildEditorConfig.editorconfig
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\SMTP.AssemblyInfoInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\SMTP.AssemblyInfo.cs
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\SMTP.csproj.CoreCompileInputs.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\SMTP.sourcelink.json
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\SMTP.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\refint\SMTP.dll
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\SMTP.pdb
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\SMTP.genruntimeconfig.cache
+E:\Пользователи\Desktop\academy\source\repos\cs\Сетевое\28.02\SMTP\SMTP\obj\Debug\net8.0\ref\SMTP.dll
