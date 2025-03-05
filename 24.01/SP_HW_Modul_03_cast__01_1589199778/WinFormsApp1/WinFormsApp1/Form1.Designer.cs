@@ -28,28 +28,25 @@
 		/// </summary>
 		private void InitializeComponent()
 		{
-			components = new System.ComponentModel.Container();
-			timer1 = new System.Windows.Forms.Timer(components);
-			textBox1 = new TextBox();
+			textBoxSimpleNumbers = new TextBox();
 			button2 = new Button();
 			label1 = new Label();
 			labelSN = new Label();
-			checkBox1 = new CheckBox();
+			checkBoxSN = new CheckBox();
+			label2 = new Label();
+			textBoxFibNumbers = new TextBox();
+			labelFN = new Label();
+			checkBoxFibNumbers = new CheckBox();
 			SuspendLayout();
 			// 
-			// timer1
+			// textBoxSimpleNumbers
 			// 
-			timer1.Interval = 1000;
-			timer1.Tick += timer1_Tick;
-			// 
-			// textBox1
-			// 
-			textBox1.Location = new Point(137, 53);
-			textBox1.Multiline = true;
-			textBox1.Name = "textBox1";
-			textBox1.ScrollBars = ScrollBars.Vertical;
-			textBox1.Size = new Size(642, 96);
-			textBox1.TabIndex = 5;
+			textBoxSimpleNumbers.Location = new Point(137, 53);
+			textBoxSimpleNumbers.Multiline = true;
+			textBoxSimpleNumbers.Name = "textBoxSimpleNumbers";
+			textBoxSimpleNumbers.ScrollBars = ScrollBars.Vertical;
+			textBoxSimpleNumbers.Size = new Size(642, 96);
+			textBoxSimpleNumbers.TabIndex = 5;
 			// 
 			// button2
 			// 
@@ -79,29 +76,74 @@
 			labelSN.TabIndex = 8;
 			labelSN.Text = "Start generating";
 			// 
-			// checkBox1
+			// checkBoxSN
 			// 
-			checkBox1.Appearance = Appearance.Button;
-			checkBox1.AutoSize = true;
-			checkBox1.Font = new Font("Britannic Bold", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-			checkBox1.Location = new Point(48, 93);
-			checkBox1.Name = "checkBox1";
-			checkBox1.Size = new Size(46, 37);
-			checkBox1.TabIndex = 9;
-			checkBox1.Text = "►";
-			checkBox1.UseVisualStyleBackColor = true;
-			checkBox1.CheckedChanged += checkBox1_CheckedChanged;
+			checkBoxSN.Appearance = Appearance.Button;
+			checkBoxSN.AutoSize = true;
+			checkBoxSN.Font = new Font("Britannic Bold", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
+			checkBoxSN.Location = new Point(48, 93);
+			checkBoxSN.Name = "checkBoxSN";
+			checkBoxSN.Size = new Size(46, 37);
+			checkBoxSN.TabIndex = 9;
+			checkBoxSN.Text = "►";
+			checkBoxSN.UseVisualStyleBackColor = true;
+			checkBoxSN.CheckedChanged += checkBox1_CheckedChanged;
+			// 
+			// label2
+			// 
+			label2.AutoSize = true;
+			label2.Font = new Font("Segoe UI Semilight", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 204);
+			label2.Location = new Point(355, 172);
+			label2.Name = "label2";
+			label2.Size = new Size(187, 30);
+			label2.TabIndex = 10;
+			label2.Text = "Fibonacci numbers";
+			// 
+			// textBoxFibNumbers
+			// 
+			textBoxFibNumbers.Location = new Point(137, 221);
+			textBoxFibNumbers.Multiline = true;
+			textBoxFibNumbers.Name = "textBoxFibNumbers";
+			textBoxFibNumbers.ScrollBars = ScrollBars.Vertical;
+			textBoxFibNumbers.Size = new Size(642, 96);
+			textBoxFibNumbers.TabIndex = 11;
+			// 
+			// labelFN
+			// 
+			labelFN.AutoSize = true;
+			labelFN.Location = new Point(21, 240);
+			labelFN.Name = "labelFN";
+			labelFN.Size = new Size(98, 12);
+			labelFN.TabIndex = 12;
+			labelFN.Text = "Start generating";
+			// 
+			// checkBoxFibNumbers
+			// 
+			checkBoxFibNumbers.Appearance = Appearance.Button;
+			checkBoxFibNumbers.AutoSize = true;
+			checkBoxFibNumbers.Font = new Font("Britannic Bold", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
+			checkBoxFibNumbers.Location = new Point(48, 268);
+			checkBoxFibNumbers.Name = "checkBoxFibNumbers";
+			checkBoxFibNumbers.Size = new Size(46, 37);
+			checkBoxFibNumbers.TabIndex = 13;
+			checkBoxFibNumbers.Text = "►";
+			checkBoxFibNumbers.UseVisualStyleBackColor = true;
+			checkBoxFibNumbers.CheckedChanged += checkBoxFibNumbers_CheckedChanged;
 			// 
 			// Form1
 			// 
 			AutoScaleDimensions = new SizeF(6F, 12F);
 			AutoScaleMode = AutoScaleMode.Font;
-			ClientSize = new Size(800, 436);
-			Controls.Add(checkBox1);
+			ClientSize = new Size(800, 344);
+			Controls.Add(checkBoxFibNumbers);
+			Controls.Add(labelFN);
+			Controls.Add(textBoxFibNumbers);
+			Controls.Add(label2);
+			Controls.Add(checkBoxSN);
 			Controls.Add(labelSN);
 			Controls.Add(label1);
 			Controls.Add(button2);
-			Controls.Add(textBox1);
+			Controls.Add(textBoxSimpleNumbers);
 			Name = "Form1";
 			Text = "Form1";
 			ResumeLayout(false);
@@ -109,11 +151,14 @@
 		}
 
 		#endregion
-		private System.Windows.Forms.Timer timer1;
-		private TextBox textBox1;
+		private TextBox textBoxSimpleNumbers;
 		private Button button2;
 		private Label label1;
 		private Label labelSN;
-		private CheckBox checkBox1;
+		private CheckBox checkBoxSN;
+		private Label label2;
+		private TextBox textBoxFibNumbers;
+		private Label labelFN;
+		private CheckBox checkBoxFibNumbers;
 	}
 }

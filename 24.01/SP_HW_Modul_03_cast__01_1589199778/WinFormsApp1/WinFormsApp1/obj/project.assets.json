@@ -14,9 +14,9 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\Пользователи\\Desktop\\academy\\source\\repos\\cs\\24.01\\SP_HW_Modul_03_cast__01_1589199778\\WinFormsApp1\\WinFormsApp1\\WinFormsApp1.csproj",
-      "projectName": "WinFormsApp1",
-      "projectPath": "E:\\Пользователи\\Desktop\\academy\\source\\repos\\cs\\24.01\\SP_HW_Modul_03_cast__01_1589199778\\WinFormsApp1\\WinFormsApp1\\WinFormsApp1.csproj",
+      "projectUniqueName": "E:\\Пользователи\\Desktop\\academy\\source\\repos\\cs\\24.01\\SP_HW_Modul_03_cast__01_1589199778\\WinFormsApp1\\WinFormsApp1\\NumberGenerator.csproj",
+      "projectName": "NumberGenerator",
+      "projectPath": "E:\\Пользователи\\Desktop\\academy\\source\\repos\\cs\\24.01\\SP_HW_Modul_03_cast__01_1589199778\\WinFormsApp1\\WinFormsApp1\\NumberGenerator.csproj",
       "packagesPath": "C:\\Users\\Comp\\.nuget\\packages\\",
       "outputPath": "E:\\Пользователи\\Desktop\\academy\\source\\repos\\cs\\24.01\\SP_HW_Modul_03_cast__01_1589199778\\WinFormsApp1\\WinFormsApp1\\obj\\",
       "projectStyle": "PackageReference",

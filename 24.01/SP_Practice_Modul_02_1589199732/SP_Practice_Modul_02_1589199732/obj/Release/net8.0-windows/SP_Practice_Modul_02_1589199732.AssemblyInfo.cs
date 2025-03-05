@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SP_Practice_Modul_02_1589199732")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5ec9e4a7cfedaab7c2b277b7ab0771c9a29f54c7")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b016891ae8718f86060838c53af73bb164a18e9b")]
 [assembly: System.Reflection.AssemblyProductAttribute("SP_Practice_Modul_02_1589199732")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SP_Practice_Modul_02_1589199732")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
