@@ -1,177 +1,194 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
-namespace DeviceInterop
+namespace InteropSamples
 {
-	public static class DeviceApi
+	// Пример 1: Базовый DllImport
+	public static class NativeMethods
 	{
-		// Инициализация устройства
-		[DllImport("device_driver.dll", CallingConvention = CallingConvention.StdCall)]
-		public static extern int InitializeDevice();
+		[DllImport("kernel32.dll")]
+		public static extern uint GetTickCount(); // Получение времени работы системы в миллисекундах
 
-		// Чтение данных с устройства
-		[DllImport("device_driver.dll", CallingConvention = CallingConvention.StdCall)]
-		public static extern int ReadData(out int value);
+		// Для macOS/Linux можно использовать:
+		// [DllImport("libc", EntryPoint = "clock_gettime")]
+	}
 
-		// Запись данных на устройство
-		[DllImport("device_driver.dll", CallingConvention = CallingConvention.StdCall)]
-		public static extern int WriteData(int value);
+	// Пример 2: Обработка ошибок WinAPI
+	public static class ErrorExample
+	{
+		[DllImport("kernel32.dll", SetLastError = true)]
+		private static extern bool CloseHandle(IntPtr handle); // Закрытие дескриптора объекта Windows
 
-		// Получение статуса устройства
-		[DllImport("device_driver.dll", CallingConvention = CallingConvention.StdCall)]
-		public static extern int GetDeviceStatus();
+		public static void Close(IntPtr handle)
+		{
+			if (!CloseHandle(handle))
+			{
+				// Получение кода последней системной ошибки
+				int errorCode = Marshal.GetLastWin32Error();
+				throw new InvalidOperationException($"Код ошибки: {errorCode}");
+			}
+		}
+	}
 
-		// Закрытие соединения с устройством
-		[DllImport("device_driver.dll", CallingConvention = CallingConvention.StdCall)]
-		public static extern int CloseDevice();
+	// Пример 3: Работа со строками и кодировками
+	public static class StringInterop
+	{
+		[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+		public static extern int MessageBox(
+			IntPtr hWnd,            // Родительское окно
+			string text,            // Текст сообщения (маршалинг в Unicode)
+			string caption,         // Заголовок окна
+			uint type               // Тип диалога (кнопки, иконки)
+		);
+
+		// ANSI версия (устаревшая, для совместимости)
+		[DllImport("user32.dll", CharSet = CharSet.Ansi)]
+		public static extern int MessageBoxA(
+			IntPtr hWnd,
+			string text,
+			string caption,
+			uint type
+		);
+	}
+
+	// Пример 4: Структуры с явным расположением в памяти
+	[StructLayout(LayoutKind.Sequential, Pack = 4)]
+	public struct Point
+	{
+		public int X;               // 4 байта, смещение 0
+		public int Y;               // 4 байта, смещение 4
+
+		// Без StructLayout CLR может оптимизировать расположение полей
+		// Pack = 4 означает выравнивание по 4-байтовой границе
+	}
+
+	// Пример 5: Структура с фиксированным строковым буфером
+	[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+	public struct SystemInfo
+	{
+		public int processorCount;
+
+		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+		public string processorName; // Фиксированный буфер на 256 символов
+
+		public int memorySizeMB;
+	}
+
+	// Пример 6: Управление неуправляемой памятью
+	public static class MemoryExample
+	{
+		[DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)]
+		private static extern int memcpy(
+			IntPtr dest,            // Целевой указатель
+			IntPtr src,             // Источник
+			int count               // Количество байт
+		);
+
+		public static void CopyMemory(byte[] source, byte[] destination)
+		{
+			if (source.Length != destination.Length)
+				throw new ArgumentException("Размеры массивов должны совпадать");
+
+			IntPtr srcPtr = Marshal.AllocHGlobal(source.Length);    // Выделение неуправляемой памяти
+			IntPtr dstPtr = Marshal.AllocHGlobal(destination.Length);
+
+			try
+			{
+				// Копирование из управляемого массива в неуправляемую память
+				Marshal.Copy(source, 0, srcPtr, source.Length);
+
+				// Вызов нативной функции копирования памяти
+				memcpy(dstPtr, srcPtr, source.Length);
+
+				// Копирование результата обратно в управляемый массив
+				Marshal.Copy(dstPtr, destination, 0, destination.Length);
+			}
+			finally
+			{
+				// Обязательное освобождение памяти даже при исключениях
+				Marshal.FreeHGlobal(srcPtr);
+				Marshal.FreeHGlobal(dstPtr);
+			}
+		}
+	}
+
+	// Пример 7: Работа с делегатами и обратными вызовами
+	public static class CallbackExample
+	{
+		// Объявление делегата, совместимого с нативной callback-функцией
+		[UnmanagedFunctionPointer(CallingConvention.StdCall)]
+		public delegate void LogCallback(
+			[MarshalAs(UnmanagedType.LPStr)] string message,    // Строка как char*
+			int severity                                        // Уровень серьезности
+		);
+
+		[DllImport("logging.dll", CallingConvention = CallingConvention.StdCall)]
+		public static extern void SetLogger(LogCallback callback);
+	}
+
+	// Пример 8: COM-взаимодействие (сокращенный пример)
+	[ComImport]
+	[Guid("00000000-0000-0000-C000-000000000046")] // IUnknown
+	[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+	public interface IUnknown
+	{
+		int QueryInterface(ref Guid riid, out IntPtr ppvObject);
+		int AddRef();
+		int Release();
 	}
 }
 
-namespace LegacyWrapper
-{
-	// Адаптационный слой для изоляции legacy-кода
-	public class DeviceService
-	{
-		private bool _isInitialized = false;
-
-		public bool Start()
-		{
-			// Вызов неуправляемого кода для инициализации устройства
-			int result = DeviceInterop.DeviceApi.InitializeDevice();
-			_isInitialized = (result == 0);
-			return _isInitialized;
-		}
-
-		public int GetValue()
-		{
-			if (!_isInitialized)
-			{
-				// Предотвращение работы с неинициализированным устройством
-				throw new InvalidOperationException("Устройство не инициализировано. Вызовите Start() перед GetValue()");
-			}
-
-			int value;
-			// Вызов неуправляемого кода для чтения данных
-			int result = DeviceInterop.DeviceApi.ReadData(out value);
-
-			if (result != 0)
-			{
-				// Преобразование кода ошибки в управляемое исключение
-				throw new InvalidOperationException("Ошибка чтения данных устройства. Код ошибки: " + result);
-			}
-
-			return value;
-		}
-
-		public void WriteValue(int value)
-		{
-			if (!_isInitialized)
-			{
-				throw new InvalidOperationException("Устройство не инициализировано. Вызовите Start() перед WriteValue()");
-			}
-
-			int result = DeviceInterop.DeviceApi.WriteData(value);
-
-			if (result != 0)
-			{
-				throw new InvalidOperationException("Ошибка записи данных на устройство. Код ошибки: " + result);
-			}
-		}
-
-		public int GetStatus()
-		{
-			if (!_isInitialized)
-			{
-				throw new InvalidOperationException("Устройство не инициализировано. Вызовите Start() перед GetStatus()");
-			}
-
-			return DeviceInterop.DeviceApi.GetDeviceStatus();
-		}
-
-		public void Stop()
-		{
-			if (_isInitialized)
-			{
-				DeviceInterop.DeviceApi.CloseDevice();
-				_isInitialized = false;
-			}
-		}
-
-		// Деструктор для гарантированного освобождения ресурсов
-		~DeviceService()
-		{
-			Stop();
-		}
-	}
-}
-
-// Главный класс программы для демонстрации работы адаптационного слоя
+// Основная программа для демонстрации всех примеров
 class Program
 {
 	static void Main(string[] args)
 	{
-		Console.WriteLine("=== Демонстрация адаптационного слоя для legacy-кода ===\n");
-
-		// Создаем экземпляр обертки вместо прямого использования DeviceApi
-		var deviceService = new LegacyWrapper.DeviceService();
+		Console.WriteLine("=== Демонстрация System.Runtime.InteropServices ===\n");
 
 		try
 		{
-			Console.WriteLine("1. Инициализация устройства через адаптер...");
-			bool started = deviceService.Start();
-			Console.WriteLine($"   Результат: {(started ? "УСПЕХ" : "ОШИБКА")}");
+			Console.WriteLine("1. GetTickCount (время работы системы):");
+			uint ticks = InteropSamples.NativeMethods.GetTickCount();
+			Console.WriteLine($"   Система работает: {ticks / 1000} секунд\n");
 
-			if (started)
-			{
-				Console.WriteLine("\n2. Проверка статуса устройства...");
-				int status = deviceService.GetStatus();
-				Console.WriteLine($"   Статус устройства: {status}");
+			Console.WriteLine("2. Структура Point:");
+			var point = new InteropSamples.Point { X = 10, Y = 20 };
+			Console.WriteLine($"   Point size: {Marshal.SizeOf(point)} байт");
+			Console.WriteLine($"   Значения: X={point.X}, Y={point.Y}\n");
 
-				Console.WriteLine("\n3. Чтение данных с устройства...");
-				try
-				{
-					int value = deviceService.GetValue();
-					Console.WriteLine($"   Полученное значение: {value}");
+			Console.WriteLine("3. Управление памятью через Marshal:");
+			byte[] source = { 1, 2, 3, 4, 5 };
+			byte[] dest = new byte[5];
+			InteropSamples.MemoryExample.CopyMemory(source, dest);
+			Console.WriteLine($"   Копирование массива: {string.Join(",", dest)}\n");
 
-					Console.WriteLine("\n4. Запись данных на устройство...");
-					deviceService.WriteValue(value + 100);
-					Console.WriteLine($"   Запись успешно выполнена");
-				}
-				catch (InvalidOperationException ex)
-				{
-					Console.WriteLine($"   ИСКЛЮЧЕНИЕ: {ex.Message}");
-					Console.WriteLine("   Продолжаем работу для демонстрации...");
-				}
-			}
-			else
-			{
-				Console.WriteLine("\nПропускаем дальнейшие операции т.к. инициализация не удалась.");
-			}
+			Console.WriteLine("4. Демонстрация кодировок:");
+			Console.WriteLine($"   Размер Unicode char: {Marshal.SystemDefaultCharSize} байт");
+			Console.WriteLine($"   Size of int: {Marshal.SizeOf(typeof(int))} байт\n");
 
-			Console.WriteLine("\n5. Повторная попытка чтения без инициализации...");
+			Console.WriteLine("=== СОВМЕСТИМОСТЬ ===");
+			Console.WriteLine($"   Platform: {(Environment.Is64BitProcess ? "x64" : "x86")}");
+			Console.WriteLine($"   OS: {Environment.OSVersion}");
+
+			// Демонстрация обработки ошибок
+			Console.WriteLine("\n6. Обработка ошибок (демо с несуществующим дескриптором):");
 			try
 			{
-				// Создаем новый экземпляр без вызова Start()
-				var badService = new LegacyWrapper.DeviceService();
-				int value = badService.GetValue(); // Будет выброшено исключение
+				InteropSamples.ErrorExample.Close(IntPtr.Zero);
 			}
 			catch (InvalidOperationException ex)
 			{
-				Console.WriteLine($"   ОЖИДАЕМОЕ ИСКЛЮЧЕНИЕ: {ex.Message}");
+				Console.WriteLine($"   Перехвачено: {ex.Message}");
 			}
 		}
-		catch (DllNotFoundException)
+		catch (DllNotFoundException ex)
 		{
-			Console.WriteLine("\nКРИТИЧЕСКАЯ ОШИБКА: Не найдена библиотека device_driver.dll");
-			Console.WriteLine("Это демонстрирует, что адаптер не скрывает фундаментальные проблемы,");
-			Console.WriteLine("а лишь преобразует стиль взаимодействия с legacy-кодом.");
+			Console.WriteLine($"Ошибка: {ex.Message}");
+			Console.WriteLine("Это демонстрация - некоторые библиотеки могут отсутствовать.");
 		}
-		finally
+		catch (Exception ex)
 		{
-			Console.WriteLine("\n6. Завершение работы...");
-			deviceService.Stop();
+			Console.WriteLine($"Неожиданная ошибка: {ex}");
 		}
-
-		Console.WriteLine("\n=== Демонстрация завершена ===");
 	}
 }
