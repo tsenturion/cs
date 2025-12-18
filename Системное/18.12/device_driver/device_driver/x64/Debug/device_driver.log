@@ -1,0 +1,6 @@
+﻿  pch.cpp
+  device_driver.cpp
+  dllmain.cpp
+  Создание кода...
+     Создается библиотека C:\Users\user\repos\cs\Системное\18.12\device_driver\x64\Debug\device_driver.lib и объект C:\Users\user\repos\cs\Системное\18.12\device_driver\x64\Debug\device_driver.exp
+  device_driver.vcxproj -> C:\Users\user\repos\cs\Системное\18.12\device_driver\x64\Debug\device_driver.dll
