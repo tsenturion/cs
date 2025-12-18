@@ -1,13 +1,12 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 
-namespace ManagedExample
+namespace LegacyInteropExample
 {
-	public class Calculator
+	public static class LegacyMath
 	{
-		public int Add(int a, int b)
-		{
-			return a + b; // Метод сложения двух целых чисел
-		}
+		[DllImport("legacy_math.dll")]
+		public static extern int add(int a, int b); // Импорт функции add из неуправляемой библиотеки
 	}
 
 	// Главный класс программы с точкой входа
@@ -15,14 +14,25 @@ namespace ManagedExample
 	{
 		static void Main(string[] args)
 		{
-			// Создаем экземпляр класса Calculator
-			Calculator calc = new Calculator();
+			try
+			{
+				// Вызов неуправляемой функции add из legacy_math.dll
+				int result = LegacyMath.add(7, 4);
 
-			// Вызываем метод Add с аргументами 5 и 3
-			int result = calc.Add(5, 3);
-
-			// Выводим результат сложения в консоль
-			Console.WriteLine($"Результат сложения: {result}");
+				// Вывод результата вызова неуправляемой функции
+				Console.WriteLine($"Результат вызова legacy_math.dll: {result}");
+			}
+			catch (DllNotFoundException ex)
+			{
+				// Обработка ошибки если библиотека не найдена
+				Console.WriteLine($"Ошибка: Не удалось найти библиотеку legacy_math.dll");
+				Console.WriteLine($"Подробности: {ex.Message}");
+			}
+			catch (Exception ex)
+			{
+				// Обработка других возможных ошибок
+				Console.WriteLine($"Ошибка при вызове неуправляемого кода: {ex.Message}");
+			}
 		}
 	}
 }
