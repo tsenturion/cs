@@ -1,0 +1,6 @@
+﻿  pch.cpp
+  dllmain.cpp
+  legacy_math.cpp
+  Создание кода...
+     Создается библиотека C:\Users\user\repos\cs\Системное\18.12\legacy_math\x64\Debug\legacy_math.lib и объект C:\Users\user\repos\cs\Системное\18.12\legacy_math\x64\Debug\legacy_math.exp
+  legacy_math.vcxproj -> C:\Users\user\repos\cs\Системное\18.12\legacy_math\x64\Debug\legacy_math.dll
