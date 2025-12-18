@@ -25,107 +25,153 @@ namespace DeviceInterop
 		[DllImport("device_driver.dll", CallingConvention = CallingConvention.StdCall)]
 		public static extern int CloseDevice();
 	}
+}
 
-	// Пример использования в C#
-	public class DeviceManager
+namespace LegacyWrapper
+{
+	// Адаптационный слой для изоляции legacy-кода
+	public class DeviceService
 	{
-		public bool Initialize()
+		private bool _isInitialized = false;
+
+		public bool Start()
 		{
-			int result = DeviceApi.InitializeDevice();
-			if (result == 0)
+			// Вызов неуправляемого кода для инициализации устройства
+			int result = DeviceInterop.DeviceApi.InitializeDevice();
+			_isInitialized = (result == 0);
+			return _isInitialized;
+		}
+
+		public int GetValue()
+		{
+			if (!_isInitialized)
 			{
-				Console.WriteLine("Device initialized successfully");
-				return true;
+				// Предотвращение работы с неинициализированным устройством
+				throw new InvalidOperationException("Устройство не инициализировано. Вызовите Start() перед GetValue()");
 			}
-			else
+
+			int value;
+			// Вызов неуправляемого кода для чтения данных
+			int result = DeviceInterop.DeviceApi.ReadData(out value);
+
+			if (result != 0)
 			{
-				Console.WriteLine($"Failed to initialize device. Error code: {result}");
-				return false;
+				// Преобразование кода ошибки в управляемое исключение
+				throw new InvalidOperationException("Ошибка чтения данных устройства. Код ошибки: " + result);
+			}
+
+			return value;
+		}
+
+		public void WriteValue(int value)
+		{
+			if (!_isInitialized)
+			{
+				throw new InvalidOperationException("Устройство не инициализировано. Вызовите Start() перед WriteValue()");
+			}
+
+			int result = DeviceInterop.DeviceApi.WriteData(value);
+
+			if (result != 0)
+			{
+				throw new InvalidOperationException("Ошибка записи данных на устройство. Код ошибки: " + result);
 			}
 		}
 
-		public bool ReadSensorData(out int sensorValue)
+		public int GetStatus()
 		{
-			sensorValue = 0;
-			int result = DeviceApi.ReadData(out sensorValue);
-
-			if (result == 0)
+			if (!_isInitialized)
 			{
-				Console.WriteLine($"Sensor value: {sensorValue}");
-				return true;
+				throw new InvalidOperationException("Устройство не инициализировано. Вызовите Start() перед GetStatus()");
 			}
-			else
+
+			return DeviceInterop.DeviceApi.GetDeviceStatus();
+		}
+
+		public void Stop()
+		{
+			if (_isInitialized)
 			{
-				Console.WriteLine($"Failed to read data. Error code: {result}");
-				return false;
+				DeviceInterop.DeviceApi.CloseDevice();
+				_isInitialized = false;
 			}
 		}
 
-		public void Dispose()
+		// Деструктор для гарантированного освобождения ресурсов
+		~DeviceService()
 		{
-			DeviceApi.CloseDevice();
-			Console.WriteLine("Device connection closed");
+			Stop();
 		}
 	}
+}
 
-	// Главный класс программы для демонстрации работы с устройством
-	class Program
+// Главный класс программы для демонстрации работы адаптационного слоя
+class Program
+{
+	static void Main(string[] args)
 	{
-		static void Main(string[] args)
+		Console.WriteLine("=== Демонстрация адаптационного слоя для legacy-кода ===\n");
+
+		// Создаем экземпляр обертки вместо прямого использования DeviceApi
+		var deviceService = new LegacyWrapper.DeviceService();
+
+		try
 		{
-			Console.WriteLine("=== Тестирование взаимодействия с устройством ===\n");
+			Console.WriteLine("1. Инициализация устройства через адаптер...");
+			bool started = deviceService.Start();
+			Console.WriteLine($"   Результат: {(started ? "УСПЕХ" : "ОШИБКА")}");
 
-			// Создаем менеджер устройства
-			DeviceManager deviceManager = new DeviceManager();
+			if (started)
+			{
+				Console.WriteLine("\n2. Проверка статуса устройства...");
+				int status = deviceService.GetStatus();
+				Console.WriteLine($"   Статус устройства: {status}");
 
+				Console.WriteLine("\n3. Чтение данных с устройства...");
+				try
+				{
+					int value = deviceService.GetValue();
+					Console.WriteLine($"   Полученное значение: {value}");
+
+					Console.WriteLine("\n4. Запись данных на устройство...");
+					deviceService.WriteValue(value + 100);
+					Console.WriteLine($"   Запись успешно выполнена");
+				}
+				catch (InvalidOperationException ex)
+				{
+					Console.WriteLine($"   ИСКЛЮЧЕНИЕ: {ex.Message}");
+					Console.WriteLine("   Продолжаем работу для демонстрации...");
+				}
+			}
+			else
+			{
+				Console.WriteLine("\nПропускаем дальнейшие операции т.к. инициализация не удалась.");
+			}
+
+			Console.WriteLine("\n5. Повторная попытка чтения без инициализации...");
 			try
 			{
-				// Пытаемся инициализировать устройство
-				bool initialized = deviceManager.Initialize();
-
-				if (initialized)
-				{
-					Console.WriteLine("\nПроверка статуса устройства:");
-					int status = DeviceApi.GetDeviceStatus();
-					Console.WriteLine($"Статус устройства: {status}");
-
-					Console.WriteLine("\nПопытка чтения данных с датчика:");
-					int sensorValue;
-					bool readSuccess = deviceManager.ReadSensorData(out sensorValue);
-
-					if (readSuccess)
-					{
-						Console.WriteLine("\nПопытка записи данных на устройство:");
-						int writeResult = DeviceApi.WriteData(sensorValue + 10);
-						Console.WriteLine($"Результат записи: {writeResult} (0 = успех)");
-					}
-
-					Console.WriteLine("\nПроверка статуса после операций:");
-					status = DeviceApi.GetDeviceStatus();
-					Console.WriteLine($"Статус устройства: {status}");
-				}
-				else
-				{
-					Console.WriteLine("Устройство не было инициализировано, пропускаем дальнейшие операции.");
-				}
+				// Создаем новый экземпляр без вызова Start()
+				var badService = new LegacyWrapper.DeviceService();
+				int value = badService.GetValue();
 			}
-			catch (DllNotFoundException)
+			catch (InvalidOperationException ex)
 			{
-				Console.WriteLine("\nОШИБКА: Не найдена библиотека device_driver.dll");
-				Console.WriteLine("Создайте тестовую библиотеку или подключите реальный драйвер устройства.");
+				Console.WriteLine($"   ОЖИДАЕМОЕ ИСКЛЮЧЕНИЕ: {ex.Message}");
 			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"\nОШИБКА: {ex.GetType().Name}: {ex.Message}");
-			}
-			finally
-			{
-				// Всегда освобождаем ресурсы устройства
-				Console.WriteLine("\nЗавершение работы с устройством...");
-				deviceManager.Dispose();
-			}
-
-			Console.WriteLine("\n=== Тестирование завершено ===");
 		}
+		catch (DllNotFoundException)
+		{
+			Console.WriteLine("\nКРИТИЧЕСКАЯ ОШИБКА: Не найдена библиотека device_driver.dll");
+			Console.WriteLine("Это демонстрирует, что адаптер не скрывает фундаментальные проблемы,");
+			Console.WriteLine("а лишь преобразует стиль взаимодействия с legacy-кодом.");
+		}
+		finally
+		{
+			Console.WriteLine("\n6. Завершение работы...");
+			deviceService.Stop();
+		}
+
+		Console.WriteLine("\n=== Демонстрация завершена ===");
 	}
 }
