@@ -153,7 +153,7 @@ class Program
 			{
 				// Создаем новый экземпляр без вызова Start()
 				var badService = new LegacyWrapper.DeviceService();
-				int value = badService.GetValue();
+				int value = badService.GetValue(); // Будет выброшено исключение
 			}
 			catch (InvalidOperationException ex)
 			{
