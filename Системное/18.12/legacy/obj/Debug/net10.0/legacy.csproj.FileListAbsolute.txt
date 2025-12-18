@@ -1,0 +1,15 @@
+C:\Users\user\repos\cs\Системное\18.12\legacy\bin\Debug\net10.0\legacy.exe
+C:\Users\user\repos\cs\Системное\18.12\legacy\bin\Debug\net10.0\legacy.deps.json
+C:\Users\user\repos\cs\Системное\18.12\legacy\bin\Debug\net10.0\legacy.runtimeconfig.json
+C:\Users\user\repos\cs\Системное\18.12\legacy\bin\Debug\net10.0\legacy.dll
+C:\Users\user\repos\cs\Системное\18.12\legacy\bin\Debug\net10.0\legacy.pdb
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\legacy.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\legacy.AssemblyInfoInputs.cache
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\legacy.AssemblyInfo.cs
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\legacy.csproj.CoreCompileInputs.cache
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\legacy.sourcelink.json
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\legacy.dll
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\refint\legacy.dll
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\legacy.pdb
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\legacy.genruntimeconfig.cache
+C:\Users\user\repos\cs\Системное\18.12\legacy\obj\Debug\net10.0\ref\legacy.dll
