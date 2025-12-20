@@ -1,12 +1,54 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\device_driver\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{06D162EB-F223-49A0-BA81-27C18F7D1979}|device_driver.vcxproj|C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\device_driver\\device_driver.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{06D162EB-F223-49A0-BA81-27C18F7D1979}|device_driver.vcxproj|solutionrelative:device_driver.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{06D162EB-F223-49A0-BA81-27C18F7D1979}|device_driver.vcxproj|C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\device_driver\\device_driver.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{06D162EB-F223-49A0-BA81-27C18F7D1979}|device_driver.vcxproj|solutionrelative:device_driver.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
-      "DocumentGroups": []
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "device_driver.h",
+              "DocumentMoniker": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\device_driver\\device_driver.h",
+              "RelativeDocumentMoniker": "device_driver.h",
+              "ToolTip": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\device_driver\\device_driver.h",
+              "RelativeToolTip": "device_driver.h",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAABoAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-12-18T15:55:48.506Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "device_driver.cpp",
+              "DocumentMoniker": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\device_driver\\device_driver.cpp",
+              "RelativeDocumentMoniker": "device_driver.cpp",
+              "ToolTip": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\device_driver\\device_driver.cpp",
+              "RelativeToolTip": "device_driver.cpp",
+              "ViewState": "AgIAAJAAAAAAAAAAAAAAAK8AAAAVAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-12-18T15:55:46.842Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -3,16 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\pch.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|solutionrelative:pch.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+      "AbsoluteMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\legacy_math.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|solutionrelative:legacy_math.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\legacy_math.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|solutionrelative:legacy_math.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\legacy_math.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|solutionrelative:legacy_math.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+      "AbsoluteMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\pch.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|solutionrelative:pch.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{C268CFA4-B8BE-43FD-AE66-7F3EF8DE4C74}|legacy_math.vcxproj|C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\dllmain.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
@@ -26,24 +26,28 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 2,
           "Children": [
             {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "pch.h",
               "DocumentMoniker": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\pch.h",
               "RelativeDocumentMoniker": "pch.h",
               "ToolTip": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\pch.h",
               "RelativeToolTip": "pch.h",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAKAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
               "WhenOpened": "2025-12-18T10:38:15.305Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 0,
               "Title": "legacy_math.cpp",
               "DocumentMoniker": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\legacy_math.cpp",
               "RelativeDocumentMoniker": "legacy_math.cpp",
@@ -62,7 +66,7 @@
               "RelativeDocumentMoniker": "legacy_math.h",
               "ToolTip": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\18.12\\legacy_math\\legacy_math.h",
               "RelativeToolTip": "legacy_math.h",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAFAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAsAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
               "WhenOpened": "2025-12-18T10:19:48.202Z",
               "EditorCaption": ""
@@ -77,8 +81,7 @@
               "RelativeToolTip": "dllmain.cpp",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
-              "WhenOpened": "2025-12-18T10:07:44.371Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-18T10:07:44.371Z"
             }
           ]
         }
