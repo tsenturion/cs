@@ -1,0 +1,15 @@
+C:\Users\user\repos\cs\Системное\20.12\process\bin\Debug\net10.0\process.exe
+C:\Users\user\repos\cs\Системное\20.12\process\bin\Debug\net10.0\process.deps.json
+C:\Users\user\repos\cs\Системное\20.12\process\bin\Debug\net10.0\process.runtimeconfig.json
+C:\Users\user\repos\cs\Системное\20.12\process\bin\Debug\net10.0\process.dll
+C:\Users\user\repos\cs\Системное\20.12\process\bin\Debug\net10.0\process.pdb
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\process.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\process.AssemblyInfoInputs.cache
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\process.AssemblyInfo.cs
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\process.csproj.CoreCompileInputs.cache
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\process.sourcelink.json
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\process.dll
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\refint\process.dll
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\process.pdb
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\process.genruntimeconfig.cache
+C:\Users\user\repos\cs\Системное\20.12\process\obj\Debug\net10.0\ref\process.dll
