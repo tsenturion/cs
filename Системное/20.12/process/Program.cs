@@ -1,104 +1,152 @@
 ﻿using System;
-using System.Threading;
+using System.Threading.Tasks;
 
 class Program
 {
 	static void Main()
 	{
-		// Создаем новый поток, указывая метод для выполнения
-		Thread thread = new Thread(DoWork);
-
-		// Запускаем выполнение потока
-		thread.Start();
-
-		Console.WriteLine("Главный поток завершил работу");
-
-		// Безопасное ожидание завершения потока (дополнение без изменения структуры)
-		WaitForThreadCompletion(thread);
-	}
-
-	static void DoWork()
-	{
-		Console.WriteLine("Код выполняется в отдельном потоке");
-
-		// Демонстрация дополнительной работы в потоке
-		SimulateWork();
-	}
-
-	static void SimulateWork()
-	{
-		// Имитация работы в потоке
-		Console.WriteLine("Поток начал выполнение работы...");
-
-		for (int i = 1; i <= 5; i++)
+		// Создание и запуск задачи с помощью Task.Run
+		Task task = Task.Run(() =>
 		{
-			Console.WriteLine($"  Поток: выполнение шага {i}/5");
-			Thread.Sleep(500); // Имитация задержки
-		}
+			Console.WriteLine("Задача выполняется");
 
-		Console.WriteLine("Поток завершил выполнение работы");
-	}
-
-	static void WaitForThreadCompletion(Thread thread)
-	{
-		// Показываем информацию о состоянии потока
-		Console.WriteLine($"\n=== Информация о созданном потоке ===");
-		Console.WriteLine($"ID потока: {thread.ManagedThreadId}");
-		Console.WriteLine($"Имя потока: {(thread.Name ?? "[не задано]")}");
-		Console.WriteLine($"Приоритет: {thread.Priority}");
-		Console.WriteLine($"Состояние: {thread.ThreadState}");
-		Console.WriteLine($"Фоновый поток: {thread.IsBackground}");
-
-		// Даем выбор: ждать завершения или продолжить
-		Console.WriteLine("\nДождаться завершения потока? (y/n)");
-		var key = Console.ReadKey(true).KeyChar;
-
-		if (char.ToLower(key) == 'y')
-		{
-			Console.WriteLine("\nОжидание завершения потока...");
-
-			// Ожидаем завершения потока с таймаутом
-			bool completed = thread.Join(TimeSpan.FromSeconds(10));
-
-			if (completed)
-			{
-				Console.WriteLine("Поток успешно завершился");
-			}
-			else
-			{
-				Console.WriteLine("Таймаут ожидания потока. Поток все еще выполняется.");
-				Console.WriteLine($"Текущее состояние: {thread.ThreadState}");
-			}
-		}
-		else
-		{
-			Console.WriteLine("\nПродолжаем выполнение без ожидания потока");
-
-			// Если поток фоновый, он завершится при закрытии приложения
-			// Если поток не фоновый, приложение будет работать пока поток не завершится
-			if (!thread.IsBackground)
-			{
-				Console.WriteLine("ВНИМАНИЕ: Созданный поток НЕ фоновый.");
-				Console.WriteLine("Приложение будет работать пока поток не завершится.");
-			}
-		}
-
-		// Показываем итоговое состояние
-		Console.WriteLine($"\nФинальное состояние потока: {thread.ThreadState}");
-
-		// Демонстрация пула потоков для сравнения
-		Console.WriteLine("\n=== Сравнение с пулом потоков ===");
-		Console.WriteLine("Пул потоков обычно используется для коротких задач:");
-
-		ThreadPool.QueueUserWorkItem(state =>
-		{
-			Console.WriteLine("Задача выполняется в пуле потоков");
-			Console.WriteLine($"ID потока пула: {Thread.CurrentThread.ManagedThreadId}");
-			Thread.Sleep(1000);
-			Console.WriteLine("Задача пула потоков завершена");
+			// Добавляем имитацию работы в задаче
+			SimulateTaskWork();
 		});
 
-		// Короткая задержка для демонстрации работы пула
-		Thread.Sleep(200);
+		// Ожидание завершения задачи (блокирует текущий поток)
+		task.Wait();
+
+		Console.WriteLine("Задача завершена");
+
+		// Дополнительная информация о задаче (без изменения структуры)
+		DisplayTaskInfo(task);
+
+		// Демонстрация других возможностей Task API
+		DemonstrateTaskFeatures();
+	}
+
+	static void SimulateTaskWork()
+	{
+		// Имитация работы в задаче
+		Console.WriteLine("Задача: Начало обработки...");
+
+		for (int i = 1; i <= 3; i++)
+		{
+			Console.WriteLine($"  Задача: шаг {i}/3 выполнен");
+			Task.Delay(300).Wait(); // Имитация асинхронной задержки
+		}
+
+		Console.WriteLine("Задача: Обработка завершена");
+	}
+
+	static void DisplayTaskInfo(Task completedTask)
+	{
+		Console.WriteLine("\n=== Информация о задаче ===");
+		Console.WriteLine($"ID задачи: {completedTask.Id}");
+		Console.WriteLine($"Статус задачи: {completedTask.Status}");
+		Console.WriteLine($"Завершена успешно: {completedTask.IsCompletedSuccessfully}");
+		Console.WriteLine($"Отменена: {completedTask.IsCanceled}");
+		Console.WriteLine($"Завершена с ошибкой: {completedTask.IsFaulted}");
+
+		// Показываем исключение если было
+		if (completedTask.IsFaulted && completedTask.Exception != null)
+		{
+			Console.WriteLine($"Исключение: {completedTask.Exception.Message}");
+		}
+	}
+
+	static void DemonstrateTaskFeatures()
+	{
+		Console.WriteLine("\n=== Демонстрация возможностей Task ===");
+
+		// 1. Возвращающая значение задача
+		Console.WriteLine("\n1. Задача с возвращаемым значением:");
+		Task<int> valueTask = Task.Run(() =>
+		{
+			Console.WriteLine("  Вычисление значения...");
+			return 42;
+		});
+
+		valueTask.Wait();
+		Console.WriteLine($"  Результат: {valueTask.Result}");
+
+		// 2. Асинхронное ожидание с продолжением (ContinueWith)
+		Console.WriteLine("\n2. Цепочка задач (ContinueWith):");
+		Task continuationTask = Task.Run(() =>
+		{
+			Console.WriteLine("  Первая задача выполняется");
+			return "Результат первой задачи";
+		})
+		.ContinueWith(previousTask =>
+		{
+			Console.WriteLine($"  Вторая задача получает: {previousTask.Result}");
+			Console.WriteLine("  Вторая задача выполняется");
+		});
+
+		continuationTask.Wait();
+
+		// 3. Параллельное выполнение нескольких задач
+		Console.WriteLine("\n3. Параллельное выполнение задач:");
+		Task[] parallelTasks = new Task[3];
+
+		for (int i = 0; i < parallelTasks.Length; i++)
+		{
+			int taskNumber = i + 1;
+			parallelTasks[i] = Task.Run(() =>
+			{
+				Console.WriteLine($"  Задача {taskNumber} запущена");
+				Task.Delay(100 * taskNumber).Wait();
+				Console.WriteLine($"  Задача {taskNumber} завершена");
+			});
+		}
+
+		// Ожидание всех задач
+		Task.WaitAll(parallelTasks);
+		Console.WriteLine("  Все параллельные задачи завершены");
+
+		// 4. Отмена задачи с CancellationToken
+		Console.WriteLine("\n4. Задача с возможностью отмены:");
+		var cancellationSource = new System.Threading.CancellationTokenSource();
+
+		Task cancellableTask = Task.Run(() =>
+		{
+			Console.WriteLine("  Задача с отменой запущена");
+
+			for (int i = 0; i < 10; i++)
+			{
+				if (cancellationSource.Token.IsCancellationRequested)
+				{
+					Console.WriteLine("  Задача отменена");
+					cancellationSource.Token.ThrowIfCancellationRequested();
+				}
+
+				Console.WriteLine($"  Шаг {i + 1}/10");
+				Task.Delay(100).Wait();
+			}
+		}, cancellationSource.Token);
+
+		// Симулируем отмену через некоторое время
+		Task.Run(() =>
+		{
+			Task.Delay(300).Wait();
+			Console.WriteLine("  Инициируем отмену...");
+			cancellationSource.Cancel();
+		});
+
+		try
+		{
+			cancellableTask.Wait();
+		}
+		catch (AggregateException ex)
+		{
+			Console.WriteLine($"  Поймано исключение: {ex.InnerExceptions[0].GetType().Name}");
+		}
+
+		// 5. Использование Task.Delay для асинхронных задержек
+		Console.WriteLine("\n5. Асинхронная задержка (Task.Delay):");
+		Console.WriteLine("  Начало ожидания...");
+		Task.Delay(500).Wait();
+		Console.WriteLine("  Ожидание завершено");
 	}
 }
