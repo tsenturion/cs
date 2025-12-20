@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("process")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+93f247507313c283e032140da370709c807f978b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+37e7634ca20fe3549a796321a449e4343a822c24")]
 [assembly: System.Reflection.AssemblyProductAttribute("process")]
 [assembly: System.Reflection.AssemblyTitleAttribute("process")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
