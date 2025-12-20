@@ -1,78 +1,104 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Threading;
 
 class Program
 {
 	static void Main()
 	{
-		// Получаем PID текущего процесса
-		Console.WriteLine("PID процесса: " + Process.GetCurrentProcess().Id);
+		// Создаем новый поток, указывая метод для выполнения
+		Thread thread = new Thread(DoWork);
 
-		// Получаем ID текущего управляемого потока
-		Console.WriteLine("ID текущего потока: " + Thread.CurrentThread.ManagedThreadId);
+		// Запускаем выполнение потока
+		thread.Start();
 
-		// Дополнительная информация о процессах и потоках (без изменения структуры)
-		Console.WriteLine("\n=== Дополнительная информация ===");
+		Console.WriteLine("Главный поток завершил работу");
 
-		// Информация о процессе
-		Process currentProcess = Process.GetCurrentProcess();
-		Console.WriteLine("Имя процесса: " + currentProcess.ProcessName);
-		Console.WriteLine("Время запуска: " + currentProcess.StartTime);
-		Console.WriteLine("Приоритет процесса: " + currentProcess.BasePriority);
-		Console.WriteLine("Количество потоков в процессе: " + currentProcess.Threads.Count);
+		// Безопасное ожидание завершения потока (дополнение без изменения структуры)
+		WaitForThreadCompletion(thread);
+	}
 
-		// Информация о текущем потоке
-		Thread currentThread = Thread.CurrentThread;
-		Console.WriteLine("\nИнформация о текущем потоке:");
-		Console.WriteLine("Имя потока: " + (currentThread.Name ?? "[не задано]"));
-		Console.WriteLine("Состояние потока: " + currentThread.ThreadState);
-		Console.WriteLine("Приоритет потока: " + currentThread.Priority);
-		Console.WriteLine("Фоновый ли поток: " + currentThread.IsBackground);
-		Console.WriteLine("Пул потоков: " + currentThread.IsThreadPoolThread);
+	static void DoWork()
+	{
+		Console.WriteLine("Код выполняется в отдельном потоке");
 
-		// Информация о системе
-		Console.WriteLine("\n=== Системная информация ===");
-		Console.WriteLine("Количество процессоров: " + Environment.ProcessorCount);
-		Console.WriteLine("Версия CLR: " + Environment.Version);
-		Console.WriteLine("64-битный процесс: " + Environment.Is64BitProcess);
+		// Демонстрация дополнительной работы в потоке
+		SimulateWork();
+	}
 
-		// Создаем еще один поток для демонстрации
-		Console.WriteLine("\n=== Создание дополнительного потока ===");
-		Thread secondThread = new Thread(() =>
+	static void SimulateWork()
+	{
+		// Имитация работы в потоке
+		Console.WriteLine("Поток начал выполнение работы...");
+
+		for (int i = 1; i <= 5; i++)
 		{
-			Console.WriteLine("Дополнительный поток:");
-			Console.WriteLine("  ID потока: " + Thread.CurrentThread.ManagedThreadId);
-			Console.WriteLine("  Приоритет: " + Thread.CurrentThread.Priority);
-			Console.WriteLine("  Фоновый: " + Thread.CurrentThread.IsBackground);
+			Console.WriteLine($"  Поток: выполнение шага {i}/5");
+			Thread.Sleep(500); // Имитация задержки
+		}
 
-			// Имитация работы
-			Thread.Sleep(500);
-			Console.WriteLine("  Дополнительный поток завершил работу");
+		Console.WriteLine("Поток завершил выполнение работы");
+	}
+
+	static void WaitForThreadCompletion(Thread thread)
+	{
+		// Показываем информацию о состоянии потока
+		Console.WriteLine($"\n=== Информация о созданном потоке ===");
+		Console.WriteLine($"ID потока: {thread.ManagedThreadId}");
+		Console.WriteLine($"Имя потока: {(thread.Name ?? "[не задано]")}");
+		Console.WriteLine($"Приоритет: {thread.Priority}");
+		Console.WriteLine($"Состояние: {thread.ThreadState}");
+		Console.WriteLine($"Фоновый поток: {thread.IsBackground}");
+
+		// Даем выбор: ждать завершения или продолжить
+		Console.WriteLine("\nДождаться завершения потока? (y/n)");
+		var key = Console.ReadKey(true).KeyChar;
+
+		if (char.ToLower(key) == 'y')
+		{
+			Console.WriteLine("\nОжидание завершения потока...");
+
+			// Ожидаем завершения потока с таймаутом
+			bool completed = thread.Join(TimeSpan.FromSeconds(10));
+
+			if (completed)
+			{
+				Console.WriteLine("Поток успешно завершился");
+			}
+			else
+			{
+				Console.WriteLine("Таймаут ожидания потока. Поток все еще выполняется.");
+				Console.WriteLine($"Текущее состояние: {thread.ThreadState}");
+			}
+		}
+		else
+		{
+			Console.WriteLine("\nПродолжаем выполнение без ожидания потока");
+
+			// Если поток фоновый, он завершится при закрытии приложения
+			// Если поток не фоновый, приложение будет работать пока поток не завершится
+			if (!thread.IsBackground)
+			{
+				Console.WriteLine("ВНИМАНИЕ: Созданный поток НЕ фоновый.");
+				Console.WriteLine("Приложение будет работать пока поток не завершится.");
+			}
+		}
+
+		// Показываем итоговое состояние
+		Console.WriteLine($"\nФинальное состояние потока: {thread.ThreadState}");
+
+		// Демонстрация пула потоков для сравнения
+		Console.WriteLine("\n=== Сравнение с пулом потоков ===");
+		Console.WriteLine("Пул потоков обычно используется для коротких задач:");
+
+		ThreadPool.QueueUserWorkItem(state =>
+		{
+			Console.WriteLine("Задача выполняется в пуле потоков");
+			Console.WriteLine($"ID потока пула: {Thread.CurrentThread.ManagedThreadId}");
+			Thread.Sleep(1000);
+			Console.WriteLine("Задача пула потоков завершена");
 		});
 
-		secondThread.Name = "Демонстрационный поток";
-		secondThread.IsBackground = true; // Фоновый поток
-
-		Console.WriteLine("Запуск дополнительного потока...");
-		secondThread.Start();
-
-		// Ждем завершения дополнительного потока
-		secondThread.Join();
-
-		// Показываем статистику потоков пула
-		Console.WriteLine("\n=== Статистика пула потоков ===");
-		ThreadPool.GetMaxThreads(out int maxWorkerThreads, out int maxCompletionPortThreads);
-		ThreadPool.GetAvailableThreads(out int availableWorkerThreads, out int availableCompletionPortThreads);
-
-		Console.WriteLine("Пул потоков (рабочие):");
-		Console.WriteLine($"  Максимум: {maxWorkerThreads}");
-		Console.WriteLine($"  Доступно: {availableWorkerThreads}");
-		Console.WriteLine($"  Используется: {maxWorkerThreads - availableWorkerThreads}");
-
-		Console.WriteLine("\nПул потоков (порты завершения ввода-вывода):");
-		Console.WriteLine($"  Максимум: {maxCompletionPortThreads}");
-		Console.WriteLine($"  Доступно: {availableCompletionPortThreads}");
-		Console.WriteLine($"  Используется: {maxCompletionPortThreads - availableCompletionPortThreads}");
+		// Короткая задержка для демонстрации работы пула
+		Thread.Sleep(200);
 	}
 }
