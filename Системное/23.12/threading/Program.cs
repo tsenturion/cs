@@ -3,127 +3,115 @@ using System.Threading;
 
 class Program
 {
-	// Флаг для корректного завершения потока
-	static bool shouldStop = false;
-
 	static void Main()
 	{
-		// Создаем и запускаем рабочий поток
-		Thread thread = new Thread(Work);
-		thread.Start();
+		Console.WriteLine("=== Демонстрация приоритетов потоков ===\n");
 
-		// Даем потоку поработать 3 секунды
-		Thread.Sleep(3000);
-		Console.WriteLine("Запрашиваем завершение потока");
-		shouldStop = true; // Устанавливаем флаг завершения
+		// Создаем два потока
+		Thread lowPriorityThread = new Thread(Work);
+		Thread highPriorityThread = new Thread(Work);
 
-		// Ждем завершения потока
-		thread.Join();
-		Console.WriteLine("Поток корректно завершён");
+		// Устанавливаем приоритеты до запуска
+		lowPriorityThread.Priority = ThreadPriority.Lowest;
+		highPriorityThread.Priority = ThreadPriority.Highest;
 
-		// Демонстрация с использованием CancellationToken
-		DemonstrateCancellationToken();
+		Console.WriteLine($"Поток {lowPriorityThread.ManagedThreadId}: Приоритет {lowPriorityThread.Priority}");
+		Console.WriteLine($"Поток {highPriorityThread.ManagedThreadId}: Приоритет {highPriorityThread.Priority}");
+		Console.WriteLine();
+
+		// Запускаем потоки
+		lowPriorityThread.Start();
+		highPriorityThread.Start();
+
+		// Ждем завершения обоих потоков
+		lowPriorityThread.Join();
+		highPriorityThread.Join();
+
+		Console.WriteLine("\nОба потока завершили работу");
+
+		// Демонстрация с сохранением информации о приоритетах
+		DemonstratePriorityEffects();
 	}
 
 	static void Work()
 	{
-		while (!shouldStop) // Проверяем флаг в каждой итерации
+		int threadId = Thread.CurrentThread.ManagedThreadId;
+		ThreadPriority priority = Thread.CurrentThread.Priority;
+
+		Console.WriteLine($"Поток {threadId} ({priority}) запущен");
+
+		long counter = 0;
+		DateTime start = DateTime.Now;
+
+		// Делаем вычисления
+		for (int i = 0; i < 1000000; i++)
 		{
-			Console.WriteLine("Поток работает");
-			Thread.Sleep(1000);
+			counter++;
+			if (i % 100000 == 0)
+			{
+				Console.WriteLine($"Поток {threadId} ({priority}): шаг {i / 100000 + 1}/10");
+			}
 		}
 
-		Console.WriteLine("Поток получил сигнал завершения");
+		TimeSpan duration = DateTime.Now - start;
+		Console.WriteLine($"Поток {threadId} ({priority}) завершен за {duration.TotalMilliseconds:F0} мс");
 	}
 
-	static void DemonstrateCancellationToken()
+	static void DemonstratePriorityEffects()
 	{
-		Console.WriteLine("\n--- CancellationToken (рекомендуемый способ) ---");
+		Console.WriteLine("\n=== Влияние приоритетов на планирование ===");
 
-		// Создаем источник токена отмены
-		CancellationTokenSource cts = new CancellationTokenSource();
-		CancellationToken token = cts.Token;
+		// Создаем потоки с разными приоритетами
+		const int threadCount = 4;
+		Thread[] threads = new Thread[threadCount];
+		long[] counters = new long[threadCount];
+		ThreadPriority[] priorities = new ThreadPriority[threadCount];
 
-		Thread tokenThread = new Thread(() =>
+		// Сохраняем приоритеты перед запуском
+		priorities[0] = ThreadPriority.Lowest;
+		priorities[1] = ThreadPriority.BelowNormal;
+		priorities[2] = ThreadPriority.AboveNormal;
+		priorities[3] = ThreadPriority.Highest;
+
+		// Создаем и настраиваем потоки
+		for (int i = 0; i < threadCount; i++)
 		{
-			try
+			int threadIndex = i;
+			threads[i] = new Thread(() =>
 			{
-				while (!token.IsCancellationRequested)
+				for (int j = 0; j < 5000000; j++)
 				{
-					Console.WriteLine("Поток с токеном работает");
-					Thread.Sleep(500);
+					counters[threadIndex]++;
 				}
-				Console.WriteLine("Поток: Токен отмены получен");
-			}
-			catch (OperationCanceledException)
-			{
-				Console.WriteLine("Поток: Прерван через исключение");
-			}
-		});
+			});
 
-		tokenThread.Start();
+			// Устанавливаем приоритет перед запуском
+			threads[i].Priority = priorities[i];
+		}
 
-		// Даем поработать 2 секунды
-		Thread.Sleep(2000);
-		Console.WriteLine("Запрашиваем отмену через CancellationTokenSource");
-		cts.Cancel();
+		Console.WriteLine("Запускаем 4 потока с разными приоритетами...");
+		DateTime start = DateTime.Now;
 
-		tokenThread.Join();
-
-		// Демонстрация отмены с таймаутом
-		Console.WriteLine("\n--- Отмена с таймаутом ---");
-		CancellationTokenSource cts2 = new CancellationTokenSource();
-
-		Thread timeoutThread = new Thread(() =>
+		// Запускаем все потоки
+		foreach (var thread in threads)
 		{
-			int count = 0;
-			while (!cts2.Token.IsCancellationRequested)
-			{
-				Console.WriteLine($"Таймаут поток: {++count}");
-				Thread.Sleep(1000);
-			}
-			Console.WriteLine("Таймаут поток завершен");
-		});
+			thread.Start();
+		}
 
-		timeoutThread.Start();
-		cts2.CancelAfter(3500); // Автоматическая отмена через 3.5 секунды
-
-		timeoutThread.Join();
-
-		// Исправленная демонстрация с volatile полем класса
-		Console.WriteLine("\n--- Volatile поле класса ---");
-		var flagDemo = new FlagDemo();
-		flagDemo.RunDemo();
-
-		// Очистка ресурсов
-		cts.Dispose();
-		cts2.Dispose();
-	}
-}
-
-// Класс для демонстрации volatile поля
-class FlagDemo
-{
-	// Volatile можно использовать только для полей класса
-	private volatile bool stopFlag = false;
-
-	public void RunDemo()
-	{
-		Thread safeThread = new Thread(() =>
+		// Ждем завершения всех потоков
+		foreach (var thread in threads)
 		{
-			while (!stopFlag)
-			{
-				Console.WriteLine("Volatile поток работает");
-				Thread.Sleep(300);
-			}
-			Console.WriteLine("Volatile поток завершен");
-		});
+			thread.Join();
+		}
 
-		safeThread.Start();
-		Thread.Sleep(1500);
+		TimeSpan totalDuration = DateTime.Now - start;
 
-		// Изменение volatile поля видно сразу всем потокам
-		stopFlag = true;
-		safeThread.Join();
+		// Используем сохраненные приоритеты
+		Console.WriteLine("\nРезультаты:");
+		for (int i = 0; i < threadCount; i++)
+		{
+			Console.WriteLine($"Поток {i} ({priorities[i]}): {counters[i]} итераций");
+		}
+		Console.WriteLine($"Общее время: {totalDuration.TotalMilliseconds:F0} мс");
 	}
 }
