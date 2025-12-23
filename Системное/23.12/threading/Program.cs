@@ -1,99 +1,101 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Threading;
 
 class Program
 {
+	static int counter = 0; // Общая переменная
+
 	static void Main()
 	{
-		// Создаем и запускаем рабочий поток
-		Thread workerThread = new Thread(DoWork);
-		workerThread.Start();
+		// Демонстрация состояния гонки
+		Console.WriteLine("Запуск потоков с состоянием гонки...");
 
-		// Главный поток продолжает выполнение
-		for (int i = 0; i < 5; i++)
-		{
-			Console.WriteLine("Работа основного потока");
-			Thread.Sleep(500); // Приостановка на 500 мс
-		}
+		Thread t1 = new Thread(Increment);
+		Thread t2 = new Thread(Increment);
 
-		// Дополнительная логика для демонстрации работы потоков
-		MonitorThreads(workerThread);
+		t1.Start();
+		t2.Start();
 
+		t1.Join();
+		t2.Join();
+
+		Console.WriteLine($"counter после гонки: {counter}");
+
+		// Тест с синхронизацией
+		TestWithInterlocked();
+		TestWithLock();
 	}
 
-	static void DoWork()
+	static void Increment()
 	{
-		for (int i = 0; i < 5; i++)
+		for (int i = 0; i < 100000; i++)
 		{
-			Console.WriteLine("Работа второго потока");
-			Thread.Sleep(500); // Приостановка на 500 мс
+			counter++; // Небезопасно
 		}
-
-		// Дополнительное завершение работы потока
-		Console.WriteLine("Второй поток завершил свою работу");
 	}
 
-	static void MonitorThreads(Thread workerThread)
+	static void TestWithInterlocked()
 	{
-		// Показываем информацию о выполнении потоков
-		Console.WriteLine("\n=== Мониторинг потоков ===");
-		Console.WriteLine($"Главный поток ID: {Thread.CurrentThread.ManagedThreadId}");
-		Console.WriteLine($"Рабочий поток ID: {workerThread.ManagedThreadId}");
-		Console.WriteLine($"Рабочий поток состояние: {workerThread.ThreadState}");
+		Console.WriteLine("\n--- Тест с Interlocked ---");
+		int safeCounter = 0;
 
-		// Ждем завершения рабочего потока если он еще не завершился
-		if (workerThread.IsAlive)
+		Thread t1 = new Thread(() =>
 		{
-			Console.WriteLine("\nОжидание завершения рабочего потока...");
-
-			// Ожидаем завершения с таймаутом
-			bool completed = workerThread.Join(TimeSpan.FromSeconds(3));
-
-			if (completed)
+			for (int i = 0; i < 100000; i++)
 			{
-				Console.WriteLine("Рабочий поток успешно завершился");
+				Interlocked.Increment(ref safeCounter);
 			}
-			else
-			{
-				Console.WriteLine("Таймаут ожидания рабочего потока");
-				Console.WriteLine($"Текущее состояние: {workerThread.ThreadState}");
-			}
-		}
-		else
+		});
+
+		Thread t2 = new Thread(() =>
 		{
-			Console.WriteLine("\nРабочий поток уже завершился");
-		}
+			for (int i = 0; i < 100000; i++)
+			{
+				Interlocked.Increment(ref safeCounter);
+			}
+		});
 
-		// Демонстрация состояния после выполнения
-		Console.WriteLine("\n=== Финальное состояние ===");
-		Console.WriteLine($"Главный поток: {Thread.CurrentThread.ThreadState}");
-		Console.WriteLine($"Рабочий поток: {workerThread.ThreadState}");
+		t1.Start();
+		t2.Start();
+		t1.Join();
+		t2.Join();
 
-		// Показываем статистику выполнения
-		Console.WriteLine("\n=== Статистика выполнения ===");
+		Console.WriteLine($"Результат: {safeCounter}");
+	}
 
-		// Получаем информацию о процессе для демонстрации
-		ProcessThreadCollection threads = System.Diagnostics.Process.GetCurrentProcess().Threads;
-		Console.WriteLine($"Всего потоков в процессе: {threads.Count}");
+	static void TestWithLock()
+	{
+		Console.WriteLine("\n--- Тест с lock ---");
+		int lockedCounter = 0;
+		object lockObj = new object();
 
-		// Демонстрация приоритетов
-		Console.WriteLine($"\nПриоритет главного потока: {Thread.CurrentThread.Priority}");
-		Console.WriteLine($"Приоритет рабочего потока: {workerThread.Priority}");
+		Thread t1 = new Thread(() =>
+		{
+			for (int i = 0; i < 100000; i++)
+			{
+				lock (lockObj)
+				{
+					lockedCounter++;
+				}
+			}
+		});
 
-		// Рекомендации по работе с потоками
-		Console.WriteLine("\n=== Рекомендации ===");
-		Console.WriteLine("1. Всегда давайте потокам осмысленные имена");
-		Console.WriteLine("2. Используйте фоновые потоки для задач, которые могут быть прерваны");
-		Console.WriteLine("3. Избегайте Thread.Sleep() в продакшен коде");
-		Console.WriteLine("4. Рассмотрите использование Task для более эффективного управления");
+		Thread t2 = new Thread(() =>
+		{
+			for (int i = 0; i < 100000; i++)
+			{
+				lock (lockObj)
+				{
+					lockedCounter++;
+				}
+			}
+		});
 
-		// Демонстрация именования потоков
-		workerThread.Name = "Рабочий поток (DoWork)";
-		Thread.CurrentThread.Name = "Главный поток";
+		t1.Start();
+		t2.Start();
+		t1.Join();
+		t2.Join();
 
-		Console.WriteLine($"\nИменованные потоки:");
-		Console.WriteLine($"- {Thread.CurrentThread.Name ?? "Без имени"}");
-		Console.WriteLine($"- {workerThread.Name ?? "Без имени"}");
+		Console.WriteLine($"Результат: {lockedCounter}");
 	}
 }
