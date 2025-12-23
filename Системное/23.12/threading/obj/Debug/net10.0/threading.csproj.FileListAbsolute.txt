@@ -1,0 +1,15 @@
+C:\Users\user\repos\cs\Системное\23.12\threading\bin\Debug\net10.0\threading.exe
+C:\Users\user\repos\cs\Системное\23.12\threading\bin\Debug\net10.0\threading.deps.json
+C:\Users\user\repos\cs\Системное\23.12\threading\bin\Debug\net10.0\threading.runtimeconfig.json
+C:\Users\user\repos\cs\Системное\23.12\threading\bin\Debug\net10.0\threading.dll
+C:\Users\user\repos\cs\Системное\23.12\threading\bin\Debug\net10.0\threading.pdb
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\threading.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\threading.AssemblyInfoInputs.cache
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\threading.AssemblyInfo.cs
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\threading.csproj.CoreCompileInputs.cache
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\threading.sourcelink.json
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\threading.dll
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\refint\threading.dll
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\threading.pdb
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\threading.genruntimeconfig.cache
+C:\Users\user\repos\cs\Системное\23.12\threading\obj\Debug\net10.0\ref\threading.dll
