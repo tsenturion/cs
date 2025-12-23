@@ -3,9 +3,8 @@ using System.Threading;
 
 class Program
 {
-	// ManualResetEvent - примитив синхронизации для управления потоками
-	// true - изначально в сигнальном состоянии (поток может работать)
-	static ManualResetEvent pauseEvent = new ManualResetEvent(true);
+	// Флаг для корректного завершения потока
+	static bool shouldStop = false;
 
 	static void Main()
 	{
@@ -13,103 +12,118 @@ class Program
 		Thread thread = new Thread(Work);
 		thread.Start();
 
-		// Даем потоку поработать 2 секунды
-		Thread.Sleep(2000);
-		Console.WriteLine("Приостанавливаем поток");
-		pauseEvent.Reset(); // Переводим в несигнальное состояние
-
-		// Держим паузу 2 секунды
-		Thread.Sleep(2000);
-		Console.WriteLine("Возобновляем поток");
-		pauseEvent.Set(); // Переводим в сигнальное состояние
+		// Даем потоку поработать 3 секунды
+		Thread.Sleep(3000);
+		Console.WriteLine("Запрашиваем завершение потока");
+		shouldStop = true; // Устанавливаем флаг завершения
 
 		// Ждем завершения потока
 		thread.Join();
-		Console.WriteLine("Работа завершена");
+		Console.WriteLine("Поток корректно завершён");
 
-		// Демонстрация дополнительных возможностей
-		DemonstrateResetEventFeatures();
+		// Демонстрация с использованием CancellationToken
+		DemonstrateCancellationToken();
 	}
 
 	static void Work()
 	{
-		for (int i = 1; i <= 5; i++)
+		while (!shouldStop) // Проверяем флаг в каждой итерации
 		{
-			// Ждем, пока событие не перейдет в сигнальное состояние
-			pauseEvent.WaitOne();
-			Console.WriteLine($"Итерация {i}");
+			Console.WriteLine("Поток работает");
 			Thread.Sleep(1000);
 		}
 
-		Console.WriteLine("Рабочий поток завершен");
+		Console.WriteLine("Поток получил сигнал завершения");
 	}
 
-	static void DemonstrateResetEventFeatures()
+	static void DemonstrateCancellationToken()
 	{
-		Console.WriteLine("\n--- Демонстрация ResetEvent ---");
+		Console.WriteLine("\n--- CancellationToken (рекомендуемый способ) ---");
 
-		// Создаем несколько событий для разных сценариев
-		ManualResetEvent event1 = new ManualResetEvent(false);
-		ManualResetEvent event2 = new ManualResetEvent(false);
+		// Создаем источник токена отмены
+		CancellationTokenSource cts = new CancellationTokenSource();
+		CancellationToken token = cts.Token;
 
-		// Демонстрация WaitOne с таймаутом
-		Thread testThread = new Thread(() =>
+		Thread tokenThread = new Thread(() =>
 		{
-			Console.WriteLine("Поток: Ожидаю событие 1...");
-			bool signaled = event1.WaitOne(TimeSpan.FromSeconds(2));
-
-			if (signaled)
+			try
 			{
-				Console.WriteLine("Поток: Событие 1 получено");
+				while (!token.IsCancellationRequested)
+				{
+					Console.WriteLine("Поток с токеном работает");
+					Thread.Sleep(500);
+				}
+				Console.WriteLine("Поток: Токен отмены получен");
 			}
-			else
+			catch (OperationCanceledException)
 			{
-				Console.WriteLine("Поток: Таймаут ожидания события 1");
-			}
-
-			Console.WriteLine("Поток: Ожидаю событие 2...");
-			event2.WaitOne();
-			Console.WriteLine("Поток: Событие 2 получено");
-		});
-
-		testThread.Start();
-
-		// Запускаем события в разное время
-		Thread.Sleep(1500);
-		event1.Set(); // Устанавливаем первое событие
-
-		Thread.Sleep(1000);
-		event2.Set(); // Устанавливаем второе событие
-
-		testThread.Join();
-
-		// Демонстрация AutoResetEvent (одноразовое событие)
-		Console.WriteLine("\n--- AutoResetEvent ---");
-		AutoResetEvent autoEvent = new AutoResetEvent(false);
-
-		Thread autoThread = new Thread(() =>
-		{
-			for (int i = 0; i < 3; i++)
-			{
-				autoEvent.WaitOne();
-				Console.WriteLine($"AutoResetEvent: получено {i + 1}");
+				Console.WriteLine("Поток: Прерван через исключение");
 			}
 		});
 
-		autoThread.Start();
+		tokenThread.Start();
 
-		// AutoResetEvent автоматически сбрасывается после каждого WaitOne
-		for (int i = 0; i < 3; i++)
+		// Даем поработать 2 секунды
+		Thread.Sleep(2000);
+		Console.WriteLine("Запрашиваем отмену через CancellationTokenSource");
+		cts.Cancel();
+
+		tokenThread.Join();
+
+		// Демонстрация отмены с таймаутом
+		Console.WriteLine("\n--- Отмена с таймаутом ---");
+		CancellationTokenSource cts2 = new CancellationTokenSource();
+
+		Thread timeoutThread = new Thread(() =>
 		{
-			Thread.Sleep(500);
-			autoEvent.Set();
-		}
+			int count = 0;
+			while (!cts2.Token.IsCancellationRequested)
+			{
+				Console.WriteLine($"Таймаут поток: {++count}");
+				Thread.Sleep(1000);
+			}
+			Console.WriteLine("Таймаут поток завершен");
+		});
 
-		autoThread.Join();
+		timeoutThread.Start();
+		cts2.CancelAfter(3500); // Автоматическая отмена через 3.5 секунды
+
+		timeoutThread.Join();
+
+		// Исправленная демонстрация с volatile полем класса
+		Console.WriteLine("\n--- Volatile поле класса ---");
+		var flagDemo = new FlagDemo();
+		flagDemo.RunDemo();
 
 		// Очистка ресурсов
-		event1.Dispose();
-		event2.Dispose();
-		autoEvent.Dispose();
+		cts.Dispose();
+		cts2.Dispose();
+	}
+}
+
+// Класс для демонстрации volatile поля
+class FlagDemo
+{
+	// Volatile можно использовать только для полей класса
+	private volatile bool stopFlag = false;
+
+	public void RunDemo()
+	{
+		Thread safeThread = new Thread(() =>
+		{
+			while (!stopFlag)
+			{
+				Console.WriteLine("Volatile поток работает");
+				Thread.Sleep(300);
+			}
+			Console.WriteLine("Volatile поток завершен");
+		});
+
+		safeThread.Start();
+		Thread.Sleep(1500);
+
+		// Изменение volatile поля видно сразу всем потокам
+		stopFlag = true;
+		safeThread.Join();
 	}
 }
