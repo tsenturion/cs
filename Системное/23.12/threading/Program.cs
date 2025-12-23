@@ -3,99 +3,45 @@ using System.Threading;
 
 class Program
 {
-	static int counter = 0; // Общая переменная
-
 	static void Main()
 	{
-		// Демонстрация состояния гонки
-		Console.WriteLine("Запуск потоков с состоянием гонки...");
+		// Создание объекта потока
+		Thread thread = new Thread(Work);
+		Console.WriteLine("Поток создан, но ещё не запущен");
 
-		Thread t1 = new Thread(Increment);
-		Thread t2 = new Thread(Increment);
+		// Запуск потока
+		thread.Start();
+		Console.WriteLine("Поток запущен");
 
-		t1.Start();
-		t2.Start();
+		// Ожидание завершения потока
+		thread.Join();
+		Console.WriteLine("Основной поток дождался завершения");
 
-		t1.Join();
-		t2.Join();
+		// Показываем финальное состояние
+		Console.WriteLine($"Состояние потока: {thread.ThreadState}");
+		Console.WriteLine($"ID потока: {thread.ManagedThreadId}");
 
-		Console.WriteLine($"counter после гонки: {counter}");
+		// Демонстрация без Join
+		Console.WriteLine("\n--- Без Join ---");
+		Thread thread2 = new Thread(QuickWork);
+		thread2.Start();
+		Console.WriteLine("Запущен второй поток без ожидания");
+		Console.WriteLine("Основной поток завершается сразу");
 
-		// Тест с синхронизацией
-		TestWithInterlocked();
-		TestWithLock();
+		Thread.Sleep(100); // Даем время для вывода
 	}
 
-	static void Increment()
+	static void Work()
 	{
-		for (int i = 0; i < 100000; i++)
-		{
-			counter++; // Небезопасно
-		}
+		Console.WriteLine("Код выполняется в новом потоке");
+		Thread.Sleep(500);
+		Console.WriteLine("Поток завершил работу");
 	}
 
-	static void TestWithInterlocked()
+	static void QuickWork()
 	{
-		Console.WriteLine("\n--- Тест с Interlocked ---");
-		int safeCounter = 0;
-
-		Thread t1 = new Thread(() =>
-		{
-			for (int i = 0; i < 100000; i++)
-			{
-				Interlocked.Increment(ref safeCounter);
-			}
-		});
-
-		Thread t2 = new Thread(() =>
-		{
-			for (int i = 0; i < 100000; i++)
-			{
-				Interlocked.Increment(ref safeCounter);
-			}
-		});
-
-		t1.Start();
-		t2.Start();
-		t1.Join();
-		t2.Join();
-
-		Console.WriteLine($"Результат: {safeCounter}");
-	}
-
-	static void TestWithLock()
-	{
-		Console.WriteLine("\n--- Тест с lock ---");
-		int lockedCounter = 0;
-		object lockObj = new object();
-
-		Thread t1 = new Thread(() =>
-		{
-			for (int i = 0; i < 100000; i++)
-			{
-				lock (lockObj)
-				{
-					lockedCounter++;
-				}
-			}
-		});
-
-		Thread t2 = new Thread(() =>
-		{
-			for (int i = 0; i < 100000; i++)
-			{
-				lock (lockObj)
-				{
-					lockedCounter++;
-				}
-			}
-		});
-
-		t1.Start();
-		t2.Start();
-		t1.Join();
-		t2.Join();
-
-		Console.WriteLine($"Результат: {lockedCounter}");
+		Console.WriteLine("Второй поток: старт");
+		Thread.Sleep(200);
+		Console.WriteLine("Второй поток: конец");
 	}
 }
