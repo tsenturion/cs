@@ -6,126 +6,240 @@ class Program
 {
 	static async Task Main()
 	{
-		Console.WriteLine("=== Демонстрация асинхронности vs многопоточности ===\n");
+		Console.WriteLine("=== Task<T> и возврат значений ===\n");
 
-		// Пример 1: Чистая асинхронность (без создания потоков)
-		Console.WriteLine("1. Чистая асинхронность (Task.Delay):");
-		await DemonstrateAsyncAwait();
+		// 1. Возврат значений через Task<T>
+		Console.WriteLine("1. Возврат значений через Task<T>:");
+		await TaskReturnExample();
 
-		// Пример 2: Проверка потоков в асинхронном коде
-		Console.WriteLine("\n2. Анализ потоков в асинхронном коде:");
-		await AnalyzeThreads();
+		// 2. await извлекает результат
+		Console.WriteLine("\n2. await извлекает результат:");
+		await AwaitExtractsValue();
 
-		// Пример 3: Многопоточность (явное создание потока)
-		Console.WriteLine("\n3. Многопоточность (явное создание Thread):");
-		DemonstrateMultiThreading();
+		// 3. Исключения в Task<T>
+		Console.WriteLine("\n3. Исключения в Task<T>:");
+		await ExceptionsInTasks();
 
-		// Пример 4: Неправильное использование Task.Run для I/O
-		Console.WriteLine("\n4. Сравнение подходов для I/O операции:");
-		await CompareIoApproaches();
+		// 4. AggregateException vs обычные исключения
+		Console.WriteLine("\n4. AggregateException:");
+		await AggregateExceptionExample();
 
-		// Пример 5: CPU-bound задача
-		Console.WriteLine("\n5. CPU-bound задача (вычисления):");
-		await DemonstrateCpuBound();
+		// 5. Task.WhenAll с исключениями
+		Console.WriteLine("\n5. Task.WhenAll с несколькими исключениями:");
+		await MultipleExceptions();
 
-		Console.WriteLine("\n=== Итог ===");
-		Console.WriteLine("Асинхронность: эффективное ожидание");
-		Console.WriteLine("Многопоточность: параллельные вычисления");
+		// 6. Обработка исключений внутри метода
+		Console.WriteLine("\n6. Обработка исключений внутри метода:");
+		await InternalExceptionHandling();
+
+		// 7. Опасность забытых задач
+		Console.WriteLine("\n7. Забытые задачи (Fire and Forget):");
+		DemonstrateForgottenTask();
+
+		Console.WriteLine("\n=== Ключевые выводы ===");
+		Console.WriteLine("- Task<T> - обещание будущего результата");
+		Console.WriteLine("- await извлекает результат/исключения");
+		Console.WriteLine("- Избегайте .Result (блокировка и AggregateException)");
+		Console.WriteLine("- Всегда обрабатывайте или ожидайте задачи");
 	}
 
-	static async Task DemonstrateAsyncAwait()
+	static async Task TaskReturnExample()
 	{
-		Console.WriteLine("  До await. Поток: " + Thread.CurrentThread.ManagedThreadId);
+		Task<int> calculationTask = CalculateAsync();
+		Console.WriteLine($"  Задача создана, состояние: {calculationTask.Status}");
 
-		// Асинхронная задержка - поток освобождается
-		await Task.Delay(1000);
-
-		Console.WriteLine("  После await. Поток: " + Thread.CurrentThread.ManagedThreadId);
-		Console.WriteLine("  Возможно тот же поток, возможно другой");
+		// await извлекает результат
+		int result = await calculationTask;
+		Console.WriteLine($"  Результат: {result}");
+		Console.WriteLine($"  Состояние: {calculationTask.Status}");
 	}
 
-	static async Task AnalyzeThreads()
+	static Task<int> CalculateAsync()
 	{
-		int initialThreadId = Thread.CurrentThread.ManagedThreadId;
-		Console.WriteLine($"  Начальный поток: {initialThreadId}");
-
-		// Создаем несколько асинхронных операций
-		Task[] tasks = new Task[3];
-		for (int i = 0; i < tasks.Length; i++)
+		return Task.Run(() =>
 		{
-			tasks[i] = Task.Delay(500 + i * 100);
+			Thread.Sleep(500);
+			return 10 + 20; // 30
+		});
+	}
+
+	static async Task AwaitExtractsValue()
+	{
+		Task<int> task1 = Task.FromResult(42);
+		Task<int> task2 = Task.Run(() => 100);
+
+		int result1 = await task1;
+		int result2 = await task2;
+
+		Console.WriteLine($"  FromResult: {result1}");
+		Console.WriteLine($"  Task.Run: {result2}");
+		Console.WriteLine($"  Сумма: {result1 + result2}");
+	}
+
+	static async Task ExceptionsInTasks()
+	{
+		Task<int> faultedTask = FailAsync();
+		Console.WriteLine($"  Задача создана, состояние: {faultedTask.Status}");
+		Console.WriteLine($"  IsFaulted: {faultedTask.IsFaulted}");
+
+		try
+		{
+			// Исключение проявится только здесь
+			int result = await faultedTask;
+		}
+		catch (InvalidOperationException ex)
+		{
+			Console.WriteLine($"  Поймано: {ex.Message}");
+			Console.WriteLine($"  Состояние после await: {faultedTask.Status}");
+			Console.WriteLine($"  IsFaulted: {faultedTask.IsFaulted}");
+		}
+	}
+
+	static Task<int> FailAsync()
+	{
+		// Используем локальную функцию для явного указания типа
+		static int ThrowException()
+		{
+			throw new InvalidOperationException("Ошибка вычисления");
 		}
 
-		Console.WriteLine("  Запущено 3 Task.Delay");
-		Console.WriteLine("  Основной поток свободен для другой работы");
-
-		await Task.WhenAll(tasks);
-
-		int finalThreadId = Thread.CurrentThread.ManagedThreadId;
-		Console.WriteLine($"  Финальный поток: {finalThreadId}");
-		Console.WriteLine($"  Совпадают: {initialThreadId == finalThreadId}");
+		return Task.Run((Func<int>)ThrowException);
 	}
 
-	static void DemonstrateMultiThreading()
+	static async Task AggregateExceptionExample()
 	{
-		Console.WriteLine("  Главный поток: " + Thread.CurrentThread.ManagedThreadId);
-
-		// Явное создание потока (дорогая операция)
-		Thread thread = new Thread(() =>
+		// Используем локальную функцию для явного указания типа
+		static int ThrowDivideByZero()
 		{
-			Console.WriteLine("  Рабочий поток: " + Thread.CurrentThread.ManagedThreadId);
-			Thread.Sleep(500); // Блокировка потока
-		});
+			throw new DivideByZeroException("Деление на ноль");
+		}
 
-		thread.Start();
-		thread.Join();
+		Task<int> task = Task.Run((Func<int>)ThrowDivideByZero);
 
-		Console.WriteLine("  Создан отдельный поток с полным стеком");
+		// Даем задаче завершиться
+		await Task.Delay(100);
+
+		try
+		{
+			// .Result выбрасывает AggregateException
+			int result = task.Result;
+		}
+		catch (AggregateException aex)
+		{
+			Console.WriteLine($"  Пойман AggregateException (через .Result)");
+			Console.WriteLine($"  Внутреннее исключение: {aex.InnerExceptions[0].GetType().Name}");
+			Console.WriteLine($"  Сообщение: {aex.InnerExceptions[0].Message}");
+		}
+
+		// Создаем новую задачу для демонстрации await
+		static int ThrowDivideByZero2()
+		{
+			throw new DivideByZeroException("Деление на ноль 2");
+		}
+
+		Task<int> task2 = Task.Run((Func<int>)ThrowDivideByZero2);
+
+		// Сравнение с await
+		try
+		{
+			int result = await task2; // Выбросит DivideByZeroException, а не AggregateException
+		}
+		catch (DivideByZeroException ex)
+		{
+			Console.WriteLine($"  Пойман DivideByZeroException (через await): {ex.Message}");
+		}
 	}
 
-	static async Task CompareIoApproaches()
+	static async Task MultipleExceptions()
 	{
-		// Имитация I/O операции (чтение файла/сети)
-		Console.WriteLine("  Имитация I/O операции...");
+		Task task1 = Task.Run(() => throw new Exception("Ошибка 1"));
+		Task task2 = Task.Run(() => throw new Exception("Ошибка 2"));
+		Task task3 = Task.Run(() => throw new Exception("Ошибка 3"));
 
-		// Неправильно: Task.Run для I/O
-		var start = DateTime.Now;
-		await Task.Run(() =>
+		Task allTasks = Task.WhenAll(task1, task2, task3);
+
+		try
 		{
-			Thread.Sleep(1000); // Имитация I/O ожидания
-		});
-		var time1 = DateTime.Now - start;
-
-		// Правильно: асинхронное ожидание
-		start = DateTime.Now;
-		await Task.Delay(1000); // Аналогично асинхронному I/O
-		var time2 = DateTime.Now - start;
-
-		Console.WriteLine($"  Task.Run + Sleep: {time1.TotalMilliseconds:F0} мс");
-		Console.WriteLine($"  Task.Delay (async): {time2.TotalMilliseconds:F0} мс");
-		Console.WriteLine("  Время одинаково, но подходы разные");
-	}
-
-	static async Task DemonstrateCpuBound()
-	{
-		Console.WriteLine("  Запускаю CPU-intensive задачу...");
-
-		// Правильно: Task.Run для вычислений
-		int result = await Task.Run(() =>
+			await allTasks;
+		}
+		catch (Exception ex)
 		{
-			Console.WriteLine($"  Вычисления в потоке: {Thread.CurrentThread.ManagedThreadId}");
+			Console.WriteLine($"  Первое исключение: {ex.Message}");
 
-			// Имитация тяжелых вычислений
-			long sum = 0;
-			for (int i = 0; i < 10000000; i++)
+			// Для WhenAll исключения находятся в AggregateException
+			if (allTasks.Exception is AggregateException aex)
 			{
-				sum += i;
+				Console.WriteLine($"  Всего исключений: {aex.InnerExceptions.Count}");
+				foreach (var inner in aex.InnerExceptions)
+				{
+					Console.WriteLine($"    - {inner.Message}");
+				}
 			}
 
-			return (int)(sum % 1000);
+			// Проверяем исходные задачи
+			Console.WriteLine($"  task1.IsFaulted: {task1.IsFaulted}");
+			Console.WriteLine($"  task2.IsFaulted: {task2.IsFaulted}");
+			Console.WriteLine($"  task3.IsFaulted: {task3.IsFaulted}");
+		}
+	}
+
+	static async Task InternalExceptionHandling()
+	{
+		Task<int> safeTask = SafeCalculateAsync(true);
+		Task<int> unsafeTask = SafeCalculateAsync(false);
+
+		try
+		{
+			int result1 = await safeTask;
+			Console.WriteLine($"  Безопасный результат: {result1}");
+
+			int result2 = await unsafeTask;
+			Console.WriteLine($"  Небезопасный результат: {result2}");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"  Исключение снаружи: {ex.Message}");
+		}
+	}
+
+	static async Task<int> SafeCalculateAsync(bool handleInternally)
+	{
+		if (handleInternally)
+		{
+			try
+			{
+				await Task.Delay(200);
+				throw new Exception("Внутренняя ошибка");
+			}
+			catch
+			{
+				return -1; // Подавляем исключение
+			}
+		}
+		else
+		{
+			await Task.Delay(200);
+			throw new Exception("Необработанная ошибка");
+		}
+	}
+
+	static void DemonstrateForgottenTask()
+	{
+		Console.WriteLine("  Запускаем забытую задачу...");
+
+		// АНТИПАТТЕРН - задача может "потеряться"
+		Task.Run(() =>
+		{
+			Thread.Sleep(500);
+			throw new Exception("Потерянная ошибка");
 		});
 
-		Console.WriteLine($"  Результат вычислений: {result}");
-		Console.WriteLine("  Для CPU-bound задач Task.Run оправдан");
+		Console.WriteLine("  Задача запущена, но не ожидается");
+		Console.WriteLine("  Исключение может проявиться в неожиданный момент");
+
+		// Даем время для демонстрации (обычно так не делают)
+		Thread.Sleep(1000);
+
+		Console.WriteLine("  Приложение продолжает работу");
 	}
 }
