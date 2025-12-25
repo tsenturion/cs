@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -6,255 +8,318 @@ class Program
 {
 	static async Task Main()
 	{
-		Console.WriteLine("=== Как работает await ===\n");
+		Console.WriteLine("=== Ограничение параллелизма ===\n");
 
-		// 1. Основное поведение await
-		Console.WriteLine("1. Основное поведение await:");
-		await BasicAwaitExample();
+		// 1. Проблема неограниченной параллельности
+		Console.WriteLine("1. Проблема неограниченной параллельности:");
+		await UnlimitedParallelismProblem();
 
-		// 2. await не блокирует поток
-		Console.WriteLine("\n2. await vs Sleep (потоки):");
-		await AwaitVsSleep();
+		// 2. SemaphoreSlim - базовый пример
+		Console.WriteLine("\n2. SemaphoreSlim - базовый пример:");
+		await BasicSemaphoreExample();
 
-		// 3. Синхронное завершение
-		Console.WriteLine("\n3. Синхронное завершение:");
-		await SynchronousCompletion();
+		// 3. Сравнение производительности
+		Console.WriteLine("\n3. Сравнение производительности:");
+		await PerformanceComparison();
 
-		// 4. Возврат управления
-		Console.WriteLine("\n4. Возврат управления:");
-		await ReturnControlExample();
+		// 4. Обработка списка с ограничением
+		Console.WriteLine("\n4. Обработка списка с ограничением:");
+		await ProcessListWithThrottling();
 
-		// 5. Потоки после await
-		Console.WriteLine("\n5. Потоки после await:");
-		await ThreadsAfterAwait();
+		// 5. Реальные сценарии использования
+		Console.WriteLine("\n5. Реальные сценарии использования:");
+		await RealWorldScenarios();
 
-		// 6. ConfigureAwait
-		Console.WriteLine("\n6. ConfigureAwait:");
-		await ConfigureAwaitExample();
-
-		// 7. await и исключения
-		Console.WriteLine("\n7. await и исключения:");
-		await AwaitAndExceptions();
-
-		// 8. Несколько await подряд
-		Console.WriteLine("\n8. Несколько await подряд:");
-		await MultipleAwaits();
+		// 6. Антипаттерны
+		Console.WriteLine("\n6. Антипаттерны:");
+		DemonstrateAntipatterns();
 
 		Console.WriteLine("\n=== Ключевые выводы ===");
-		Console.WriteLine("- await никогда не блокирует поток");
-		Console.WriteLine("- await приостанавливает метод, а не поток");
-		Console.WriteLine("- Если задача завершена, await работает синхронно");
-		Console.WriteLine("- await возвращает управление вызывающему коду");
-		Console.WriteLine("- await извлекает результат/исключение из Task");
+		Console.WriteLine("- Параллельность - ресурс, а не бонус");
+		Console.WriteLine("- Бесконтрольная параллельность ведет к деградации");
+		Console.WriteLine("- SemaphoreSlim - основной инструмент ограничения");
+		Console.WriteLine("- try/finally обязательно при работе с семафорами");
+		Console.WriteLine("- Ограниченный параллелизм - золотая середина");
 	}
 
-	// 1. Основное поведение await
-	static async Task BasicAwaitExample()
+	// 1. Проблема неограниченной параллельности
+	static async Task UnlimitedParallelismProblem()
 	{
-		Console.WriteLine($"  До await, поток: {Thread.CurrentThread.ManagedThreadId}");
+		Console.WriteLine("  Имитация 100 запросов к базе данных...");
 
-		// await приостанавливает метод, а не поток
-		await Task.Delay(500);
+		var stopwatch = Stopwatch.StartNew();
 
-		Console.WriteLine($"  После await, поток: {Thread.CurrentThread.ManagedThreadId}");
-		Console.WriteLine("  Поток мог смениться");
-	}
-
-	// 2. await не блокирует поток
-	static async Task AwaitVsSleep()
-	{
-		Console.WriteLine($"  Начало, поток: {Thread.CurrentThread.ManagedThreadId}");
-
-		// Создаем фоновую задачу для мониторинга
-		Task monitorTask = Task.Run(() =>
+		try
 		{
-			for (int i = 1; i <= 5; i++)
+			// АНТИПАТТЕРН: запуск всего сразу
+			var tasks = new List<Task>();
+			for (int i = 1; i <= 100; i++)
 			{
-				Console.WriteLine($"    Монитор: шаг {i}, поток: {Thread.CurrentThread.ManagedThreadId}");
-				Thread.Sleep(200);
+				int id = i;
+				tasks.Add(Task.Run(async () =>
+				{
+					await SimulateDatabaseQuery(id);
+				}));
 			}
-		});
 
-		Console.WriteLine("  Запускаем await Task.Delay(1000)...");
-		await Task.Delay(1000); // Поток освобождается
-
-		Console.WriteLine($"  После await, поток: {Thread.CurrentThread.ManagedThreadId}");
-
-		Console.WriteLine("\n  Теперь Sleep (для сравнения)...");
-		Thread.Sleep(1000); // Поток блокируется
-
-		Console.WriteLine($"  После Sleep, поток: {Thread.CurrentThread.ManagedThreadId}");
-
-		await monitorTask;
-	}
-
-	// 3. Синхронное завершение
-	static async Task SynchronousCompletion()
-	{
-		Console.WriteLine($"  Начало, поток: {Thread.CurrentThread.ManagedThreadId}");
-
-		// Задача уже завершена - await работает синхронно
-		Task<int> completedTask = Task.FromResult(42);
-		Console.WriteLine($"  Состояние задачи: {completedTask.Status}");
-
-		int result = await completedTask; // Синхронное выполнение
-
-		Console.WriteLine($"  После await, поток: {Thread.CurrentThread.ManagedThreadId}");
-		Console.WriteLine($"  Результат: {result}");
-
-		// Сравнение с незавершенной задачей
-		Console.WriteLine("\n  Незавершенная задача:");
-		Task<int> delayedTask = GetDelayedValueAsync();
-		Console.WriteLine($"  Состояние перед await: {delayedTask.Status}");
-
-		result = await delayedTask; // Асинхронное выполнение
-		Console.WriteLine($"  Состояние после await: {delayedTask.Status}");
-	}
-
-	static async Task<int> GetDelayedValueAsync()
-	{
-		await Task.Delay(300);
-		return 100;
-	}
-
-	// 4. Возврат управления
-	static async Task ReturnControlExample()
-	{
-		Console.WriteLine("  Вызываем асинхронный метод...");
-
-		// Метод возвращает управление на первом await
-		Task<int> task = ProcessAsync();
-		Console.WriteLine($"  Метод вернул Task, состояние: {task.Status}");
-		Console.WriteLine("  Основной код продолжает работу");
-
-		// Делаем что-то еще
-		await Task.Delay(300);
-		Console.WriteLine($"  Основной код: после задержки, состояние задачи: {task.Status}");
-
-		// Теперь ждем результат
-		int result = await task;
-		Console.WriteLine($"  Результат: {result}, состояние: {task.Status}");
-	}
-
-	static async Task<int> ProcessAsync()
-	{
-		Console.WriteLine("    ProcessAsync: Начало");
-		Console.WriteLine($"    ProcessAsync: поток {Thread.CurrentThread.ManagedThreadId}");
-
-		// Первый await - точка возврата управления
-		await Task.Delay(500);
-
-		Console.WriteLine($"    ProcessAsync: после первого await, поток {Thread.CurrentThread.ManagedThreadId}");
-
-		// Второй await
-		await Task.Delay(300);
-
-		Console.WriteLine($"    ProcessAsync: завершение, поток {Thread.CurrentThread.ManagedThreadId}");
-		return 42;
-	}
-
-	// 5. Потоки после await
-	static async Task ThreadsAfterAwait()
-	{
-		Console.WriteLine($"  Главный поток: {Thread.CurrentThread.ManagedThreadId}");
-
-		// В консольном приложении поток может меняться
-		for (int i = 0; i < 3; i++)
-		{
-			await Task.Delay(100);
-			Console.WriteLine($"  После await #{i + 1}: {Thread.CurrentThread.ManagedThreadId}");
-		}
-
-		// Использование Task.Run
-		await Task.Run(() =>
-		{
-			Console.WriteLine($"  В Task.Run: {Thread.CurrentThread.ManagedThreadId}");
-		});
-
-		Console.WriteLine($"  После Task.Run: {Thread.CurrentThread.ManagedThreadId}");
-	}
-
-	// 6. ConfigureAwait
-	static async Task ConfigureAwaitExample()
-	{
-		Console.WriteLine($"  Начало, поток: {Thread.CurrentThread.ManagedThreadId}");
-
-		// Без ConfigureAwait - может вернуться в тот же контекст
-		await Task.Delay(200);
-		Console.WriteLine($"  Без ConfigureAwait: {Thread.CurrentThread.ManagedThreadId}");
-
-		// С ConfigureAwait(false) - может продолжить в любом потоке
-		await Task.Delay(200).ConfigureAwait(false);
-		Console.WriteLine($"  С ConfigureAwait(false): {Thread.CurrentThread.ManagedThreadId}");
-
-		// Еще раз для демонстрации
-		await Task.Delay(200).ConfigureAwait(false);
-		Console.WriteLine($"  Снова ConfigureAwait(false): {Thread.CurrentThread.ManagedThreadId}");
-
-		Console.WriteLine("  ConfigureAwait(false) полезен в библиотеках");
-	}
-
-	// 7. await и исключения
-	static async Task AwaitAndExceptions()
-	{
-		Console.WriteLine("  Тестирование исключений с await...");
-
-		Task faultedTask = Task.Run(() =>
-		{
-			throw new InvalidOperationException("Тестовая ошибка");
-		});
-
-		// Без await исключение остается внутри Task
-		Console.WriteLine($"  Состояние задачи без await: {faultedTask.Status}");
-		Console.WriteLine($"  IsFaulted: {faultedTask.IsFaulted}");
-
-		try
-		{
-			// await извлекает исключение
-			await faultedTask;
-		}
-		catch (InvalidOperationException ex)
-		{
-			Console.WriteLine($"  Поймано исключение через await: {ex.Message}");
-			Console.WriteLine($"  Состояние задачи после await: {faultedTask.Status}");
-		}
-
-		// Исключения из async метода
-		try
-		{
-			await ThrowAsync();
+			await Task.WhenAll(tasks);
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"  Исключение из async метода: {ex.Message}");
+			Console.WriteLine($"  Ошибка: {ex.Message}");
+			Console.WriteLine("  Перегружен пул соединений или исчерпаны ресурсы");
+		}
+
+		stopwatch.Stop();
+		Console.WriteLine($"  Время: {stopwatch.ElapsedMilliseconds} мс");
+	}
+
+	// 2. SemaphoreSlim - базовый пример
+	static async Task BasicSemaphoreExample()
+	{
+		// Создаем семафор на 3 одновременных операции
+		SemaphoreSlim semaphore = new SemaphoreSlim(3);
+
+		Console.WriteLine($"  Семафор создан. Доступно мест: {semaphore.CurrentCount}");
+
+		var tasks = new List<Task>();
+		for (int i = 1; i <= 10; i++)
+		{
+			int itemId = i;
+			tasks.Add(ProcessWithSemaphoreAsync(itemId, semaphore));
+		}
+
+		await Task.WhenAll(tasks);
+		Console.WriteLine("  Все задачи завершены");
+	}
+
+	static async Task ProcessWithSemaphoreAsync(int itemId, SemaphoreSlim semaphore)
+	{
+		Console.WriteLine($"    Элемент {itemId}: ожидает семафора");
+
+		// Асинхронное ожидание доступа
+		await semaphore.WaitAsync();
+
+		try
+		{
+			Console.WriteLine($"    Элемент {itemId}: начал обработку");
+			Console.WriteLine($"    Доступно мест: {semaphore.CurrentCount}");
+
+			await Task.Delay(500); // Имитация работы
+
+			Console.WriteLine($"    Элемент {itemId}: завершил обработку");
+		}
+		finally
+		{
+			// ВСЕГДА освобождаем семафор в finally
+			semaphore.Release();
 		}
 	}
 
-	static async Task ThrowAsync()
+	// 3. Сравнение производительности
+	static async Task PerformanceComparison()
 	{
-		await Task.Delay(100);
-		throw new ApplicationException("Исключение из async метода");
+		const int totalOperations = 20;
+		const int maxParallelism = 4;
+
+		Console.WriteLine($"  Всего операций: {totalOperations}");
+		Console.WriteLine($"  Максимальная параллельность: {maxParallelism}");
+
+		// Тест 1: Последовательная обработка
+		Console.WriteLine("\n  Тест 1: Последовательная обработка");
+		var stopwatch = Stopwatch.StartNew();
+		for (int i = 0; i < totalOperations; i++)
+		{
+			await SimulateIoOperation(i);
+		}
+		stopwatch.Stop();
+		Console.WriteLine($"  Время: {stopwatch.ElapsedMilliseconds} мс");
+
+		// Тест 2: Без ограничений
+		Console.WriteLine("\n  Тест 2: Без ограничений");
+		stopwatch.Restart();
+		var tasks = new List<Task>();
+		for (int i = 0; i < totalOperations; i++)
+		{
+			int id = i;
+			tasks.Add(Task.Run(() => SimulateIoOperation(id)));
+		}
+		await Task.WhenAll(tasks);
+		stopwatch.Stop();
+		Console.WriteLine($"  Время: {stopwatch.ElapsedMilliseconds} мс");
+
+		// Тест 3: Ограниченная параллельность
+		Console.WriteLine("\n  Тест 3: Ограниченная параллельность");
+		var semaphore = new SemaphoreSlim(maxParallelism);
+		stopwatch.Restart();
+
+		tasks.Clear();
+		for (int i = 0; i < totalOperations; i++)
+		{
+			int id = i;
+			tasks.Add(ProcessWithThrottlingAsync(id, semaphore));
+		}
+
+		await Task.WhenAll(tasks);
+		stopwatch.Stop();
+		Console.WriteLine($"  Время: {stopwatch.ElapsedMilliseconds} мс");
 	}
 
-	// 8. Несколько await подряд
-	static async Task MultipleAwaits()
+	static async Task SimulateIoOperation(int id)
 	{
-		Console.WriteLine($"  Начало, поток: {Thread.CurrentThread.ManagedThreadId}");
+		await Task.Delay(300); // Имитация I/O операции
+	}
 
-		// Каждый await - потенциальная точка приостановки
-		Console.WriteLine("  Первый await...");
-		await Task.Delay(200);
-		Console.WriteLine($"  После первого await, поток: {Thread.CurrentThread.ManagedThreadId}");
+	static async Task ProcessWithThrottlingAsync(int id, SemaphoreSlim semaphore)
+	{
+		await semaphore.WaitAsync();
+		try
+		{
+			await SimulateIoOperation(id);
+		}
+		finally
+		{
+			semaphore.Release();
+		}
+	}
 
-		Console.WriteLine("  Второй await...");
-		await Task.Delay(200);
-		Console.WriteLine($"  После второго await, поток: {Thread.CurrentThread.ManagedThreadId}");
+	// 4. Обработка списка с ограничением
+	static async Task ProcessListWithThrottling()
+	{
+		var items = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
-		Console.WriteLine("  Третий await...");
-		await Task.Delay(200);
-		Console.WriteLine($"  После третьего await, поток: {Thread.CurrentThread.ManagedThreadId}");
+		Console.WriteLine($"  Обработка {items.Count} элементов");
 
-		// Когда все await завершены
-		Console.WriteLine($"  Завершение, поток: {Thread.CurrentThread.ManagedThreadId}");
+		// Создаем семафор для ограничения параллельности
+		SemaphoreSlim semaphore = new SemaphoreSlim(2);
+
+		var tasks = new List<Task<string>>();
+		foreach (var item in items)
+		{
+			tasks.Add(ProcessItemAsync(item, semaphore));
+		}
+
+		var results = await Task.WhenAll(tasks);
+
+		Console.WriteLine("  Результаты:");
+		foreach (var result in results)
+		{
+			Console.WriteLine($"    {result}");
+		}
+	}
+
+	static async Task<string> ProcessItemAsync(int item, SemaphoreSlim semaphore)
+	{
+		await semaphore.WaitAsync();
+		try
+		{
+			await Task.Delay(300); // Имитация работы
+			return $"Элемент {item} обработан";
+		}
+		finally
+		{
+			semaphore.Release();
+		}
+	}
+
+	// 5. Реальные сценарии использования
+	static async Task RealWorldScenarios()
+	{
+		Console.WriteLine("  Сценарий 1: Запросы к внешнему API");
+		await ApiRateLimitingExample();
+
+		Console.WriteLine("\n  Сценарий 2: Работа с файлами");
+		await FileOperationsExample();
+	}
+
+	static async Task ApiRateLimitingExample()
+	{
+		// Ограничение: не более 3 запросов в секунду к внешнему API
+		SemaphoreSlim apiSemaphore = new SemaphoreSlim(3);
+
+		var apiTasks = new List<Task>();
+		for (int i = 1; i <= 10; i++)
+		{
+			int requestId = i;
+			apiTasks.Add(MakeApiRequestAsync(requestId, apiSemaphore));
+		}
+
+		await Task.WhenAll(apiTasks);
+		Console.WriteLine("    Все API запросы завершены");
+	}
+
+	static async Task MakeApiRequestAsync(int requestId, SemaphoreSlim semaphore)
+	{
+		await semaphore.WaitAsync();
+		try
+		{
+			Console.WriteLine($"    API запрос #{requestId} начат");
+			await Task.Delay(500); // Имитация API вызова
+			Console.WriteLine($"    API запрос #{requestId} завершен");
+		}
+		finally
+		{
+			semaphore.Release();
+		}
+	}
+
+	static async Task FileOperationsExample()
+	{
+		// Ограничение одновременных операций с файлами
+		SemaphoreSlim fileSemaphore = new SemaphoreSlim(2);
+
+		var fileTasks = new List<Task>();
+		for (int i = 1; i <= 5; i++)
+		{
+			int fileId = i;
+			fileTasks.Add(WriteToFileAsync(fileId, fileSemaphore));
+		}
+
+		await Task.WhenAll(fileTasks);
+		Console.WriteLine("    Все файловые операции завершены");
+	}
+
+	static async Task WriteToFileAsync(int fileId, SemaphoreSlim semaphore)
+	{
+		await semaphore.WaitAsync();
+		try
+		{
+			Console.WriteLine($"    Запись в файл #{fileId} начата");
+			await Task.Delay(400); // Имитация записи
+			Console.WriteLine($"    Запись в файл #{fileId} завершена");
+		}
+		finally
+		{
+			semaphore.Release();
+		}
+	}
+
+	// 6. Антипаттерны
+	static void DemonstrateAntipatterns()
+	{
+		Console.WriteLine("  Антипаттерн 1: Забытый Release");
+		Console.WriteLine("    Без finally ресурсы могут быть заблокированы навсегда");
+
+		Console.WriteLine("\n  Антипаттерн 2: Task.Run + Semaphore без необходимости");
+		Console.WriteLine("    Лишняя обертка в Task.Run усложняет код");
+
+		Console.WriteLine("\n  Антипаттерн 3: Глобальный семафор без Dispose");
+		Console.WriteLine("    Семафоры реализуют IDisposable - нужно освобождать ресурсы");
+
+		Console.WriteLine("\n  Антипаттерн 4: Слишком низкие лимиты");
+		Console.WriteLine("    Слишком строгие ограничения могут снизить производительность");
+
+		// Пример правильного Dispose
+		Console.WriteLine("\n  Правильное использование:");
+		using (var semaphore = new SemaphoreSlim(2))
+		{
+			Console.WriteLine("    Семафор создан в using блоке");
+		}
+		Console.WriteLine("    Ресурсы освобождены автоматически");
+	}
+
+	static async Task SimulateDatabaseQuery(int id)
+	{
+		await Task.Delay(100); // Имитация запроса к БД
 	}
 }
