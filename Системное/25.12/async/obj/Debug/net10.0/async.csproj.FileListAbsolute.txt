@@ -1,0 +1,15 @@
+C:\Users\user\repos\cs\Системное\25.12\async\bin\Debug\net10.0\async.exe
+C:\Users\user\repos\cs\Системное\25.12\async\bin\Debug\net10.0\async.deps.json
+C:\Users\user\repos\cs\Системное\25.12\async\bin\Debug\net10.0\async.runtimeconfig.json
+C:\Users\user\repos\cs\Системное\25.12\async\bin\Debug\net10.0\async.dll
+C:\Users\user\repos\cs\Системное\25.12\async\bin\Debug\net10.0\async.pdb
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\async.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\async.AssemblyInfoInputs.cache
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\async.AssemblyInfo.cs
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\async.csproj.CoreCompileInputs.cache
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\async.sourcelink.json
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\async.dll
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\refint\async.dll
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\async.pdb
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\async.genruntimeconfig.cache
+C:\Users\user\repos\cs\Системное\25.12\async\obj\Debug\net10.0\ref\async.dll
