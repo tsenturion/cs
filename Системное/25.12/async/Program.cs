@@ -6,240 +6,273 @@ class Program
 {
 	static async Task Main()
 	{
-		Console.WriteLine("=== Task<T> и возврат значений ===\n");
+		Console.WriteLine("=== Как работает async ===\n");
 
-		// 1. Возврат значений через Task<T>
-		Console.WriteLine("1. Возврат значений через Task<T>:");
-		await TaskReturnExample();
+		// 1. async без await
+		Console.WriteLine("1. async без await (антипаттерн):");
+		await AsyncWithoutAwait();
 
-		// 2. await извлекает результат
-		Console.WriteLine("\n2. await извлекает результат:");
-		await AwaitExtractsValue();
+		// 2. Разделение метода на части
+		Console.WriteLine("\n2. Разделение метода на части await:");
+		await MethodPartsExample();
 
-		// 3. Исключения в Task<T>
-		Console.WriteLine("\n3. Исключения в Task<T>:");
-		await ExceptionsInTasks();
+		// 3. Потоки в async методах
+		Console.WriteLine("\n3. Потоки в async методах:");
+		await ThreadsInAsync();
 
-		// 4. AggregateException vs обычные исключения
-		Console.WriteLine("\n4. AggregateException:");
-		await AggregateExceptionExample();
+		// 4. Вызов async метода без ожидания
+		Console.WriteLine("\n4. Вызов async метода без ожидания:");
+		await FireAndForgetAsync();
 
-		// 5. Task.WhenAll с исключениями
-		Console.WriteLine("\n5. Task.WhenAll с несколькими исключениями:");
-		await MultipleExceptions();
+		// 5. Возврат Task<T> из async метода
+		Console.WriteLine("\n5. Возврат Task<T> из async метода:");
+		await ReturnValueFromAsync();
 
-		// 6. Обработка исключений внутри метода
-		Console.WriteLine("\n6. Обработка исключений внутри метода:");
-		await InternalExceptionHandling();
+		// 6. async void - опасный пример (без краха приложения)
+		Console.WriteLine("\n6. async void (опасно!):");
+		await DemonstrateAsyncVoid();
 
-		// 7. Опасность забытых задач
-		Console.WriteLine("\n7. Забытые задачи (Fire and Forget):");
-		DemonstrateForgottenTask();
+		// 7. Стек вызовов в async
+		Console.WriteLine("\n7. Стек вызовов:");
+		await CallStackDemo();
+
+		// 8. Когда async бесполезен
+		Console.WriteLine("\n8. Когда async бесполезен:");
+		await UselessAsync();
 
 		Console.WriteLine("\n=== Ключевые выводы ===");
-		Console.WriteLine("- Task<T> - обещание будущего результата");
-		Console.WriteLine("- await извлекает результат/исключения");
-		Console.WriteLine("- Избегайте .Result (блокировка и AggregateException)");
-		Console.WriteLine("- Всегда обрабатывайте или ожидайте задачи");
+		Console.WriteLine("- async сам по себе не делает код асинхронным");
+		Console.WriteLine("- Реальная асинхронность появляется только с await");
+		Console.WriteLine("- async не создает новые потоки");
+		Console.WriteLine("- async void почти всегда ошибка");
+		Console.WriteLine("- async != быстрее");
 	}
 
-	static async Task TaskReturnExample()
+	// 1. async без await - антипаттерн
+	static async Task AsyncWithoutAwait()
 	{
-		Task<int> calculationTask = CalculateAsync();
-		Console.WriteLine($"  Задача создана, состояние: {calculationTask.Status}");
-
-		// await извлекает результат
-		int result = await calculationTask;
-		Console.WriteLine($"  Результат: {result}");
-		Console.WriteLine($"  Состояние: {calculationTask.Status}");
+		Console.WriteLine($"  Выполняется в потоке: {Thread.CurrentThread.ManagedThreadId}");
+		Console.WriteLine("  Этот метод async, но не содержит await");
+		Console.WriteLine("  Он выполняется синхронно, Task уже завершен");
 	}
 
-	static Task<int> CalculateAsync()
+	// 2. Разделение метода на части
+	static async Task MethodPartsExample()
 	{
-		return Task.Run(() =>
+		Console.WriteLine("  Часть 1: До первого await");
+		Console.WriteLine($"  Поток: {Thread.CurrentThread.ManagedThreadId}");
+
+		await Task.Delay(500);
+
+		Console.WriteLine("  Часть 2: После первого await");
+		Console.WriteLine($"  Поток: {Thread.CurrentThread.ManagedThreadId}");
+
+		await Task.Delay(500);
+
+		Console.WriteLine("  Часть 3: После второго await");
+		Console.WriteLine($"  Поток: {Thread.CurrentThread.ManagedThreadId}");
+	}
+
+	// 3. Потоки в async методах
+	static async Task ThreadsInAsync()
+	{
+		Console.WriteLine($"  Начало метода: {Thread.CurrentThread.ManagedThreadId}");
+
+		await Task.Delay(100);
+		Console.WriteLine($"  После Delay: {Thread.CurrentThread.ManagedThreadId}");
+
+		Thread.Sleep(100);
+		Console.WriteLine($"  После Sleep: {Thread.CurrentThread.ManagedThreadId}");
+
+		await Task.Run(() =>
 		{
-			Thread.Sleep(500);
-			return 10 + 20; // 30
+			Console.WriteLine($"  В Task.Run: {Thread.CurrentThread.ManagedThreadId}");
 		});
+
+		Console.WriteLine($"  После Task.Run: {Thread.CurrentThread.ManagedThreadId}");
 	}
 
-	static async Task AwaitExtractsValue()
+	// 4. Вызов async метода без ожидания
+	static async Task FireAndForgetAsync()
 	{
-		Task<int> task1 = Task.FromResult(42);
-		Task<int> task2 = Task.Run(() => 100);
+		Console.WriteLine("  Запускаем задачу без ожидания...");
 
-		int result1 = await task1;
-		int result2 = await task2;
+		Task task = ExampleAsync();
+		Console.WriteLine($"  Задача запущена, состояние: {task.Status}");
+		Console.WriteLine("  Основной код продолжает выполняться");
 
-		Console.WriteLine($"  FromResult: {result1}");
-		Console.WriteLine($"  Task.Run: {result2}");
-		Console.WriteLine($"  Сумма: {result1 + result2}");
+		await task;
+		Console.WriteLine($"  После await, состояние: {task.Status}");
 	}
 
-	static async Task ExceptionsInTasks()
+	static async Task ExampleAsync()
 	{
-		Task<int> faultedTask = FailAsync();
-		Console.WriteLine($"  Задача создана, состояние: {faultedTask.Status}");
-		Console.WriteLine($"  IsFaulted: {faultedTask.IsFaulted}");
+		Console.WriteLine("    ExampleAsync: Начало");
+		await Task.Delay(800);
+		Console.WriteLine("    ExampleAsync: Завершение");
+	}
 
+	// 5. Возврат Task<T> из async метода
+	static async Task ReturnValueFromAsync()
+	{
+		Task<int> task1 = GetValueAsync();
+		Console.WriteLine($"  Задача создана, состояние: {task1.Status}");
+
+		int result = await task1;
+		Console.WriteLine($"  Результат: {result}, состояние: {task1.Status}");
+
+		Task<int> task2 = GetValueWithExceptionAsync();
 		try
 		{
-			// Исключение проявится только здесь
-			int result = await faultedTask;
+			result = await task2;
 		}
 		catch (InvalidOperationException ex)
 		{
-			Console.WriteLine($"  Поймано: {ex.Message}");
-			Console.WriteLine($"  Состояние после await: {faultedTask.Status}");
-			Console.WriteLine($"  IsFaulted: {faultedTask.IsFaulted}");
+			Console.WriteLine($"  Исключение: {ex.Message}, состояние: {task2.Status}");
 		}
 	}
 
-	static Task<int> FailAsync()
+	static async Task<int> GetValueAsync()
 	{
-		// Используем локальную функцию для явного указания типа
-		static int ThrowException()
-		{
-			throw new InvalidOperationException("Ошибка вычисления");
-		}
-
-		return Task.Run((Func<int>)ThrowException);
+		await Task.Delay(300);
+		return 42;
 	}
 
-	static async Task AggregateExceptionExample()
+	static async Task<int> GetValueWithExceptionAsync()
 	{
-		// Используем локальную функцию для явного указания типа
-		static int ThrowDivideByZero()
+		await Task.Delay(300);
+		throw new InvalidOperationException("Ошибка в async методе");
+	}
+
+	// 6. async void - безопасная демонстрация
+	static async Task DemonstrateAsyncVoid()
+	{
+		Console.WriteLine("  Запускаем async void метод...");
+
+		try
 		{
-			throw new DivideByZeroException("Деление на ноль");
+			// Используем try-catch, но он не сработает
+			AsyncVoidMethod();
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"  Этот блок НЕ выполнится: {ex.Message}");
 		}
 
-		Task<int> task = Task.Run((Func<int>)ThrowDivideByZero);
+		Console.WriteLine("  Основной поток продолжает работу...");
+		Console.WriteLine("  Ожидаем, чтобы увидеть, что происходит...");
 
-		// Даем задаче завершиться
+		// Ждем, чтобы async void метод успел выполниться
+		await Task.Delay(500);
+
+		Console.WriteLine("  Приложение все еще работает...");
+
+		// Теперь покажем безопасный способ
+		Console.WriteLine("\n  Правильный способ (async Task):");
+		try
+		{
+			await AsyncTaskMethod();
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"  Исключение поймано: {ex.Message}");
+		}
+
+		Console.WriteLine("  Демонстрация завершена успешно");
+	}
+
+	// Безопасная версия async void для демонстрации
+	static async void AsyncVoidMethod()
+	{
+		Console.WriteLine("    AsyncVoidMethod: начало");
+
+		try
+		{
+			// Вместо прямого throw, делаем это безопасно
+			await Task.Delay(100);
+
+			// Создаем исключение, но не бросаем его
+			var exception = new Exception("Ошибка в async void - не ловится try-catch!");
+			Console.WriteLine($"    Создано исключение: {exception.Message}");
+			Console.WriteLine("    В реальном приложении это бы привело к краху!");
+
+			// Вместо throw просто сообщаем
+			Console.WriteLine("    [Здесь было бы: throw exception;]");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"    Внутренний catch: {ex.Message}");
+		}
+	}
+
+	static async Task AsyncTaskMethod()
+	{
+		Console.WriteLine("    AsyncTaskMethod: начало");
+		await Task.Delay(100);
+		throw new Exception("Ошибка в async Task - ловится try-catch");
+	}
+
+	// 7. Стек вызовов
+	static async Task CallStackDemo()
+	{
+		Console.WriteLine("  Вызываем MethodA...");
+		await MethodA();
+	}
+
+	static async Task MethodA()
+	{
+		Console.WriteLine("    MethodA: начало");
+		await Task.Delay(100);
+		await MethodB();
+		Console.WriteLine("    MethodA: завершение");
+	}
+
+	static async Task MethodB()
+	{
+		Console.WriteLine("      MethodB: начало");
 		await Task.Delay(100);
 
 		try
 		{
-			// .Result выбрасывает AggregateException
-			int result = task.Result;
-		}
-		catch (AggregateException aex)
-		{
-			Console.WriteLine($"  Пойман AggregateException (через .Result)");
-			Console.WriteLine($"  Внутреннее исключение: {aex.InnerExceptions[0].GetType().Name}");
-			Console.WriteLine($"  Сообщение: {aex.InnerExceptions[0].Message}");
-		}
-
-		// Создаем новую задачу для демонстрации await
-		static int ThrowDivideByZero2()
-		{
-			throw new DivideByZeroException("Деление на ноль 2");
-		}
-
-		Task<int> task2 = Task.Run((Func<int>)ThrowDivideByZero2);
-
-		// Сравнение с await
-		try
-		{
-			int result = await task2; // Выбросит DivideByZeroException, а не AggregateException
-		}
-		catch (DivideByZeroException ex)
-		{
-			Console.WriteLine($"  Пойман DivideByZeroException (через await): {ex.Message}");
-		}
-	}
-
-	static async Task MultipleExceptions()
-	{
-		Task task1 = Task.Run(() => throw new Exception("Ошибка 1"));
-		Task task2 = Task.Run(() => throw new Exception("Ошибка 2"));
-		Task task3 = Task.Run(() => throw new Exception("Ошибка 3"));
-
-		Task allTasks = Task.WhenAll(task1, task2, task3);
-
-		try
-		{
-			await allTasks;
+			throw new Exception("Тест исключения");
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"  Первое исключение: {ex.Message}");
-
-			// Для WhenAll исключения находятся в AggregateException
-			if (allTasks.Exception is AggregateException aex)
-			{
-				Console.WriteLine($"  Всего исключений: {aex.InnerExceptions.Count}");
-				foreach (var inner in aex.InnerExceptions)
-				{
-					Console.WriteLine($"    - {inner.Message}");
-				}
-			}
-
-			// Проверяем исходные задачи
-			Console.WriteLine($"  task1.IsFaulted: {task1.IsFaulted}");
-			Console.WriteLine($"  task2.IsFaulted: {task2.IsFaulted}");
-			Console.WriteLine($"  task3.IsFaulted: {task3.IsFaulted}");
+			Console.WriteLine($"      StackTrace:\n{ex.StackTrace}");
 		}
+
+		Console.WriteLine("      MethodB: завершение");
 	}
 
-	static async Task InternalExceptionHandling()
+	// 8. Когда async бесполезен
+	static async Task UselessAsync()
 	{
-		Task<int> safeTask = SafeCalculateAsync(true);
-		Task<int> unsafeTask = SafeCalculateAsync(false);
+		Console.WriteLine("  Тест CPU-bound операции:");
 
-		try
-		{
-			int result1 = await safeTask;
-			Console.WriteLine($"  Безопасный результат: {result1}");
+		var start = DateTime.Now;
 
-			int result2 = await unsafeTask;
-			Console.WriteLine($"  Небезопасный результат: {result2}");
-		}
-		catch (Exception ex)
-		{
-			Console.WriteLine($"  Исключение снаружи: {ex.Message}");
-		}
-	}
-
-	static async Task<int> SafeCalculateAsync(bool handleInternally)
-	{
-		if (handleInternally)
-		{
-			try
-			{
-				await Task.Delay(200);
-				throw new Exception("Внутренняя ошибка");
-			}
-			catch
-			{
-				return -1; // Подавляем исключение
-			}
-		}
-		else
-		{
-			await Task.Delay(200);
-			throw new Exception("Необработанная ошибка");
-		}
-	}
-
-	static void DemonstrateForgottenTask()
-	{
-		Console.WriteLine("  Запускаем забытую задачу...");
-
-		// АНТИПАТТЕРН - задача может "потеряться"
-		Task.Run(() =>
+		int result1 = await Task.Run(() =>
 		{
 			Thread.Sleep(500);
-			throw new Exception("Потерянная ошибка");
+			return CalculateSomething();
 		});
 
-		Console.WriteLine("  Задача запущена, но не ожидается");
-		Console.WriteLine("  Исключение может проявиться в неожиданный момент");
+		var time1 = DateTime.Now - start;
+		Console.WriteLine($"  Async результат: {result1}, время: {time1.TotalMilliseconds:F0}мс");
 
-		// Даем время для демонстрации (обычно так не делают)
-		Thread.Sleep(1000);
+		start = DateTime.Now;
+		int result2 = CalculateSomething();
+		var time2 = DateTime.Now - start;
+		Console.WriteLine($"  Sync результат: {result2}, время: {time2.TotalMilliseconds:F0}мс");
+	}
 
-		Console.WriteLine("  Приложение продолжает работу");
+	static int CalculateSomething()
+	{
+		int sum = 0;
+		for (int i = 0; i < 1000000; i++)
+		{
+			sum += i % 100;
+		}
+		return sum;
 	}
 }
