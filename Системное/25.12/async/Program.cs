@@ -1,87 +1,131 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 
 class Program
 {
-	static void Main()
+	static async Task Main()
 	{
-		// Главный поток начинает выполнение
-		Console.WriteLine("Начало работы программы");
+		Console.WriteLine("=== Демонстрация асинхронности vs многопоточности ===\n");
 
-		// Показываем информацию о потоке
-		ShowThreadInfo("Главный поток");
+		// Пример 1: Чистая асинхронность (без создания потоков)
+		Console.WriteLine("1. Чистая асинхронность (Task.Delay):");
+		await DemonstrateAsyncAwait();
 
-		// Синхронное выполнение - поток блокируется
-		Console.WriteLine("\nВызов Thread.Sleep(3000)...");
-		Thread.Sleep(3000); // Поток блокируется на 3 секунды
+		// Пример 2: Проверка потоков в асинхронном коде
+		Console.WriteLine("\n2. Анализ потоков в асинхронном коде:");
+		await AnalyzeThreads();
 
-		Console.WriteLine("Поток возобновил работу после Sleep");
+		// Пример 3: Многопоточность (явное создание потока)
+		Console.WriteLine("\n3. Многопоточность (явное создание Thread):");
+		DemonstrateMultiThreading();
 
-		// Демонстрация стека вызовов
-		DemonstrateCallStack();
+		// Пример 4: Неправильное использование Task.Run для I/O
+		Console.WriteLine("\n4. Сравнение подходов для I/O операции:");
+		await CompareIoApproaches();
 
-		// Симуляция длительной операции
-		SimulateLongOperation();
+		// Пример 5: CPU-bound задача
+		Console.WriteLine("\n5. CPU-bound задача (вычисления):");
+		await DemonstrateCpuBound();
 
-		Console.WriteLine("\nКонец работы программы");
+		Console.WriteLine("\n=== Итог ===");
+		Console.WriteLine("Асинхронность: эффективное ожидание");
+		Console.WriteLine("Многопоточность: параллельные вычисления");
 	}
 
-	static void ShowThreadInfo(string context)
+	static async Task DemonstrateAsyncAwait()
 	{
-		Thread currentThread = Thread.CurrentThread;
-		Console.WriteLine($"{context}:");
-		Console.WriteLine($"  ID потока: {currentThread.ManagedThreadId}");
-		Console.WriteLine($"  Приоритет: {currentThread.Priority}");
-		Console.WriteLine($"  Состояние: {currentThread.ThreadState}");
+		Console.WriteLine("  До await. Поток: " + Thread.CurrentThread.ManagedThreadId);
+
+		// Асинхронная задержка - поток освобождается
+		await Task.Delay(1000);
+
+		Console.WriteLine("  После await. Поток: " + Thread.CurrentThread.ManagedThreadId);
+		Console.WriteLine("  Возможно тот же поток, возможно другой");
 	}
 
-	static void DemonstrateCallStack()
+	static async Task AnalyzeThreads()
 	{
-		Console.WriteLine("\n=== Демонстрация стека вызовов ===");
+		int initialThreadId = Thread.CurrentThread.ManagedThreadId;
+		Console.WriteLine($"  Начальный поток: {initialThreadId}");
 
-		Console.WriteLine("Метод Main вызывает MethodA");
-		MethodA();
-
-		Console.WriteLine("Возврат в Main");
-	}
-
-	static void MethodA()
-	{
-		Console.WriteLine("  MethodA: Зашел в метод");
-		Console.WriteLine("  MethodA: Вызываю MethodB");
-
-		MethodB();
-
-		Console.WriteLine("  MethodA: Вернулся из MethodB");
-		Console.WriteLine("  MethodA: Завершаю работу");
-	}
-
-	static void MethodB()
-	{
-		Console.WriteLine("    MethodB: Зашел в метод");
-		Console.WriteLine("    MethodB: Выполняю работу...");
-		Thread.Sleep(500);
-		Console.WriteLine("    MethodB: Завершаю работу");
-	}
-
-	static void SimulateLongOperation()
-	{
-		Console.WriteLine("\n=== Симуляция длительной операции ===");
-
-		Console.WriteLine("Начинаю длительную операцию (чтение файла)...");
-		DateTime start = DateTime.Now;
-
-		// Имитация чтения большого файла
-		for (int i = 1; i <= 5; i++)
+		// Создаем несколько асинхронных операций
+		Task[] tasks = new Task[3];
+		for (int i = 0; i < tasks.Length; i++)
 		{
-			Console.WriteLine($"  Чтение файла... часть {i}/5");
-			Thread.Sleep(1000); // Блокировка потока на 1 секунду
+			tasks[i] = Task.Delay(500 + i * 100);
 		}
 
-		TimeSpan duration = DateTime.Now - start;
-		Console.WriteLine($"Длительная операция завершена за {duration.TotalSeconds:F1} секунд");
+		Console.WriteLine("  Запущено 3 Task.Delay");
+		Console.WriteLine("  Основной поток свободен для другой работы");
 
-		Console.WriteLine("\nПроблема: Поток был заблокирован все это время!");
-		Console.WriteLine("Не мог обрабатывать другие запросы или обновлять UI.");
+		await Task.WhenAll(tasks);
+
+		int finalThreadId = Thread.CurrentThread.ManagedThreadId;
+		Console.WriteLine($"  Финальный поток: {finalThreadId}");
+		Console.WriteLine($"  Совпадают: {initialThreadId == finalThreadId}");
+	}
+
+	static void DemonstrateMultiThreading()
+	{
+		Console.WriteLine("  Главный поток: " + Thread.CurrentThread.ManagedThreadId);
+
+		// Явное создание потока (дорогая операция)
+		Thread thread = new Thread(() =>
+		{
+			Console.WriteLine("  Рабочий поток: " + Thread.CurrentThread.ManagedThreadId);
+			Thread.Sleep(500); // Блокировка потока
+		});
+
+		thread.Start();
+		thread.Join();
+
+		Console.WriteLine("  Создан отдельный поток с полным стеком");
+	}
+
+	static async Task CompareIoApproaches()
+	{
+		// Имитация I/O операции (чтение файла/сети)
+		Console.WriteLine("  Имитация I/O операции...");
+
+		// Неправильно: Task.Run для I/O
+		var start = DateTime.Now;
+		await Task.Run(() =>
+		{
+			Thread.Sleep(1000); // Имитация I/O ожидания
+		});
+		var time1 = DateTime.Now - start;
+
+		// Правильно: асинхронное ожидание
+		start = DateTime.Now;
+		await Task.Delay(1000); // Аналогично асинхронному I/O
+		var time2 = DateTime.Now - start;
+
+		Console.WriteLine($"  Task.Run + Sleep: {time1.TotalMilliseconds:F0} мс");
+		Console.WriteLine($"  Task.Delay (async): {time2.TotalMilliseconds:F0} мс");
+		Console.WriteLine("  Время одинаково, но подходы разные");
+	}
+
+	static async Task DemonstrateCpuBound()
+	{
+		Console.WriteLine("  Запускаю CPU-intensive задачу...");
+
+		// Правильно: Task.Run для вычислений
+		int result = await Task.Run(() =>
+		{
+			Console.WriteLine($"  Вычисления в потоке: {Thread.CurrentThread.ManagedThreadId}");
+
+			// Имитация тяжелых вычислений
+			long sum = 0;
+			for (int i = 0; i < 10000000; i++)
+			{
+				sum += i;
+			}
+
+			return (int)(sum % 1000);
+		});
+
+		Console.WriteLine($"  Результат вычислений: {result}");
+		Console.WriteLine("  Для CPU-bound задач Task.Run оправдан");
 	}
 }
