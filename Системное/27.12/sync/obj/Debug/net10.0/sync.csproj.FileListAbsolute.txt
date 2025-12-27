@@ -1,0 +1,15 @@
+C:\Users\user\repos\cs\Системное\27.12\sync\bin\Debug\net10.0\sync.exe
+C:\Users\user\repos\cs\Системное\27.12\sync\bin\Debug\net10.0\sync.deps.json
+C:\Users\user\repos\cs\Системное\27.12\sync\bin\Debug\net10.0\sync.runtimeconfig.json
+C:\Users\user\repos\cs\Системное\27.12\sync\bin\Debug\net10.0\sync.dll
+C:\Users\user\repos\cs\Системное\27.12\sync\bin\Debug\net10.0\sync.pdb
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\sync.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\sync.AssemblyInfoInputs.cache
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\sync.AssemblyInfo.cs
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\sync.csproj.CoreCompileInputs.cache
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\sync.sourcelink.json
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\sync.dll
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\refint\sync.dll
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\sync.pdb
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\sync.genruntimeconfig.cache
+C:\Users\user\repos\cs\Системное\27.12\sync\obj\Debug\net10.0\ref\sync.dll
