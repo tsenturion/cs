@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("sync")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ab41f6af7b358d6b4a0cc41f22ac6fe9a441d0c2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a2105bddbbc8cb90502214a166f4508213cead29")]
 [assembly: System.Reflection.AssemblyProductAttribute("sync")]
 [assembly: System.Reflection.AssemblyTitleAttribute("sync")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
