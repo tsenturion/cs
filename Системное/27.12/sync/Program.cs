@@ -6,278 +6,290 @@ class Program
 {
 	static async Task Main()
 	{
-		Console.WriteLine("=== Mutex - межпроцессная синхронизация ===\n");
+		Console.WriteLine("=== Semaphore и SemaphoreSlim ===\n");
 
-		// 1. Защита от запуска второго экземпляра
-		Console.WriteLine("1. Один экземпляр приложения:");
-		await SingleInstanceExample();
+		// 1. Semaphore - межпроцессный
+		Console.WriteLine("1. Semaphore (межпроцессный):");
+		await SemaphoreExample();
 
-		// 2. Межпроцессная синхронизация
-		Console.WriteLine("\n2. Межпроцессная синхронизация:");
-		await CrossProcessExample();
+		// 2. SemaphoreSlim - внутрипроцессный
+		Console.WriteLine("\n2. SemaphoreSlim (внутрипроцессный):");
+		await SemaphoreSlimExample();
 
-		// 3. Сравнение производительности
-		Console.WriteLine("\n3. Производительность:");
-		await PerformanceComparison();
+		// 3. WaitAsync - асинхронное ожидание
+		Console.WriteLine("\n3. SemaphoreSlim с WaitAsync:");
+		await SemaphoreSlimAsyncExample();
 
-		// 4. AbandonedMutexException
-		Console.WriteLine("\n4. AbandonedMutexException:");
-		await AbandonedMutexDemo();
+		// 4. Ограничение параллелизма
+		Console.WriteLine("\n4. Ограничение параллелизма:");
+		await ParallelismLimitation();
 
-		// 5. Работа с файлом
-		Console.WriteLine("\n5. Синхронизация доступа к файлу:");
-		await FileAccessExample();
+		// 5. Ошибки при работе с семафорами
+		Console.WriteLine("\n5. Типичные ошибки:");
+		await CommonMistakes();
 	}
 
-	// 1. Защита от запуска второго экземпляра
-	static async Task SingleInstanceExample()
+	// 1. Semaphore - межпроцессный
+	static async Task SemaphoreExample()
 	{
-		bool createdNew;
-		using (Mutex mutex = new Mutex(true, "Global\\MySingleInstanceApp", out createdNew))
+		// Создаем семафор на 3 одновременных входа
+		using (Semaphore semaphore = new Semaphore(3, 3, "Global\\MySemaphore"))
 		{
-			if (!createdNew)
+			Console.WriteLine("Семафор создан. Максимум 3 одновременных входа");
+
+			// Имитация нескольких "процессов"
+			Task[] processes = new Task[5];
+
+			for (int i = 1; i <= 5; i++)
 			{
-				Console.WriteLine("Приложение уже запущено");
-				Console.WriteLine("Закройте предыдущий экземпляр");
-				return;
+				int processId = i;
+				processes[i - 1] = Task.Run(() => ProcessWithSemaphore(processId, semaphore));
+				await Task.Delay(100);
 			}
 
-			Console.WriteLine("Приложение запущено");
-			Console.WriteLine("Попробуйте запустить второй экземпляр");
-
-			await Task.Delay(3000);
-			Console.WriteLine("Первый экземпляр завершает работу");
+			await Task.WhenAll(processes);
+			Console.WriteLine("Все процессы завершили работу");
 		}
 	}
 
-	// 2. Межпроцессная синхронизация
-	static async Task CrossProcessExample()
+	static void ProcessWithSemaphore(int id, Semaphore semaphore)
 	{
-		Console.WriteLine("Процесс 1: Запущен");
+		Console.WriteLine($"  Процесс {id}: жду входа");
+		semaphore.WaitOne();
 
-		// Используем Task.Run для имитации разных потоков
-		Task process1 = Task.Run(async () =>
+		try
 		{
-			using (Mutex mutex = new Mutex(false, "Global\\CrossProcessMutex"))
-			{
-				Console.WriteLine("Процесс 1: Захватываю мьютекс");
-				mutex.WaitOne();
-
-				try
-				{
-					Console.WriteLine("Процесс 1: Работаю с ресурсом");
-					await Task.Delay(1500); // Работа с общим ресурсом
-				}
-				finally
-				{
-					Console.WriteLine("Процесс 1: Освобождаю мьютекс");
-					mutex.ReleaseMutex();
-				}
-			}
-		});
-
-		// Запускаем "процесс 2" с задержкой
-		await Task.Delay(500);
-
-		Task process2 = Task.Run(async () =>
+			Console.WriteLine($"  Процесс {id}: вошел");
+			Thread.Sleep(1500);
+		}
+		finally
 		{
-			Console.WriteLine("Процесс 2: Запущен");
-
-			try
-			{
-				using (Mutex mutex = Mutex.OpenExisting("Global\\CrossProcessMutex"))
-				{
-					Console.WriteLine("Процесс 2: Пытаюсь захватить мьютекс");
-					bool acquired = mutex.WaitOne(1000);
-
-					if (acquired)
-					{
-						try
-						{
-							Console.WriteLine("Процесс 2: Захватил мьютекс");
-							await Task.Delay(500);
-						}
-						finally
-						{
-							mutex.ReleaseMutex();
-							Console.WriteLine("Процесс 2: Освободил мьютекс");
-						}
-					}
-					else
-					{
-						Console.WriteLine("Процесс 2: Не удалось захватить (таймаут)");
-					}
-				}
-			}
-			catch (WaitHandleCannotBeOpenedException)
-			{
-				Console.WriteLine("Процесс 2: Мьютекс не найден");
-			}
-		});
-
-		await Task.WhenAll(process1, process2);
-		Console.WriteLine("Оба процесса завершены");
-	}
-
-	// 3. Сравнение производительности
-	static async Task PerformanceComparison()
-	{
-		const int iterations = 10000;
-
-		Console.WriteLine($"Тест на {iterations} итераций");
-
-		// Тест lock
-		object lockObj = new object();
-		var lockStopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-		await Task.Run(() =>
-		{
-			for (int i = 0; i < iterations; i++)
-			{
-				lock (lockObj)
-				{
-					// Пустая операция
-				}
-			}
-		});
-
-		lockStopwatch.Stop();
-		Console.WriteLine($"lock: {lockStopwatch.ElapsedMilliseconds} мс");
-
-		// Тест Mutex (внутрипроцессный)
-		var mutexStopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-		await Task.Run(() =>
-		{
-			using (Mutex mutex = new Mutex())
-			{
-				for (int i = 0; i < iterations; i++)
-				{
-					mutex.WaitOne();
-					mutex.ReleaseMutex();
-				}
-			}
-		});
-
-		mutexStopwatch.Stop();
-		Console.WriteLine($"Mutex: {mutexStopwatch.ElapsedMilliseconds} мс");
-
-		if (lockStopwatch.ElapsedMilliseconds > 0)
-		{
-			double ratio = mutexStopwatch.ElapsedMilliseconds / (double)lockStopwatch.ElapsedMilliseconds;
-			Console.WriteLine($"Mutex медленнее в {ratio:F1} раз");
+			semaphore.Release();
+			Console.WriteLine($"  Процесс {id}: вышел");
 		}
 	}
 
-	// 4. AbandonedMutexException
-	static async Task AbandonedMutexDemo()
+	// 2. SemaphoreSlim - внутрипроцессный
+	static async Task SemaphoreSlimExample()
 	{
-		Console.WriteLine("Демонстрация AbandonedMutexException...");
-
-		// Создаем и захватываем мьютекс в одном потоке
-		Mutex dangerousMutex = new Mutex(false, "Global\\DangerousMutex");
-
-		Task faultyTask = Task.Run(() =>
+		// Облегченный семафор на 2 одновременных входа
+		using (SemaphoreSlim semaphore = new SemaphoreSlim(2))
 		{
-			Console.WriteLine("Поток 1: Захватываю мьютекс");
-			dangerousMutex.WaitOne();
-			Console.WriteLine("Поток 1: Захватил, но не освобожу!");
-			// Умышленно не вызываем ReleaseMutex
-			// Объект будет утилизирован без освобождения
-		});
+			Console.WriteLine($"Семафор создан. Доступно мест: {semaphore.CurrentCount}");
 
-		await faultyTask;
+			Task[] tasks = new Task[4];
 
-		// Даем время для завершения
-		await Task.Delay(100);
-
-		// Другой поток пытается захватить
-		Task recoveryTask = Task.Run(() =>
-		{
-			Console.WriteLine("Поток 2: Пытаюсь захватить мьютекс");
-			try
+			for (int i = 1; i <= 4; i++)
 			{
-				// Используем существующий мьютекс
-				bool acquired = dangerousMutex.WaitOne(1000);
-				Console.WriteLine($"Поток 2: Результат WaitOne: {acquired}");
+				int taskId = i;
+				tasks[i - 1] = Task.Run(() => ProcessWithSemaphoreSlim(taskId, semaphore));
 			}
-			catch (AbandonedMutexException ex)
-			{
-				Console.WriteLine($"Поток 2: Поймал AbandonedMutexException");
-				Console.WriteLine($"  Сообщение: {ex.Message}");
 
-				// Даже при исключении мьютекс захвачен
-				dangerousMutex.ReleaseMutex();
-				Console.WriteLine("Поток 2: Освободил мьютекс после исключения");
-			}
-			finally
-			{
-				dangerousMutex.Dispose();
-			}
-		});
-
-		await recoveryTask;
+			await Task.WhenAll(tasks);
+			Console.WriteLine("Все задачи завершены");
+		}
 	}
 
-	// 5. Работа с файлом
-	static async Task FileAccessExample()
+	static void ProcessWithSemaphoreSlim(int id, SemaphoreSlim semaphore)
 	{
-		Console.WriteLine("Синхронизация доступа к общему файлу...");
+		Console.WriteLine($"  Задача {id}: жду входа");
+		semaphore.Wait();
 
-		// Создаем мьютекс для синхронизации доступа к файлу
-		using (Mutex fileMutex = new Mutex(false, "Global\\SharedFileAccess"))
+		try
 		{
-			// Имитация двух независимых процессов
-			Task writer1 = Task.Run(async () =>
+			Console.WriteLine($"  Задача {id}: вошла");
+			Console.WriteLine($"  Доступно мест: {semaphore.CurrentCount}");
+			Thread.Sleep(1000);
+		}
+		finally
+		{
+			semaphore.Release();
+			Console.WriteLine($"  Задача {id}: вышла");
+		}
+	}
+
+	// 3. WaitAsync - асинхронное ожидание
+	static async Task SemaphoreSlimAsyncExample()
+	{
+		using (SemaphoreSlim semaphore = new SemaphoreSlim(2))
+		{
+			Console.WriteLine("Запускаем асинхронные задачи...");
+
+			Task[] tasks = new Task[5];
+
+			for (int i = 1; i <= 5; i++)
 			{
-				Console.WriteLine("Писатель 1: Захватываю мьютекс");
-				fileMutex.WaitOne();
+				int taskId = i;
+				tasks[i - 1] = WorkerAsync(taskId, semaphore);
+				await Task.Delay(50);
+			}
 
-				try
-				{
-					Console.WriteLine("Писатель 1: Начинаю запись в файл");
-					await Task.Delay(800); // Имитация записи
-					Console.WriteLine("Писатель 1: Запись завершена");
-				}
-				finally
-				{
-					fileMutex.ReleaseMutex();
-					Console.WriteLine("Писатель 1: Освободил мьютекс");
-				}
-			});
+			await Task.WhenAll(tasks);
+			Console.WriteLine("Все асинхронные задачи завершены");
+		}
+	}
 
-			// Второй писатель запускается с задержкой
-			await Task.Delay(200);
+	static async Task WorkerAsync(int id, SemaphoreSlim semaphore)
+	{
+		Console.WriteLine($"  Задача {id}: начинаю ожидание");
+		await semaphore.WaitAsync();
 
-			Task writer2 = Task.Run(async () =>
+		try
+		{
+			Console.WriteLine($"  Задача {id}: вошла в критическую секцию");
+			await Task.Delay(800); // Асинхронная работа
+			Console.WriteLine($"  Задача {id}: завершила работу");
+		}
+		finally
+		{
+			semaphore.Release();
+		}
+	}
+
+	// 4. Ограничение параллелизма
+	static async Task ParallelismLimitation()
+	{
+		Console.WriteLine("Ограничение запросов к внешнему API...");
+
+		// Максимум 3 одновременных запроса к API
+		using (SemaphoreSlim apiThrottler = new SemaphoreSlim(3))
+		{
+			Task[] apiCalls = new Task[10];
+
+			for (int i = 1; i <= 10; i++)
 			{
-				Console.WriteLine("Писатель 2: Пытаюсь захватить мьютекс");
+				int requestId = i;
+				apiCalls[i - 1] = MakeApiCallAsync(requestId, apiThrottler);
+			}
 
-				// Ждем максимум 2 секунды
-				bool acquired = fileMutex.WaitOne(2000);
+			await Task.WhenAll(apiCalls);
+			Console.WriteLine("Все запросы к API выполнены");
+		}
+	}
 
-				if (acquired)
+	static async Task MakeApiCallAsync(int id, SemaphoreSlim throttler)
+	{
+		Console.WriteLine($"  Запрос {id}: в очереди");
+		await throttler.WaitAsync();
+
+		try
+		{
+			Console.WriteLine($"  Запрос {id}: выполняется");
+			await Task.Delay(300); // Имитация API-вызова
+			Console.WriteLine($"  Запрос {id}: завершен");
+		}
+		finally
+		{
+			throttler.Release();
+		}
+	}
+
+	// 5. Ошибки при работе с семафорами
+	static async Task CommonMistakes()
+	{
+		Console.WriteLine("Демонстрация ошибок:");
+
+		// Ошибка 1: Забытый Release
+		Console.WriteLine("\nОшибка 1: Забытый Release");
+		SemaphoreSlim badSemaphore = new SemaphoreSlim(1);
+		try
+		{
+			Console.WriteLine($"  Доступно мест: {badSemaphore.CurrentCount}");
+
+			badSemaphore.Wait();
+			Console.WriteLine($"  После Wait: {badSemaphore.CurrentCount}");
+
+			// Забыли Release!
+			// Пытаемся захватить еще раз (дедлок)
+			bool acquired = badSemaphore.Wait(500);
+			Console.WriteLine($"  Второй Wait: {acquired}");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"  Исключение: {ex.GetType().Name}");
+		}
+		finally
+		{
+			badSemaphore.Dispose();
+		}
+
+		// Ошибка 2: Слишком много Release
+		Console.WriteLine("\nОшибка 2: Слишком много Release");
+		try
+		{
+			SemaphoreSlim overflowSemaphore = new SemaphoreSlim(2, 2);
+
+			Console.WriteLine($"  Изначально доступно: {overflowSemaphore.CurrentCount}");
+			overflowSemaphore.Wait();
+			Console.WriteLine($"  После Wait: {overflowSemaphore.CurrentCount}");
+
+			overflowSemaphore.Release();
+			Console.WriteLine($"  После Release: {overflowSemaphore.CurrentCount}");
+
+			overflowSemaphore.Release(); // Второй Release - нормально
+			Console.WriteLine($"  После второго Release: {overflowSemaphore.CurrentCount}");
+
+			// Третий Release будет вызывать исключение
+			overflowSemaphore.Release();
+		}
+		catch (SemaphoreFullException ex)
+		{
+			Console.WriteLine($"  SemaphoreFullException: {ex.Message}");
+		}
+
+		// Ошибка 3: Использование как lock
+		Console.WriteLine("\nОшибка 3: Семафор вместо lock");
+		try
+		{
+			int counter = 0;
+			SemaphoreSlim wrongLock = new SemaphoreSlim(1);
+
+			Task[] tasks = new Task[10];
+			for (int i = 0; i < 10; i++)
+			{
+				tasks[i] = Task.Run(() =>
 				{
+					wrongLock.Wait();
 					try
 					{
-						Console.WriteLine("Писатель 2: Захватил мьютекс");
-						await Task.Delay(400); // Имитация записи
-						Console.WriteLine("Писатель 2: Запись завершена");
+						counter++;
 					}
 					finally
 					{
-						fileMutex.ReleaseMutex();
-						Console.WriteLine("Писатель 2: Освободил мьютекс");
+						wrongLock.Release();
 					}
-				}
-				else
+				});
+			}
+
+			await Task.WhenAll(tasks);
+			Console.WriteLine($"  Результат: {counter}");
+			Console.WriteLine("  Работает, но это неоправданно сложно");
+			wrongLock.Dispose();
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"  Ошибка: {ex.Message}");
+		}
+
+		// Правильный подход с lock
+		Console.WriteLine("\nПравильный подход (lock):");
+		int correctCounter = 0;
+		object lockObj = new object();
+
+		Task[] correctTasks = new Task[10];
+		for (int i = 0; i < 10; i++)
+		{
+			correctTasks[i] = Task.Run(() =>
+			{
+				lock (lockObj)
 				{
-					Console.WriteLine("Писатель 2: Не удалось получить доступ к файлу");
+					correctCounter++;
 				}
 			});
-
-			await Task.WhenAll(writer1, writer2);
-			Console.WriteLine("Все операции с файлом завершены");
 		}
+
+		await Task.WhenAll(correctTasks);
+		Console.WriteLine($"  Результат: {correctCounter}");
+		Console.WriteLine("  Проще и быстрее");
 	}
 }
