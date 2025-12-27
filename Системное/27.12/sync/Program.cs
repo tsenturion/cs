@@ -6,290 +6,392 @@ class Program
 {
 	static async Task Main()
 	{
-		Console.WriteLine("=== Semaphore и SemaphoreSlim ===\n");
+		Console.WriteLine("=== ReaderWriterLockSlim ===\n");
 
-		// 1. Semaphore - межпроцессный
-		Console.WriteLine("1. Semaphore (межпроцессный):");
-		await SemaphoreExample();
+		// 1. Базовое использование
+		Console.WriteLine("1. Базовое использование:");
+		await BasicExample();
 
-		// 2. SemaphoreSlim - внутрипроцессный
-		Console.WriteLine("\n2. SemaphoreSlim (внутрипроцессный):");
-		await SemaphoreSlimExample();
+		// 2. Сравнение с lock
+		Console.WriteLine("\n2. Сравнение с lock:");
+		await CompareWithLock();
 
-		// 3. WaitAsync - асинхронное ожидание
-		Console.WriteLine("\n3. SemaphoreSlim с WaitAsync:");
-		await SemaphoreSlimAsyncExample();
+		// 3. UpgradeableReadLock
+		Console.WriteLine("\n3. UpgradeableReadLock:");
+		await UpgradeableReadExample();
 
-		// 4. Ограничение параллелизма
-		Console.WriteLine("\n4. Ограничение параллелизма:");
-		await ParallelismLimitation();
+		// 4. Много читателей, мало писателей
+		Console.WriteLine("\n4. Много читателей, мало писателей:");
+		await ManyReadersFewWriters();
 
-		// 5. Ошибки при работе с семафорами
+		// 5. Типичные ошибки
 		Console.WriteLine("\n5. Типичные ошибки:");
 		await CommonMistakes();
 	}
 
-	// 1. Semaphore - межпроцессный
-	static async Task SemaphoreExample()
+	// 1. Базовое использование
+	static async Task BasicExample()
 	{
-		// Создаем семафор на 3 одновременных входа
-		using (Semaphore semaphore = new Semaphore(3, 3, "Global\\MySemaphore"))
+		var cache = new SharedCache();
+
+		Console.WriteLine("Запускаем читателей...");
+
+		Task[] readers = new Task[3];
+		for (int i = 0; i < 3; i++)
 		{
-			Console.WriteLine("Семафор создан. Максимум 3 одновременных входа");
-
-			// Имитация нескольких "процессов"
-			Task[] processes = new Task[5];
-
-			for (int i = 1; i <= 5; i++)
+			int readerId = i + 1;
+			readers[i] = Task.Run(() =>
 			{
-				int processId = i;
-				processes[i - 1] = Task.Run(() => ProcessWithSemaphore(processId, semaphore));
-				await Task.Delay(100);
-			}
-
-			await Task.WhenAll(processes);
-			Console.WriteLine("Все процессы завершили работу");
+				int value = cache.Read();
+				Console.WriteLine($"  Читатель {readerId}: {value}");
+			});
 		}
-	}
 
-	static void ProcessWithSemaphore(int id, Semaphore semaphore)
-	{
-		Console.WriteLine($"  Процесс {id}: жду входа");
-		semaphore.WaitOne();
+		await Task.WhenAll(readers);
 
-		try
+		Console.WriteLine("Писатель обновляет данные...");
+		cache.Write(42);
+
+		Console.WriteLine("Проверяем обновленные данные...");
+		for (int i = 0; i < 2; i++)
 		{
-			Console.WriteLine($"  Процесс {id}: вошел");
-			Thread.Sleep(1500);
-		}
-		finally
-		{
-			semaphore.Release();
-			Console.WriteLine($"  Процесс {id}: вышел");
-		}
-	}
-
-	// 2. SemaphoreSlim - внутрипроцессный
-	static async Task SemaphoreSlimExample()
-	{
-		// Облегченный семафор на 2 одновременных входа
-		using (SemaphoreSlim semaphore = new SemaphoreSlim(2))
-		{
-			Console.WriteLine($"Семафор создан. Доступно мест: {semaphore.CurrentCount}");
-
-			Task[] tasks = new Task[4];
-
-			for (int i = 1; i <= 4; i++)
+			int readerId = i + 4;
+			Task.Run(() =>
 			{
-				int taskId = i;
-				tasks[i - 1] = Task.Run(() => ProcessWithSemaphoreSlim(taskId, semaphore));
-			}
-
-			await Task.WhenAll(tasks);
-			Console.WriteLine("Все задачи завершены");
+				int value = cache.Read();
+				Console.WriteLine($"  Читатель {readerId}: {value}");
+			});
 		}
+
+		await Task.Delay(500);
 	}
 
-	static void ProcessWithSemaphoreSlim(int id, SemaphoreSlim semaphore)
+	// 2. Сравнение с lock
+	static async Task CompareWithLock()
 	{
-		Console.WriteLine($"  Задача {id}: жду входа");
-		semaphore.Wait();
+		const int readerCount = 1000;
+		const int iterations = 10000;
 
-		try
+		Console.WriteLine($"Тест: {readerCount} читателей, {iterations} итераций");
+
+		// Тест с ReaderWriterLockSlim
+		var rwLock = new ReaderWriterLockSlim();
+		int rwCounter = 0;
+		var rwStopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+		Task[] rwTasks = new Task[readerCount];
+		for (int i = 0; i < readerCount; i++)
 		{
-			Console.WriteLine($"  Задача {id}: вошла");
-			Console.WriteLine($"  Доступно мест: {semaphore.CurrentCount}");
-			Thread.Sleep(1000);
-		}
-		finally
-		{
-			semaphore.Release();
-			Console.WriteLine($"  Задача {id}: вышла");
-		}
-	}
-
-	// 3. WaitAsync - асинхронное ожидание
-	static async Task SemaphoreSlimAsyncExample()
-	{
-		using (SemaphoreSlim semaphore = new SemaphoreSlim(2))
-		{
-			Console.WriteLine("Запускаем асинхронные задачи...");
-
-			Task[] tasks = new Task[5];
-
-			for (int i = 1; i <= 5; i++)
+			rwTasks[i] = Task.Run(() =>
 			{
-				int taskId = i;
-				tasks[i - 1] = WorkerAsync(taskId, semaphore);
-				await Task.Delay(50);
-			}
-
-			await Task.WhenAll(tasks);
-			Console.WriteLine("Все асинхронные задачи завершены");
-		}
-	}
-
-	static async Task WorkerAsync(int id, SemaphoreSlim semaphore)
-	{
-		Console.WriteLine($"  Задача {id}: начинаю ожидание");
-		await semaphore.WaitAsync();
-
-		try
-		{
-			Console.WriteLine($"  Задача {id}: вошла в критическую секцию");
-			await Task.Delay(800); // Асинхронная работа
-			Console.WriteLine($"  Задача {id}: завершила работу");
-		}
-		finally
-		{
-			semaphore.Release();
-		}
-	}
-
-	// 4. Ограничение параллелизма
-	static async Task ParallelismLimitation()
-	{
-		Console.WriteLine("Ограничение запросов к внешнему API...");
-
-		// Максимум 3 одновременных запроса к API
-		using (SemaphoreSlim apiThrottler = new SemaphoreSlim(3))
-		{
-			Task[] apiCalls = new Task[10];
-
-			for (int i = 1; i <= 10; i++)
-			{
-				int requestId = i;
-				apiCalls[i - 1] = MakeApiCallAsync(requestId, apiThrottler);
-			}
-
-			await Task.WhenAll(apiCalls);
-			Console.WriteLine("Все запросы к API выполнены");
-		}
-	}
-
-	static async Task MakeApiCallAsync(int id, SemaphoreSlim throttler)
-	{
-		Console.WriteLine($"  Запрос {id}: в очереди");
-		await throttler.WaitAsync();
-
-		try
-		{
-			Console.WriteLine($"  Запрос {id}: выполняется");
-			await Task.Delay(300); // Имитация API-вызова
-			Console.WriteLine($"  Запрос {id}: завершен");
-		}
-		finally
-		{
-			throttler.Release();
-		}
-	}
-
-	// 5. Ошибки при работе с семафорами
-	static async Task CommonMistakes()
-	{
-		Console.WriteLine("Демонстрация ошибок:");
-
-		// Ошибка 1: Забытый Release
-		Console.WriteLine("\nОшибка 1: Забытый Release");
-		SemaphoreSlim badSemaphore = new SemaphoreSlim(1);
-		try
-		{
-			Console.WriteLine($"  Доступно мест: {badSemaphore.CurrentCount}");
-
-			badSemaphore.Wait();
-			Console.WriteLine($"  После Wait: {badSemaphore.CurrentCount}");
-
-			// Забыли Release!
-			// Пытаемся захватить еще раз (дедлок)
-			bool acquired = badSemaphore.Wait(500);
-			Console.WriteLine($"  Второй Wait: {acquired}");
-		}
-		catch (Exception ex)
-		{
-			Console.WriteLine($"  Исключение: {ex.GetType().Name}");
-		}
-		finally
-		{
-			badSemaphore.Dispose();
-		}
-
-		// Ошибка 2: Слишком много Release
-		Console.WriteLine("\nОшибка 2: Слишком много Release");
-		try
-		{
-			SemaphoreSlim overflowSemaphore = new SemaphoreSlim(2, 2);
-
-			Console.WriteLine($"  Изначально доступно: {overflowSemaphore.CurrentCount}");
-			overflowSemaphore.Wait();
-			Console.WriteLine($"  После Wait: {overflowSemaphore.CurrentCount}");
-
-			overflowSemaphore.Release();
-			Console.WriteLine($"  После Release: {overflowSemaphore.CurrentCount}");
-
-			overflowSemaphore.Release(); // Второй Release - нормально
-			Console.WriteLine($"  После второго Release: {overflowSemaphore.CurrentCount}");
-
-			// Третий Release будет вызывать исключение
-			overflowSemaphore.Release();
-		}
-		catch (SemaphoreFullException ex)
-		{
-			Console.WriteLine($"  SemaphoreFullException: {ex.Message}");
-		}
-
-		// Ошибка 3: Использование как lock
-		Console.WriteLine("\nОшибка 3: Семафор вместо lock");
-		try
-		{
-			int counter = 0;
-			SemaphoreSlim wrongLock = new SemaphoreSlim(1);
-
-			Task[] tasks = new Task[10];
-			for (int i = 0; i < 10; i++)
-			{
-				tasks[i] = Task.Run(() =>
+				for (int j = 0; j < iterations; j++)
 				{
-					wrongLock.Wait();
+					rwLock.EnterReadLock();
 					try
 					{
-						counter++;
+						_ = rwCounter; // Чтение
 					}
 					finally
 					{
-						wrongLock.Release();
+						rwLock.ExitReadLock();
 					}
-				});
-			}
-
-			await Task.WhenAll(tasks);
-			Console.WriteLine($"  Результат: {counter}");
-			Console.WriteLine("  Работает, но это неоправданно сложно");
-			wrongLock.Dispose();
-		}
-		catch (Exception ex)
-		{
-			Console.WriteLine($"  Ошибка: {ex.Message}");
-		}
-
-		// Правильный подход с lock
-		Console.WriteLine("\nПравильный подход (lock):");
-		int correctCounter = 0;
-		object lockObj = new object();
-
-		Task[] correctTasks = new Task[10];
-		for (int i = 0; i < 10; i++)
-		{
-			correctTasks[i] = Task.Run(() =>
-			{
-				lock (lockObj)
-				{
-					correctCounter++;
 				}
 			});
 		}
 
-		await Task.WhenAll(correctTasks);
-		Console.WriteLine($"  Результат: {correctCounter}");
-		Console.WriteLine("  Проще и быстрее");
+		await Task.WhenAll(rwTasks);
+		rwStopwatch.Stop();
+
+		// Тест с lock
+		object lockObj = new object();
+		int lockCounter = 0;
+		var lockStopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+		Task[] lockTasks = new Task[readerCount];
+		for (int i = 0; i < readerCount; i++)
+		{
+			lockTasks[i] = Task.Run(() =>
+			{
+				for (int j = 0; j < iterations; j++)
+				{
+					lock (lockObj)
+					{
+						_ = lockCounter; // Чтение
+					}
+				}
+			});
+		}
+
+		await Task.WhenAll(lockTasks);
+		lockStopwatch.Stop();
+
+		Console.WriteLine($"ReaderWriterLockSlim: {rwStopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"lock: {lockStopwatch.ElapsedMilliseconds} мс");
+
+		if (lockStopwatch.ElapsedMilliseconds > 0)
+		{
+			double ratio = (double)lockStopwatch.ElapsedMilliseconds / rwStopwatch.ElapsedMilliseconds;
+			Console.WriteLine($"Выигрыш: {ratio:F1}x");
+		}
+	}
+
+	// 3. UpgradeableReadLock
+	static async Task UpgradeableReadExample()
+	{
+		var database = new DatabaseSimulator();
+
+		Console.WriteLine("Запускаем операции с UpgradeableReadLock...");
+
+		Task[] updaters = new Task[3];
+		for (int i = 0; i < 3; i++)
+		{
+			int updaterId = i + 1;
+			updaters[i] = Task.Run(() =>
+			{
+				// Поток читает, и при необходимости обновляет
+				bool updated = database.UpdateIfNeeded(updaterId * 10);
+				Console.WriteLine($"  Поток {updaterId}: {(updated ? "обновил" : "не изменил")}");
+			});
+		}
+
+		// Читатели во время обновлений
+		Task[] readers = new Task[2];
+		for (int i = 0; i < 2; i++)
+		{
+			int readerId = i + 1;
+			readers[i] = Task.Run(() =>
+			{
+				int value = database.Read();
+				Console.WriteLine($"  Читатель {readerId}: {value}");
+			});
+		}
+
+		await Task.WhenAll(updaters);
+		await Task.WhenAll(readers);
+	}
+
+	// 4. Много читателей, мало писателей
+	static async Task ManyReadersFewWriters()
+	{
+		var config = new Configuration();
+
+		Console.WriteLine("Ситуация: 5 читателей, 2 писателя");
+		Console.WriteLine("Читатели работают постоянно, писатели - редко");
+
+		CancellationTokenSource cts = new CancellationTokenSource();
+
+		// Много читателей
+		Task[] readers = new Task[5];
+		for (int i = 0; i < 5; i++)
+		{
+			int readerId = i + 1;
+			readers[i] = Task.Run(async () =>
+			{
+				while (!cts.Token.IsCancellationRequested)
+				{
+					string value = config.GetValue();
+					Console.WriteLine($"  Читатель {readerId}: {value}");
+					await Task.Delay(100);
+				}
+			});
+		}
+
+		// Мало писателей
+		Task[] writers = new Task[2];
+		for (int i = 0; i < 2; i++)
+		{
+			int writerId = i + 1;
+			writers[i] = Task.Run(async () =>
+			{
+				for (int j = 0; j < 2; j++)
+				{
+					await Task.Delay(500);
+					config.SetValue($"Значение от писателя {writerId}");
+					Console.WriteLine($"  Писатель {writerId}: обновил");
+				}
+			});
+		}
+
+		await Task.WhenAll(writers);
+		cts.CancelAfter(100);
+
+		try
+		{
+			await Task.WhenAll(readers);
+		}
+		catch (OperationCanceledException) { }
+
+		Console.WriteLine("Симуляция завершена");
+	}
+
+	// 5. Типичные ошибки
+	static async Task CommonMistakes()
+	{
+		Console.WriteLine("Ошибка 1: Неправильный порядок блокировок");
+
+		var rwLock = new ReaderWriterLockSlim();
+
+		try
+		{
+			rwLock.EnterReadLock();
+			Console.WriteLine("  Вошел в read lock");
+
+			// Нельзя напрямую войти в write lock из read lock
+			rwLock.EnterWriteLock(); // Исключение или дедлок
+		}
+		catch (LockRecursionException ex)
+		{
+			Console.WriteLine($"  LockRecursionException: {ex.Message}");
+			rwLock.ExitReadLock();
+		}
+
+		Console.WriteLine("\nОшибка 2: Забытый Exit");
+
+		var rwLock2 = new ReaderWriterLockSlim();
+		try
+		{
+			rwLock2.EnterReadLock();
+			Console.WriteLine("  Вошел в read lock");
+			// Забыли ExitReadLock!
+		}
+		finally
+		{
+			// В реальном коде нужно в finally
+			// rwLock2.ExitReadLock();
+		}
+
+		Console.WriteLine("  (в реальном коде это привело бы к проблемам)");
+
+		Console.WriteLine("\nПравильный подход:");
+
+		var rwLock3 = new ReaderWriterLockSlim();
+		try
+		{
+			rwLock3.EnterReadLock();
+			Console.WriteLine("  Вошел в read lock");
+			// Работа с данными
+		}
+		finally
+		{
+			rwLock3.ExitReadLock();
+			Console.WriteLine("  Вышел из read lock");
+		}
+	}
+}
+
+// 1. Простой кэш с ReaderWriterLockSlim
+class SharedCache
+{
+	private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
+	private int _data = 0;
+
+	public int Read()
+	{
+		_lock.EnterReadLock();
+		try
+		{
+			Thread.Sleep(50); // Имитация чтения
+			return _data;
+		}
+		finally
+		{
+			_lock.ExitReadLock();
+		}
+	}
+
+	public void Write(int value)
+	{
+		_lock.EnterWriteLock();
+		try
+		{
+			Thread.Sleep(100); // Имитация записи
+			_data = value;
+		}
+		finally
+		{
+			_lock.ExitWriteLock();
+		}
+	}
+}
+
+// 2. База данных с UpgradeableReadLock
+class DatabaseSimulator
+{
+	private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
+	private int _value = 0;
+
+	public int Read()
+	{
+		_lock.EnterReadLock();
+		try
+		{
+			Thread.Sleep(30);
+			return _value;
+		}
+		finally
+		{
+			_lock.ExitReadLock();
+		}
+	}
+
+	public bool UpdateIfNeeded(int newValue)
+	{
+		_lock.EnterUpgradeableReadLock();
+		try
+		{
+			if (_value == newValue)
+			{
+				return false; // Не нужно обновлять
+			}
+
+			_lock.EnterWriteLock();
+			try
+			{
+				Thread.Sleep(50);
+				_value = newValue;
+				return true;
+			}
+			finally
+			{
+				_lock.ExitWriteLock();
+			}
+		}
+		finally
+		{
+			_lock.ExitUpgradeableReadLock();
+		}
+	}
+}
+
+// 3. Конфигурация с частым чтением
+class Configuration
+{
+	private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
+	private string _value = "default";
+
+	public string GetValue()
+	{
+		_lock.EnterReadLock();
+		try
+		{
+			return _value;
+		}
+		finally
+		{
+			_lock.ExitReadLock();
+		}
+	}
+
+	public void SetValue(string newValue)
+	{
+		_lock.EnterWriteLock();
+		try
+		{
+			_value = newValue;
+		}
+		finally
+		{
+			_lock.ExitWriteLock();
+		}
 	}
 }
