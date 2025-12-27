@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -6,117 +7,116 @@ class Program
 {
 	static async Task Main()
 	{
-		Console.WriteLine("=== ReaderWriterLockSlim ===\n");
+		Console.WriteLine("=== SpinLock и активное ожидание ===\n");
 
 		// 1. Базовое использование
-		Console.WriteLine("1. Базовое использование:");
-		await BasicExample();
+		Console.WriteLine("1. Базовое использование SpinLock:");
+		await BasicSpinLockExample();
 
 		// 2. Сравнение с lock
-		Console.WriteLine("\n2. Сравнение с lock:");
-		await CompareWithLock();
+		Console.WriteLine("\n2. Сравнение SpinLock и lock:");
+		await CompareSpinLockWithLock();
 
-		// 3. UpgradeableReadLock
-		Console.WriteLine("\n3. UpgradeableReadLock:");
-		await UpgradeableReadExample();
+		// 3. Длительное ожидание
+		Console.WriteLine("\n3. Длительное ожидание (антипаттерн):");
+		await LongWaitAntiPattern();
 
-		// 4. Много читателей, мало писателей
-		Console.WriteLine("\n4. Много читателей, мало писателей:");
-		await ManyReadersFewWriters();
+		// 4. Конкуренция потоков
+		Console.WriteLine("\n4. Высокая конкуренция:");
+		await HighContentionScenario();
 
-		// 5. Типичные ошибки
-		Console.WriteLine("\n5. Типичные ошибки:");
-		await CommonMistakes();
+		// 5. SpinWait
+		Console.WriteLine("\n5. SpinWait - управляемое ожидание:");
+		await SpinWaitExample();
 	}
 
 	// 1. Базовое использование
-	static async Task BasicExample()
+	static async Task BasicSpinLockExample()
 	{
-		var cache = new SharedCache();
+		SpinLock spinLock = new SpinLock();
+		int counter = 0;
 
-		Console.WriteLine("Запускаем читателей...");
+		Console.WriteLine("Запускаем короткие операции...");
 
-		Task[] readers = new Task[3];
+		Task[] tasks = new Task[3];
 		for (int i = 0; i < 3; i++)
 		{
-			int readerId = i + 1;
-			readers[i] = Task.Run(() =>
+			tasks[i] = Task.Run(() =>
 			{
-				int value = cache.Read();
-				Console.WriteLine($"  Читатель {readerId}: {value}");
-			});
-		}
-
-		await Task.WhenAll(readers);
-
-		Console.WriteLine("Писатель обновляет данные...");
-		cache.Write(42);
-
-		Console.WriteLine("Проверяем обновленные данные...");
-		for (int i = 0; i < 2; i++)
-		{
-			int readerId = i + 4;
-			Task.Run(() =>
-			{
-				int value = cache.Read();
-				Console.WriteLine($"  Читатель {readerId}: {value}");
-			});
-		}
-
-		await Task.Delay(500);
-	}
-
-	// 2. Сравнение с lock
-	static async Task CompareWithLock()
-	{
-		const int readerCount = 1000;
-		const int iterations = 10000;
-
-		Console.WriteLine($"Тест: {readerCount} читателей, {iterations} итераций");
-
-		// Тест с ReaderWriterLockSlim
-		var rwLock = new ReaderWriterLockSlim();
-		int rwCounter = 0;
-		var rwStopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-		Task[] rwTasks = new Task[readerCount];
-		for (int i = 0; i < readerCount; i++)
-		{
-			rwTasks[i] = Task.Run(() =>
-			{
-				for (int j = 0; j < iterations; j++)
+				for (int j = 0; j < 1000; j++)
 				{
-					rwLock.EnterReadLock();
+					bool lockTaken = false;
 					try
 					{
-						_ = rwCounter; // Чтение
+						spinLock.Enter(ref lockTaken);
+						counter++; // Короткая операция
 					}
 					finally
 					{
-						rwLock.ExitReadLock();
+						if (lockTaken)
+							spinLock.Exit();
 					}
 				}
 			});
 		}
 
-		await Task.WhenAll(rwTasks);
-		rwStopwatch.Stop();
+		await Task.WhenAll(tasks);
+		Console.WriteLine($"Результат: {counter}");
+	}
 
-		// Тест с lock
+	// 2. Сравнение с lock
+	static async Task CompareSpinLockWithLock()
+	{
+		const int iterations = 100000;
+		const int threadCount = 4;
+
+		Console.WriteLine($"Тест: {iterations} итераций, {threadCount} потока");
+
+		// Тест SpinLock
+		SpinLock spinLock = new SpinLock();
+		int spinLockCounter = 0;
+		var spinLockStopwatch = Stopwatch.StartNew();
+
+		Task[] spinLockTasks = new Task[threadCount];
+		for (int i = 0; i < threadCount; i++)
+		{
+			spinLockTasks[i] = Task.Run(() =>
+			{
+				for (int j = 0; j < iterations / threadCount; j++)
+				{
+					bool lockTaken = false;
+					try
+					{
+						spinLock.Enter(ref lockTaken);
+						spinLockCounter++;
+					}
+					finally
+					{
+						if (lockTaken)
+							spinLock.Exit();
+					}
+				}
+			});
+		}
+
+		await Task.WhenAll(spinLockTasks);
+		spinLockStopwatch.Stop();
+
+		// Тест lock
 		object lockObj = new object();
 		int lockCounter = 0;
-		var lockStopwatch = System.Diagnostics.Stopwatch.StartNew();
+		var lockStopwatch = Stopwatch.StartNew();
 
-		Task[] lockTasks = new Task[readerCount];
-		for (int i = 0; i < readerCount; i++)
+		Task[] lockTasks = new Task[threadCount];
+		for (int i = 0; i < threadCount; i++)
 		{
 			lockTasks[i] = Task.Run(() =>
 			{
-				for (int j = 0; j < iterations; j++)
+				for (int j = 0; j < iterations / threadCount; j++)
 				{
 					lock (lockObj)
 					{
-						_ = lockCounter; // Чтение
+						lockCounter++;
 					}
 				}
 			});
@@ -125,273 +125,161 @@ class Program
 		await Task.WhenAll(lockTasks);
 		lockStopwatch.Stop();
 
-		Console.WriteLine($"ReaderWriterLockSlim: {rwStopwatch.ElapsedMilliseconds} мс");
-		Console.WriteLine($"lock: {lockStopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"SpinLock: {spinLockStopwatch.ElapsedMilliseconds} мс, результат: {spinLockCounter}");
+		Console.WriteLine($"lock: {lockStopwatch.ElapsedMilliseconds} мс, результат: {lockCounter}");
 
-		if (lockStopwatch.ElapsedMilliseconds > 0)
+		if (lockStopwatch.ElapsedMilliseconds > 0 && spinLockStopwatch.ElapsedMilliseconds > 0)
 		{
-			double ratio = (double)lockStopwatch.ElapsedMilliseconds / rwStopwatch.ElapsedMilliseconds;
-			Console.WriteLine($"Выигрыш: {ratio:F1}x");
+			double ratio = (double)lockStopwatch.ElapsedMilliseconds / spinLockStopwatch.ElapsedMilliseconds;
+			Console.WriteLine($"Отношение: {ratio:F2}x ({(ratio > 1 ? "SpinLock быстрее" : "lock быстрее")})");
 		}
 	}
 
-	// 3. UpgradeableReadLock
-	static async Task UpgradeableReadExample()
+	// 3. Длительное ожидание
+	static async Task LongWaitAntiPattern()
 	{
-		var database = new DatabaseSimulator();
+		Console.WriteLine("Демонстрация антипаттерна...");
 
-		Console.WriteLine("Запускаем операции с UpgradeableReadLock...");
+		SpinLock spinLock = new SpinLock();
+		bool resourceAvailable = false;
 
-		Task[] updaters = new Task[3];
-		for (int i = 0; i < 3; i++)
+		// Поток, который долго держит ресурс
+		Task longHolder = Task.Run(() =>
 		{
-			int updaterId = i + 1;
-			updaters[i] = Task.Run(() =>
-			{
-				// Поток читает, и при необходимости обновляет
-				bool updated = database.UpdateIfNeeded(updaterId * 10);
-				Console.WriteLine($"  Поток {updaterId}: {(updated ? "обновил" : "не изменил")}");
-			});
-		}
+			bool lockTaken = false;
+			spinLock.Enter(ref lockTaken);
 
-		// Читатели во время обновлений
-		Task[] readers = new Task[2];
-		for (int i = 0; i < 2; i++)
-		{
-			int readerId = i + 1;
-			readers[i] = Task.Run(() =>
-			{
-				int value = database.Read();
-				Console.WriteLine($"  Читатель {readerId}: {value}");
-			});
-		}
-
-		await Task.WhenAll(updaters);
-		await Task.WhenAll(readers);
-	}
-
-	// 4. Много читателей, мало писателей
-	static async Task ManyReadersFewWriters()
-	{
-		var config = new Configuration();
-
-		Console.WriteLine("Ситуация: 5 читателей, 2 писателя");
-		Console.WriteLine("Читатели работают постоянно, писатели - редко");
-
-		CancellationTokenSource cts = new CancellationTokenSource();
-
-		// Много читателей
-		Task[] readers = new Task[5];
-		for (int i = 0; i < 5; i++)
-		{
-			int readerId = i + 1;
-			readers[i] = Task.Run(async () =>
-			{
-				while (!cts.Token.IsCancellationRequested)
-				{
-					string value = config.GetValue();
-					Console.WriteLine($"  Читатель {readerId}: {value}");
-					await Task.Delay(100);
-				}
-			});
-		}
-
-		// Мало писателей
-		Task[] writers = new Task[2];
-		for (int i = 0; i < 2; i++)
-		{
-			int writerId = i + 1;
-			writers[i] = Task.Run(async () =>
-			{
-				for (int j = 0; j < 2; j++)
-				{
-					await Task.Delay(500);
-					config.SetValue($"Значение от писателя {writerId}");
-					Console.WriteLine($"  Писатель {writerId}: обновил");
-				}
-			});
-		}
-
-		await Task.WhenAll(writers);
-		cts.CancelAfter(100);
-
-		try
-		{
-			await Task.WhenAll(readers);
-		}
-		catch (OperationCanceledException) { }
-
-		Console.WriteLine("Симуляция завершена");
-	}
-
-	// 5. Типичные ошибки
-	static async Task CommonMistakes()
-	{
-		Console.WriteLine("Ошибка 1: Неправильный порядок блокировок");
-
-		var rwLock = new ReaderWriterLockSlim();
-
-		try
-		{
-			rwLock.EnterReadLock();
-			Console.WriteLine("  Вошел в read lock");
-
-			// Нельзя напрямую войти в write lock из read lock
-			rwLock.EnterWriteLock(); // Исключение или дедлок
-		}
-		catch (LockRecursionException ex)
-		{
-			Console.WriteLine($"  LockRecursionException: {ex.Message}");
-			rwLock.ExitReadLock();
-		}
-
-		Console.WriteLine("\nОшибка 2: Забытый Exit");
-
-		var rwLock2 = new ReaderWriterLockSlim();
-		try
-		{
-			rwLock2.EnterReadLock();
-			Console.WriteLine("  Вошел в read lock");
-			// Забыли ExitReadLock!
-		}
-		finally
-		{
-			// В реальном коде нужно в finally
-			// rwLock2.ExitReadLock();
-		}
-
-		Console.WriteLine("  (в реальном коде это привело бы к проблемам)");
-
-		Console.WriteLine("\nПравильный подход:");
-
-		var rwLock3 = new ReaderWriterLockSlim();
-		try
-		{
-			rwLock3.EnterReadLock();
-			Console.WriteLine("  Вошел в read lock");
-			// Работа с данными
-		}
-		finally
-		{
-			rwLock3.ExitReadLock();
-			Console.WriteLine("  Вышел из read lock");
-		}
-	}
-}
-
-// 1. Простой кэш с ReaderWriterLockSlim
-class SharedCache
-{
-	private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
-	private int _data = 0;
-
-	public int Read()
-	{
-		_lock.EnterReadLock();
-		try
-		{
-			Thread.Sleep(50); // Имитация чтения
-			return _data;
-		}
-		finally
-		{
-			_lock.ExitReadLock();
-		}
-	}
-
-	public void Write(int value)
-	{
-		_lock.EnterWriteLock();
-		try
-		{
-			Thread.Sleep(100); // Имитация записи
-			_data = value;
-		}
-		finally
-		{
-			_lock.ExitWriteLock();
-		}
-	}
-}
-
-// 2. База данных с UpgradeableReadLock
-class DatabaseSimulator
-{
-	private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
-	private int _value = 0;
-
-	public int Read()
-	{
-		_lock.EnterReadLock();
-		try
-		{
-			Thread.Sleep(30);
-			return _value;
-		}
-		finally
-		{
-			_lock.ExitReadLock();
-		}
-	}
-
-	public bool UpdateIfNeeded(int newValue)
-	{
-		_lock.EnterUpgradeableReadLock();
-		try
-		{
-			if (_value == newValue)
-			{
-				return false; // Не нужно обновлять
-			}
-
-			_lock.EnterWriteLock();
 			try
 			{
-				Thread.Sleep(50);
-				_value = newValue;
-				return true;
+				Console.WriteLine("Держатель: захватил ресурс на 2 секунды");
+				Thread.Sleep(2000);
 			}
 			finally
 			{
-				_lock.ExitWriteLock();
+				if (lockTaken)
+				{
+					spinLock.Exit();
+					Console.WriteLine("Держатель: освободил ресурс");
+				}
 			}
-		}
-		finally
+		});
+
+		await Task.Delay(100);
+
+		// Поток с активным ожиданием
+		Task spinner = Task.Run(() =>
 		{
-			_lock.ExitUpgradeableReadLock();
-		}
+			Console.WriteLine("Ожидающий: начинаю активное ожидание");
+			var waitStopwatch = Stopwatch.StartNew();
+
+			bool lockTaken = false;
+			while (!lockTaken)
+			{
+				spinLock.Enter(ref lockTaken);
+				if (!lockTaken)
+				{
+					// Краткая пауза между попытками
+					Thread.Sleep(1);
+				}
+			}
+
+			waitStopwatch.Stop();
+
+			try
+			{
+				Console.WriteLine($"Ожидающий: захватил ресурс через {waitStopwatch.ElapsedMilliseconds} мс");
+				Console.WriteLine("Активное ожидание потребляет процессорное время!");
+			}
+			finally
+			{
+				spinLock.Exit();
+			}
+		});
+
+		await Task.WhenAll(longHolder, spinner);
+		Console.WriteLine("Ситуация, когда SpinLock вреден");
 	}
-}
 
-// 3. Конфигурация с частым чтением
-class Configuration
-{
-	private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
-	private string _value = "default";
-
-	public string GetValue()
+	// 4. Конкуренция потоков
+	static async Task HighContentionScenario()
 	{
-		_lock.EnterReadLock();
-		try
+		Console.WriteLine("Высокая конкуренция (много потоков)...");
+
+		SpinLock spinLock = new SpinLock();
+		int counter = 0;
+		int threadCount = 8;
+
+		Console.WriteLine($"Запускаем {threadCount} потоков с высокой конкуренцией");
+
+		Task[] highContentionTasks = new Task[threadCount];
+		for (int i = 0; i < threadCount; i++)
 		{
-			return _value;
+			highContentionTasks[i] = Task.Run(() =>
+			{
+				for (int j = 0; j < 10000; j++)
+				{
+					bool lockTaken = false;
+					try
+					{
+						spinLock.Enter(ref lockTaken);
+						counter++;
+					}
+					finally
+					{
+						if (lockTaken)
+							spinLock.Exit();
+					}
+				}
+			});
 		}
-		finally
-		{
-			_lock.ExitReadLock();
-		}
+
+		await Task.WhenAll(highContentionTasks);
+		Console.WriteLine($"Результат: {counter}");
+		Console.WriteLine("При высокой конкуренции SpinLock теряет эффективность");
 	}
 
-	public void SetValue(string newValue)
+	// 5. SpinWait
+	static async Task SpinWaitExample()
 	{
-		_lock.EnterWriteLock();
-		try
+		Console.WriteLine("Использование SpinWait...");
+
+		bool condition = false;
+		int attempts = 0;
+
+		Task setter = Task.Run(() =>
 		{
-			_value = newValue;
-		}
-		finally
+			Thread.Sleep(500);
+			condition = true;
+			Console.WriteLine("Установил условие");
+		});
+
+		Task waiter = Task.Run(() =>
 		{
-			_lock.ExitWriteLock();
+			Console.WriteLine("Начинаю ожидание с SpinWait");
+			var spinWait = new SpinWait();
+
+			while (!condition)
+			{
+				spinWait.SpinOnce();
+				attempts++;
+
+				if (attempts % 100 == 0)
+				{
+					Console.WriteLine($"  Попытка {attempts}");
+				}
+			}
+
+			Console.WriteLine($"Условие выполнено после {attempts} попыток");
+		});
+
+		await Task.WhenAll(setter, waiter);
+
+		Console.WriteLine("\nSpinWait постепенно увеличивает паузы:");
+		var demoSpinWait = new SpinWait();
+		for (int i = 0; i < 5; i++)
+		{
+			demoSpinWait.SpinOnce();
+			Console.WriteLine($"  Итерация {i + 1}: счетчик = {demoSpinWait.Count}");
 		}
 	}
 }
