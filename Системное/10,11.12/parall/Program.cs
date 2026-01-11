@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 class Program
 {
@@ -10,8 +11,6 @@ class Program
 		// ШАГ 1. Подготовка данных
 		// =========================
 
-		// Создаём коллекцию чисел от 1 до 10 000 000
-		// Эти данные будут использоваться на всех следующих шагах
 		List<int> numbers = new List<int>(10_000_000);
 
 		for (int i = 1; i <= 10_000_000; i++)
@@ -27,22 +26,48 @@ class Program
 		// ШАГ 2. Последовательное решение
 		// =========================
 
-		// Stopwatch используем для измерения времени выполнения
 		Stopwatch stopwatch = Stopwatch.StartNew();
 
-		long sum = 0;
+		long sequentialSum = 0;
 
-		// Обычный последовательный проход по коллекции
 		foreach (int number in numbers)
 		{
-			sum += HeavyCalculation(number);
+			sequentialSum += HeavyCalculation(number);
 		}
 
 		stopwatch.Stop();
 
-		Console.WriteLine("Последовательное выполнение завершено.");
-		Console.WriteLine($"Итоговая сумма: {sum}");
+		Console.WriteLine("ШАГ 2. Последовательное выполнение");
+		Console.WriteLine($"Итоговая сумма: {sequentialSum}");
 		Console.WriteLine($"Время выполнения: {stopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine();
+
+		// =========================
+		// ШАГ 3. Неправильный параллельный вариант
+		// =========================
+
+		stopwatch.Restart();
+
+		long parallelSumWrong = 0;
+
+		Parallel.ForEach(numbers, number =>
+		{
+			// НАМЕРЕННАЯ ОШИБКА:
+			// Несколько потоков одновременно изменяют одну переменную
+			parallelSumWrong += HeavyCalculation(number);
+		});
+
+		stopwatch.Stop();
+
+		Console.WriteLine("ШАГ 3. Параллельный вариант (НЕПРАВИЛЬНЫЙ)");
+		Console.WriteLine($"Итоговая сумма: {parallelSumWrong}");
+		Console.WriteLine($"Время выполнения: {stopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine();
+
+		// Сравнение результатов
+		Console.WriteLine("Сравнение результатов:");
+		Console.WriteLine($"Последовательный результат: {sequentialSum}");
+		Console.WriteLine($"Параллельный результат:     {parallelSumWrong}");
 	}
 
 	// =========================
@@ -50,11 +75,8 @@ class Program
 	// =========================
 	static int HeavyCalculation(int x)
 	{
-		// Локальная переменная — не разделяется между потоками
 		int result = 0;
 
-		// Искусственно нагружаем процессор
-		// Это важно, чтобы параллельность имела смысл на следующих шагах
 		for (int i = 0; i < 100; i++)
 		{
 			result += (x * i) % 7;
