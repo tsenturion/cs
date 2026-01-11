@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -8,9 +9,9 @@ class Program
 {
 	static void Main()
 	{
-		// =========================
+		// =====================================================
 		// ШАГ 1. Подготовка данных
-		// =========================
+		// =====================================================
 
 		List<int> numbers = new List<int>(10_000_000);
 
@@ -20,12 +21,12 @@ class Program
 		}
 
 		Console.WriteLine($"Количество элементов: {numbers.Count}");
-		Console.WriteLine("Подготовка данных завершена.");
+		Console.WriteLine("Шаг 1 завершён: данные подготовлены.");
 		Console.WriteLine();
 
-		// =========================
+		// =====================================================
 		// ШАГ 2. Последовательное решение
-		// =========================
+		// =====================================================
 
 		Stopwatch stopwatch = Stopwatch.StartNew();
 
@@ -39,13 +40,13 @@ class Program
 		stopwatch.Stop();
 
 		Console.WriteLine("ШАГ 2. Последовательное выполнение");
-		Console.WriteLine($"Итоговая сумма: {sequentialSum}");
-		Console.WriteLine($"Время выполнения: {stopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"Сумма: {sequentialSum}");
+		Console.WriteLine($"Время: {stopwatch.ElapsedMilliseconds} мс");
 		Console.WriteLine();
 
-		// =========================
+		// =====================================================
 		// ШАГ 3. Неправильный параллельный вариант
-		// =========================
+		// =====================================================
 
 		stopwatch.Restart();
 
@@ -54,21 +55,20 @@ class Program
 		Parallel.ForEach(numbers, number =>
 		{
 			// НАМЕРЕННАЯ ОШИБКА:
-			// Несколько потоков одновременно меняют одну переменную
+			// Состояние гонки при изменении общей переменной
 			parallelSumWrong += HeavyCalculation(number);
 		});
 
 		stopwatch.Stop();
 
 		Console.WriteLine("ШАГ 3. Параллельный вариант (НЕПРАВИЛЬНЫЙ)");
-		Console.WriteLine($"Итоговая сумма: {parallelSumWrong}");
-		Console.WriteLine($"Время выполнения: {stopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"Сумма: {parallelSumWrong}");
+		Console.WriteLine($"Время: {stopwatch.ElapsedMilliseconds} мс");
 		Console.WriteLine();
 
-		// =========================
+		// =====================================================
 		// ШАГ 4. Корректный Parallel.ForEach
-		// с локальными аккумуляторами
-		// =========================
+		// =====================================================
 
 		stopwatch.Restart();
 
@@ -76,16 +76,11 @@ class Program
 
 		Parallel.ForEach(
 			numbers,
-			// Инициализация локального состояния для каждого потока
 			() => 0L,
-
-			// Тело цикла: работаем только с локальной переменной
 			(number, state, localSum) =>
 			{
 				return localSum + HeavyCalculation(number);
 			},
-
-			// Финализация: безопасно добавляем локальный результат
 			localSum =>
 			{
 				Interlocked.Add(ref parallelSumCorrect, localSum);
@@ -94,23 +89,78 @@ class Program
 		stopwatch.Stop();
 
 		Console.WriteLine("ШАГ 4. Параллельный вариант (КОРРЕКТНЫЙ)");
-		Console.WriteLine($"Итоговая сумма: {parallelSumCorrect}");
-		Console.WriteLine($"Время выполнения: {stopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"Сумма: {parallelSumCorrect}");
+		Console.WriteLine($"Время: {stopwatch.ElapsedMilliseconds} мс");
 		Console.WriteLine();
 
-		// =========================
-		// Итоговое сравнение
-		// =========================
+		// =====================================================
+		// ШАГ 5. Решение с использованием PLINQ
+		// =====================================================
 
-		Console.WriteLine("СРАВНЕНИЕ РЕЗУЛЬТАТОВ:");
-		Console.WriteLine($"Последовательный: {sequentialSum}");
-		Console.WriteLine($"Параллельный (ошибка): {parallelSumWrong}");
-		Console.WriteLine($"Параллельный (правильно): {parallelSumCorrect}");
+		stopwatch.Restart();
+
+		long plinqSum = numbers
+			.AsParallel()
+			.Select(HeavyCalculation)
+			.Sum(x => (long)x);
+
+		stopwatch.Stop();
+
+		Console.WriteLine("ШАГ 5. PLINQ (без сохранения порядка)");
+		Console.WriteLine($"Сумма: {plinqSum}");
+		Console.WriteLine($"Время: {stopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine();
+
+		// --- PLINQ с сохранением порядка ---
+
+		stopwatch.Restart();
+
+		long plinqOrderedSum = numbers
+			.AsParallel()
+			.AsOrdered()
+			.Select(HeavyCalculation)
+			.Sum(x => (long)x);
+
+		stopwatch.Stop();
+
+		Console.WriteLine("ШАГ 5. PLINQ (С СОХРАНЕНИЕМ ПОРЯДКА)");
+		Console.WriteLine($"Сумма: {plinqOrderedSum}");
+		Console.WriteLine($"Время: {stopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine();
+
+		// --- PLINQ с ограничением параллелизма ---
+
+		stopwatch.Restart();
+
+		long plinqLimitedSum = numbers
+			.AsParallel()
+			.WithDegreeOfParallelism(4)
+			.Select(HeavyCalculation)
+			.Sum(x => (long)x);
+
+		stopwatch.Stop();
+
+		Console.WriteLine("ШАГ 5. PLINQ (ограничение параллелизма = 4)");
+		Console.WriteLine($"Сумма: {plinqLimitedSum}");
+		Console.WriteLine($"Время: {stopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine();
+
+		// =====================================================
+		// ШАГ 6. Итоговый анализ результатов
+		// =====================================================
+
+		Console.WriteLine("ШАГ 6. СРАВНЕНИЕ РЕЗУЛЬТАТОВ");
+		Console.WriteLine($"Последовательный:           {sequentialSum}");
+		Console.WriteLine($"Параллельный (ошибка):      {parallelSumWrong}");
+		Console.WriteLine($"Parallel.ForEach (правил.): {parallelSumCorrect}");
+		Console.WriteLine($"PLINQ:                      {plinqSum}");
+		Console.WriteLine($"PLINQ (ordered):            {plinqOrderedSum}");
+		Console.WriteLine($"PLINQ (limit = 4):          {plinqLimitedSum}");
 	}
 
-	// =========================
+	// =====================================================
 	// CPU-bound метод
-	// =========================
+	// =====================================================
 	static int HeavyCalculation(int x)
 	{
 		int result = 0;
