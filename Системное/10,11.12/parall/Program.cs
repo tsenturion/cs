@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 
 class Program
@@ -53,7 +54,7 @@ class Program
 		Parallel.ForEach(numbers, number =>
 		{
 			// НАМЕРЕННАЯ ОШИБКА:
-			// Несколько потоков одновременно изменяют одну переменную
+			// Несколько потоков одновременно меняют одну переменную
 			parallelSumWrong += HeavyCalculation(number);
 		});
 
@@ -64,10 +65,47 @@ class Program
 		Console.WriteLine($"Время выполнения: {stopwatch.ElapsedMilliseconds} мс");
 		Console.WriteLine();
 
-		// Сравнение результатов
-		Console.WriteLine("Сравнение результатов:");
-		Console.WriteLine($"Последовательный результат: {sequentialSum}");
-		Console.WriteLine($"Параллельный результат:     {parallelSumWrong}");
+		// =========================
+		// ШАГ 4. Корректный Parallel.ForEach
+		// с локальными аккумуляторами
+		// =========================
+
+		stopwatch.Restart();
+
+		long parallelSumCorrect = 0;
+
+		Parallel.ForEach(
+			numbers,
+			// Инициализация локального состояния для каждого потока
+			() => 0L,
+
+			// Тело цикла: работаем только с локальной переменной
+			(number, state, localSum) =>
+			{
+				return localSum + HeavyCalculation(number);
+			},
+
+			// Финализация: безопасно добавляем локальный результат
+			localSum =>
+			{
+				Interlocked.Add(ref parallelSumCorrect, localSum);
+			});
+
+		stopwatch.Stop();
+
+		Console.WriteLine("ШАГ 4. Параллельный вариант (КОРРЕКТНЫЙ)");
+		Console.WriteLine($"Итоговая сумма: {parallelSumCorrect}");
+		Console.WriteLine($"Время выполнения: {stopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine();
+
+		// =========================
+		// Итоговое сравнение
+		// =========================
+
+		Console.WriteLine("СРАВНЕНИЕ РЕЗУЛЬТАТОВ:");
+		Console.WriteLine($"Последовательный: {sequentialSum}");
+		Console.WriteLine($"Параллельный (ошибка): {parallelSumWrong}");
+		Console.WriteLine($"Параллельный (правильно): {parallelSumCorrect}");
 	}
 
 	// =========================
