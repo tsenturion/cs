@@ -1,4 +1,8 @@
 ﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -6,382 +10,366 @@ class Program
 {
 	static async Task Main()
 	{
-		Console.WriteLine("=== volatile и модель памяти ===\n");
+		Console.WriteLine("=== Параллельные циклы и PLINQ ===\n");
 
-		// 1. Проблема видимости памяти
-		Console.WriteLine("1. Проблема видимости памяти:");
-		await VisibilityProblemDemo();
+		// 1. Parallel.For - основы
+		Console.WriteLine("1. Parallel.For - основы:");
+		await ParallelForBasics();
 
-		// 2. volatile как решение
-		Console.WriteLine("\n2. volatile как решение:");
-		await VolatileSolutionDemo();
+		// 2. Parallel.ForEach
+		Console.WriteLine("\n2. Parallel.ForEach:");
+		await ParallelForEachExample();
 
-		// 3. volatile vs Interlocked
-		Console.WriteLine("\n3. volatile vs Interlocked:");
-		await VolatileVsInterlocked();
+		// 3. PLINQ - основы
+		Console.WriteLine("\n3. PLINQ - основы:");
+		await PlinqBasics();
 
-		// 4. Сравнение с lock
-		Console.WriteLine("\n4. Сравнение с lock:");
-		await CompareWithLock();
+		// 4. Сравнение производительности
+		Console.WriteLine("\n4. Сравнение производительности:");
+		await PerformanceComparison();
 
-		// 5. Ограничения volatile
-		Console.WriteLine("\n5. Ограничения volatile:");
-		await VolatileLimitations();
+		// 5. Ошибки и исключения
+		Console.WriteLine("\n5. Ошибки и исключения:");
+		await ExceptionsHandling();
+
+		// 6. Ограничения параллелизма
+		Console.WriteLine("\n6. Ограничения параллелизма:");
+		await ParallelismLimits();
 	}
 
-	// 1. Проблема видимости памяти
-	static async Task VisibilityProblemDemo()
+	// 1. Parallel.For - основы
+	static async Task ParallelForBasics()
 	{
-		Console.WriteLine("Сценарий: поток-исполнитель и поток-сигнальщик");
+		Console.WriteLine("Простой Parallel.For:");
 
-		var worker = new NonVolatileWorker();
-		Task workerTask = Task.Run(() => worker.DoWork());
-
-		// Даем поработать
-		await Task.Delay(100);
-
-		Console.WriteLine("Сигнальщик: посылаю сигнал остановки");
-		worker.RequestStop();
-
-		// Ждем завершения
-		bool completed = await Task.Run(() => workerTask.Wait(2000));
-
-		if (completed)
+		Parallel.For(0, 10, i =>
 		{
-			Console.WriteLine("Рабочий поток завершился");
-		}
-		else
-		{
-			Console.WriteLine("Рабочий поток не завершился (проблема видимости!)");
-			worker.ForceStop();
-		}
-
-		Console.WriteLine($"Итераций выполнено: {worker.Iterations}");
-	}
-
-	// 2. volatile как решение
-	static async Task VolatileSolutionDemo()
-	{
-		Console.WriteLine("Тот же сценарий с volatile");
-
-		var worker = new VolatileWorker();
-		Task workerTask = Task.Run(() => worker.DoWork());
-
-		await Task.Delay(100);
-
-		Console.WriteLine("Сигнальщик: посылаю сигнал остановки");
-		worker.RequestStop();
-
-		bool completed = await Task.Run(() => workerTask.Wait(1000));
-
-		if (completed)
-		{
-			Console.WriteLine("Рабочий поток завершился корректно");
-		}
-		else
-		{
-			Console.WriteLine("Рабочий поток не завершился");
-			worker.ForceStop();
-		}
-
-		Console.WriteLine($"Итераций выполнено: {worker.Iterations}");
-	}
-
-	// 3. volatile vs Interlocked
-	static async Task VolatileVsInterlocked()
-	{
-		Console.WriteLine("Тест 1: volatile с инкрементом (небезопасно)");
-
-		var unsafeCounter = new VolatileCounter();
-		Task[] unsafeTasks = new Task[10];
-
-		for (int i = 0; i < 10; i++)
-		{
-			unsafeTasks[i] = Task.Run(() =>
-			{
-				for (int j = 0; j < 1000; j++)
-				{
-					unsafeCounter.Increment();
-				}
-			});
-		}
-
-		await Task.WhenAll(unsafeTasks);
-		Console.WriteLine($"Ожидаемое: 10000, Получено: {unsafeCounter.Value}");
-		Console.WriteLine("Результат меньше ожидаемого из-за гонки данных");
-
-		Console.WriteLine("\nТест 2: Interlocked (атомарно)");
-
-		var safeCounter = new InterlockedCounter();
-		Task[] safeTasks = new Task[10];
-
-		for (int i = 0; i < 10; i++)
-		{
-			safeTasks[i] = Task.Run(() =>
-			{
-				for (int j = 0; j < 1000; j++)
-				{
-					safeCounter.Increment();
-				}
-			});
-		}
-
-		await Task.WhenAll(safeTasks);
-		Console.WriteLine($"Ожидаемое: 10000, Получено: {safeCounter.Value}");
-		Console.WriteLine("Атомарные операции предотвращают гонки");
-	}
-
-	// 4. Сравнение с lock
-	static async Task CompareWithLock()
-	{
-		const int iterations = 10000;
-		const int threadCount = 4;
-
-		Console.WriteLine($"Тест: {iterations} итераций, {threadCount} потока");
-
-		// Тест с volatile
-		var volatileCounter = new VolatileCounter();
-		var volatileStopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-		Task[] volatileTasks = new Task[threadCount];
-		for (int i = 0; i < threadCount; i++)
-		{
-			volatileTasks[i] = Task.Run(() =>
-			{
-				for (int j = 0; j < iterations / threadCount; j++)
-				{
-					volatileCounter.Increment();
-				}
-			});
-		}
-
-		await Task.WhenAll(volatileTasks);
-		volatileStopwatch.Stop();
-
-		// Тест с lock
-		var lockCounter = new LockCounter();
-		var lockStopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-		Task[] lockTasks = new Task[threadCount];
-		for (int i = 0; i < threadCount; i++)
-		{
-			lockTasks[i] = Task.Run(() =>
-			{
-				for (int j = 0; j < iterations / threadCount; j++)
-				{
-					lockCounter.Increment();
-				}
-			});
-		}
-
-		await Task.WhenAll(lockTasks);
-		lockStopwatch.Stop();
-
-		// Тест с Interlocked
-		var interlockedCounter = new InterlockedCounter();
-		var interlockedStopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-		Task[] interlockedTasks = new Task[threadCount];
-		for (int i = 0; i < threadCount; i++)
-		{
-			interlockedTasks[i] = Task.Run(() =>
-			{
-				for (int j = 0; j < iterations / threadCount; j++)
-				{
-					interlockedCounter.Increment();
-				}
-			});
-		}
-
-		await Task.WhenAll(interlockedTasks);
-		interlockedStopwatch.Stop();
-
-		Console.WriteLine($"volatile: {volatileStopwatch.ElapsedMilliseconds} мс, результат: {volatileCounter.Value}");
-		Console.WriteLine($"lock: {lockStopwatch.ElapsedMilliseconds} мс, результат: {lockCounter.Value}");
-		Console.WriteLine($"Interlocked: {interlockedStopwatch.ElapsedMilliseconds} мс, результат: {interlockedCounter.Value}");
-
-		Console.WriteLine("\nВыводы:");
-		Console.WriteLine("- volatile быстрее, но небезопасен для сложных операций");
-		Console.WriteLine("- lock безопасен, но медленнее");
-		Console.WriteLine("- Interlocked оптимален для атомарных операций");
-	}
-
-	// 5. Ограничения volatile
-	static async Task VolatileLimitations()
-	{
-		Console.WriteLine("Демонстрация ограничений volatile:");
-
-		Console.WriteLine("\n1. volatile не обеспечивает атомарность");
-		Console.WriteLine("   Инкремент требует Interlocked");
-
-		Console.WriteLine("\n2. volatile не гарантирует согласованность нескольких полей");
-
-		var holder = new MultiFieldHolder();
-
-		Task writer = Task.Run(() =>
-		{
-			holder.SetValues(100, 200);
+			Console.Write($"{i} ");
 		});
 
-		Task reader = Task.Run(() =>
+		Console.WriteLine("\n\nПорядок выполнения не гарантирован!");
+
+		Console.WriteLine("\nАккумулятор с локальными значениями:");
+
+		long total = 0;
+		Parallel.For(
+			0,
+			1000,
+			() => 0L,
+			(i, state, localSum) =>
+			{
+				return localSum + i;
+			},
+			localSum =>
+			{
+				Interlocked.Add(ref total, localSum);
+			});
+
+		Console.WriteLine($"Сумма 0..999: {total}");
+
+		Console.WriteLine("\nРучное прерывание:");
+
+		var cts = new CancellationTokenSource();
+		ParallelOptions options = new ParallelOptions
 		{
-			var (a, b) = holder.GetValues();
-			Console.WriteLine($"   Читатель: a={a}, b={b}");
-			Console.WriteLine("   Может быть: a=100, b=0 (несогласованное состояние)");
+			CancellationToken = cts.Token
+		};
+
+		try
+		{
+			Parallel.For(0, 100, options, (i, state) =>
+			{
+				if (i == 50)
+				{
+					state.Stop();
+					Console.WriteLine($"Остановка на итерации {i}");
+				}
+
+				if (state.IsStopped)
+				{
+					return;
+				}
+
+				Console.Write($"{i} ");
+			});
+		}
+		catch (OperationCanceledException)
+		{
+			Console.WriteLine("Операция отменена");
+		}
+	}
+
+	// 2. Parallel.ForEach
+	static async Task ParallelForEachExample()
+	{
+		var items = Enumerable.Range(1, 20).ToList();
+
+		Console.WriteLine("Parallel.ForEach с коллекцией:");
+
+		var results = new ConcurrentBag<int>();
+
+		Parallel.ForEach(items, item =>
+		{
+			int result = ProcessItem(item);
+			results.Add(result);
+			Console.Write($"{result} ");
 		});
 
-		await Task.WhenAll(writer, reader);
+		Console.WriteLine($"\nОбработано элементов: {results.Count}");
 
-		Console.WriteLine("\n3. volatile не работает с локальными переменными");
-		Console.WriteLine("   Только с полями класса");
+		Console.WriteLine("\nParallel.ForEach с Partitioner:");
 
-		Console.WriteLine("\n4. Правильный сценарий для volatile - флаги состояния");
+		var largeList = Enumerable.Range(1, 10000).ToList();
+		var partitioner = Partitioner.Create(largeList, true);
 
-		var service = new VolatileService();
-		Task serviceTask = Task.Run(() => service.Run());
+		long partitionerSum = 0;
 
-		await Task.Delay(100);
-		Console.WriteLine("   Останавливаю сервис...");
-		service.Stop();
-
-		await Task.Delay(100);
-		Console.WriteLine("   Сервис корректно остановлен");
-	}
-}
-
-// 1. Классы для демонстрации проблемы видимости
-class NonVolatileWorker
-{
-	private bool _stopRequested = false;
-	private long _iterations = 0;
-
-	public long Iterations => _iterations;
-
-	public void DoWork()
-	{
-		while (!_stopRequested)
+		Parallel.ForEach(partitioner, () => 0L, (item, state, localSum) =>
 		{
-			_iterations++;
-			Thread.Sleep(1);
+			return localSum + item;
+		}, localSum =>
+		{
+			Interlocked.Add(ref partitionerSum, localSum);
+		});
+
+		Console.WriteLine($"Сумма через Partitioner: {partitionerSum}");
+	}
+
+	// 3. PLINQ - основы
+	static async Task PlinqBasics()
+	{
+		var numbers = Enumerable.Range(1, 20);
+
+		Console.WriteLine("Простой PLINQ запрос:");
+
+		var squared = numbers
+			.AsParallel()
+			.Select(x =>
+			{
+				Console.Write($"{x} ");
+				return x * x;
+			})
+			.ToList();
+
+		Console.WriteLine($"\nКвадраты: {string.Join(", ", squared.Take(10))}...");
+
+		Console.WriteLine("\nPLINQ с сохранением порядка:");
+
+		var orderedSquares = numbers
+			.AsParallel()
+			.AsOrdered()
+			.Select(x => x * x)
+			.ToList();
+
+		Console.WriteLine($"Квадраты по порядку: {string.Join(", ", orderedSquares.Take(10))}...");
+
+		Console.WriteLine("\nPLINQ с фильтрацией:");
+
+		var evenSquares = numbers
+			.AsParallel()
+			.Where(x => x % 2 == 0)
+			.Select(x => x * x)
+			.ToList();
+
+		Console.WriteLine($"Квадраты четных: {string.Join(", ", evenSquares.Take(5))}...");
+
+		Console.WriteLine("\nPLINQ с агрегацией:");
+
+		long parallelSum = numbers
+			.AsParallel()
+			.Sum(x => (long)x);
+
+		Console.WriteLine($"Сумма через PLINQ: {parallelSum}");
+	}
+
+	// 4. Сравнение производительности
+	static async Task PerformanceComparison()
+	{
+		const int size = 1000000;
+		var data = Enumerable.Range(1, size).ToArray();
+
+		Console.WriteLine($"Тест на {size:N0} элементах");
+
+		// Последовательный LINQ
+		var sequentialStopwatch = Stopwatch.StartNew();
+		long seqSum = data.Sum(x => (long)x);
+		sequentialStopwatch.Stop();
+
+		// Parallel.For
+		var parallelForStopwatch = Stopwatch.StartNew();
+		long parallelForSum = 0;
+
+		Parallel.For(0, data.Length, () => 0L, (i, state, localSum) =>
+		{
+			return localSum + data[i];
+		}, localSum =>
+		{
+			Interlocked.Add(ref parallelForSum, localSum);
+		});
+		parallelForStopwatch.Stop();
+
+		// PLINQ
+		var plinqStopwatch = Stopwatch.StartNew();
+		long plinqSum = data.AsParallel().Sum(x => (long)x);
+		plinqStopwatch.Stop();
+
+		Console.WriteLine($"Последовательный LINQ: {sequentialStopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"Parallel.For: {parallelForStopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"PLINQ: {plinqStopwatch.ElapsedMilliseconds} мс");
+
+		Console.WriteLine($"\nПроверка сумм: {seqSum == parallelForSum && seqSum == plinqSum}");
+
+		Console.WriteLine("\nТест с тяжелыми вычислениями:");
+
+		var computeStopwatch = Stopwatch.StartNew();
+		var seqCompute = data.Select(HeavyComputation).ToList();
+		computeStopwatch.Stop();
+
+		var parallelComputeStopwatch = Stopwatch.StartNew();
+		var parallelCompute = data.AsParallel().Select(HeavyComputation).ToList();
+		parallelComputeStopwatch.Stop();
+
+		Console.WriteLine($"Последовательно: {computeStopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"Параллельно: {parallelComputeStopwatch.ElapsedMilliseconds} мс");
+
+		double speedup = (double)computeStopwatch.ElapsedMilliseconds / parallelComputeStopwatch.ElapsedMilliseconds;
+		Console.WriteLine($"Ускорение: {speedup:F1}x");
+	}
+
+	// 5. Ошибки и исключения
+	static async Task ExceptionsHandling()
+	{
+		Console.WriteLine("Обработка исключений в Parallel.ForEach:");
+
+		var items = Enumerable.Range(0, 10);
+		var exceptions = new ConcurrentQueue<Exception>();
+
+		try
+		{
+			Parallel.ForEach(items, i =>
+			{
+				try
+				{
+					if (i == 5)
+					{
+						throw new InvalidOperationException($"Ошибка в итерации {i}");
+					}
+
+					Console.Write($"{i} ");
+				}
+				catch (Exception ex)
+				{
+					exceptions.Enqueue(ex);
+				}
+			});
+
+			if (exceptions.Count > 0)
+			{
+				throw new AggregateException(exceptions);
+			}
+		}
+		catch (AggregateException ex)
+		{
+			Console.WriteLine($"\nAggregateException: {ex.InnerExceptions.Count} исключений");
+			foreach (var inner in ex.InnerExceptions)
+			{
+				Console.WriteLine($"  - {inner.Message}");
+			}
+		}
+
+		Console.WriteLine("\nИсключения в PLINQ:");
+
+		try
+		{
+			var result = items
+				.AsParallel()
+				.Select(i =>
+				{
+					if (i == 3)
+					{
+						throw new ArgumentException($"PLINQ ошибка в {i}");
+					}
+					return i * 2;
+				})
+				.ToList();
+		}
+		catch (AggregateException ex)
+		{
+			Console.WriteLine($"PLINQ AggregateException: {ex.InnerExceptions.Count} исключений");
 		}
 	}
 
-	public void RequestStop()
+	// 6. Ограничения параллелизма
+	static async Task ParallelismLimits()
 	{
-		_stopRequested = true;
-	}
+		var numbers = Enumerable.Range(1, 100);
 
-	public void ForceStop()
-	{
-		// Ничего не делаем, просто для завершения задачи
-	}
-}
+		Console.WriteLine("PLINQ с ограничением параллелизма:");
 
-class VolatileWorker
-{
-	private volatile bool _stopRequested = false;
-	private long _iterations = 0;
+		var limitedResult = numbers
+			.AsParallel()
+			.WithDegreeOfParallelism(2)
+			.Select(x =>
+			{
+				Console.Write($"{x} ");
+				Thread.Sleep(10);
+				return x;
+			})
+			.ToList();
 
-	public long Iterations => _iterations;
+		Console.WriteLine($"\nС DegreeOfParallelism = 2");
 
-	public void DoWork()
-	{
-		while (!_stopRequested)
+		Console.WriteLine("\nParallel.ForEach с ParallelOptions:");
+
+		var options = new ParallelOptions
 		{
-			_iterations++;
-			Thread.Sleep(1);
-		}
-	}
+			MaxDegreeOfParallelism = 3
+		};
 
-	public void RequestStop()
-	{
-		_stopRequested = true;
-	}
-
-	public void ForceStop()
-	{
-		// Ничего не делаем
-	}
-}
-
-// 2. Классы для сравнения подходов
-class VolatileCounter
-{
-	private volatile int _value = 0;
-
-	public int Value => _value;
-
-	public void Increment()
-	{
-		_value++; // НЕ атомарно, даже с volatile!
-	}
-}
-
-class InterlockedCounter
-{
-	private int _value = 0;
-
-	public int Value => _value;
-
-	public void Increment()
-	{
-		Interlocked.Increment(ref _value);
-	}
-}
-
-class LockCounter
-{
-	private int _value = 0;
-	private readonly object _lock = new object();
-
-	public int Value => _value;
-
-	public void Increment()
-	{
-		lock (_lock)
+		Parallel.ForEach(numbers, options, x =>
 		{
-			_value++;
-		}
-	}
-}
-
-// 3. Класс для демонстрации несогласованности
-class MultiFieldHolder
-{
-	public volatile int FieldA = 0;
-	public volatile int FieldB = 0;
-
-	public void SetValues(int a, int b)
-	{
-		FieldA = a;
-		// Между присваиваниями может вклиниться другой поток
-		FieldB = b;
-	}
-
-	public (int, int) GetValues()
-	{
-		return (FieldA, FieldB);
-	}
-}
-
-// 4. Правильный сценарий использования volatile
-class VolatileService
-{
-	private volatile bool _isRunning = true;
-
-	public void Run()
-	{
-		int count = 0;
-		while (_isRunning)
-		{
-			count++;
+			Console.Write($"{x} ");
 			Thread.Sleep(10);
-		}
-		Console.WriteLine($"   Сервис выполнил {count} итераций");
+		});
+
+		Console.WriteLine($"\nС MaxDegreeOfParallelism = 3");
+
+		Console.WriteLine("\nКогда НЕ использовать параллельные циклы:");
+
+		// I/O-bound операции
+		Console.WriteLine("I/O-bound операции (сеть, файлы) - лучше async/await");
+
+		// Легкие вычисления
+		var lightData = Enumerable.Range(1, 100);
+		var lightStopwatch = Stopwatch.StartNew();
+		var lightPlinq = lightData.AsParallel().Select(x => x + 1).ToList();
+		lightStopwatch.Stop();
+
+		var lightSeqStopwatch = Stopwatch.StartNew();
+		var lightSeq = lightData.Select(x => x + 1).ToList();
+		lightSeqStopwatch.Stop();
+
+		Console.WriteLine($"Легкие вычисления (100 элементов):");
+		Console.WriteLine($"  PLINQ: {lightStopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"  LINQ: {lightSeqStopwatch.ElapsedMilliseconds} мс");
+		Console.WriteLine($"  Накладные расходы: {(lightStopwatch.ElapsedMilliseconds - lightSeqStopwatch.ElapsedMilliseconds)} мс");
 	}
 
-	public void Stop()
+	// Вспомогательные методы
+	static int ProcessItem(int item)
 	{
-		_isRunning = false;
+		Thread.Sleep(10);
+		return item * 2;
+	}
+
+	static int HeavyComputation(int value)
+	{
+		// Имитация тяжелых вычислений
+		long result = 0;
+		for (int i = 0; i < 1000; i++)
+		{
+			result += (value + i) % 100;
+		}
+		return (int)result;
 	}
 }

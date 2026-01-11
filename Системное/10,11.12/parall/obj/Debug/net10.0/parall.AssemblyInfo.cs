@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("parall")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9c0420f562a90ffef8d2148ba8db955b94082833")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b44d2d483b9236628ffe59604f364cd4e7c9d6be")]
 [assembly: System.Reflection.AssemblyProductAttribute("parall")]
 [assembly: System.Reflection.AssemblyTitleAttribute("parall")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
