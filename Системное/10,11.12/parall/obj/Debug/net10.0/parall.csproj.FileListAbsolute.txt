@@ -1,0 +1,15 @@
+C:\Users\user\repos\cs\Системное\10,11.12\parall\bin\Debug\net10.0\parall.exe
+C:\Users\user\repos\cs\Системное\10,11.12\parall\bin\Debug\net10.0\parall.deps.json
+C:\Users\user\repos\cs\Системное\10,11.12\parall\bin\Debug\net10.0\parall.runtimeconfig.json
+C:\Users\user\repos\cs\Системное\10,11.12\parall\bin\Debug\net10.0\parall.dll
+C:\Users\user\repos\cs\Системное\10,11.12\parall\bin\Debug\net10.0\parall.pdb
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\parall.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\parall.AssemblyInfoInputs.cache
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\parall.AssemblyInfo.cs
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\parall.csproj.CoreCompileInputs.cache
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\parall.sourcelink.json
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\parall.dll
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\refint\parall.dll
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\parall.pdb
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\parall.genruntimeconfig.cache
+C:\Users\user\repos\cs\Системное\10,11.12\parall\obj\Debug\net10.0\ref\parall.dll
