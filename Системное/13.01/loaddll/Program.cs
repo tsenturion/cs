@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Reflection;
 using System.IO;
+using System.Linq;
+using System.Runtime.Versioning;
 
 namespace LoadDLL
 {
@@ -17,9 +19,6 @@ namespace LoadDLL
 			// 2. Проверка всех методов
 			Console.WriteLine("\n2. Исследование типов библиотеки:");
 			ExploreAssembly();
-
-			Console.WriteLine("\nНажмите любую клавишу для выхода...");
-			Console.ReadKey();
 		}
 
 		static void LoadAndUseDLL()
@@ -151,7 +150,7 @@ namespace LoadDLL
 
 				// Проверяем целевую платформу
 				Console.WriteLine($"\n  Целевая платформа:");
-				var targetFrameworkAttribute = assembly.GetCustomAttribute<System.Runtime.Versioning.TargetFrameworkAttribute>();
+				var targetFrameworkAttribute = assembly.GetCustomAttribute<TargetFrameworkAttribute>();
 				if (targetFrameworkAttribute != null)
 				{
 					Console.WriteLine($"    {targetFrameworkAttribute.FrameworkName}");
