@@ -1,0 +1,15 @@
+C:\Users\user\repos\cs\Системное\13.01\loaddll\bin\Debug\net10.0\loaddll.exe
+C:\Users\user\repos\cs\Системное\13.01\loaddll\bin\Debug\net10.0\loaddll.deps.json
+C:\Users\user\repos\cs\Системное\13.01\loaddll\bin\Debug\net10.0\loaddll.runtimeconfig.json
+C:\Users\user\repos\cs\Системное\13.01\loaddll\bin\Debug\net10.0\loaddll.dll
+C:\Users\user\repos\cs\Системное\13.01\loaddll\bin\Debug\net10.0\loaddll.pdb
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.AssemblyInfoInputs.cache
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.AssemblyInfo.cs
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.csproj.CoreCompileInputs.cache
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.sourcelink.json
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.dll
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\refint\loaddll.dll
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.pdb
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.genruntimeconfig.cache
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\ref\loaddll.dll

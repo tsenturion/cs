@@ -1,0 +1,37 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\13.01\\loaddll\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{DF5D2B5D-9570-48B5-8445-BCE18446270B}|loaddll.csproj|c:\\users\\user\\repos\\cs\\\u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\13.01\\loaddll\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DF5D2B5D-9570-48B5-8445-BCE18446270B}|loaddll.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\13.01\\loaddll\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\13.01\\loaddll\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAOAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-13T14:27:59.88Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
