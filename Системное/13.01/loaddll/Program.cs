@@ -1,228 +1,120 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Runtime.Versioning;
-
-namespace LibraryConsumer
+namespace MathOperations
 {
-	class Program
-	{
-		static void Main()
-		{
-			Console.WriteLine("=== ИСПОЛЬЗОВАНИЕ БИБЛИОТЕКИ DLL ===\n");
+    namespace MathOperations.Core
+    {
+        public interface IMathOperation
+        {
+            public double Execute(double a, double b);
+            
+            string OperationName { get; }
+        }
 
-			// Способ 1: Статическое подключение (ссылка на проект)
-			Console.WriteLine("1. СТАТИЧЕСКОЕ ПОДКЛЮЧЕНИЕ (ссылка на проект):");
-			DemonstrateStaticReference();
+        public interface IAdvancedMath
+        {
+            double Power(double x, double y);
+        }
 
-			// Способ 2: Динамическая загрузка (готовый DLL файл)
-			Console.WriteLine("\n2. ДИНАМИЧЕСКАЯ ЗАГРУЗКА (готовый DLL):");
-			DemonstrateDynamicLoading();
+        public abstract class OperationValidator
+        {
+            public abstract bool Validate(double a, double b);
+            public virtual string ErrorMessage { get; }
+        }
+    }
 
-			// Исследование метаданных
-			Console.WriteLine("\n3. ИССЛЕДОВАНИЕ МЕТАДАННЫХ:");
-			ExploreAssemblyMetadata();
-		}
+    namespace MathOperations.Implementations
+    {
+        public class BasicCalculator : Core.IMathOperation
+        {
+            public String OperationName { get; private set; }
 
-		static void DemonstrateStaticReference()
-		{
-			// Компилятор знает типы из метаданных DLL
-			// IntelliSense работает, проверка типов на этапе компиляции
+            public Double Execute(Double a, Double b)
+            {
+                OperationName = "Addition";
+                return a + b;
+            }
 
-			// Использование интерфейса - зависимость от контракта
-			ClassLibrary1.Core.ICalculator calculator = new ClassLibrary1.Implementations.SimpleCalculator();
+            public double Multiply(double a, double b)
+            {
+                OperationName = "Multiply";
+                return a * b;
+            }
+        }
 
-			// Вызов методов публичного API
-			int result = calculator.Calculate(10, 20);
-			Console.WriteLine($"  Использование интерфейса: ICalculator.Calculate(10, 20) = {result}");
+        public class ScientificCalculator : Core.IMathOperation, Core.IAdvancedMath
+        {
+            public String OperationName { get; private set; }
 
-			// Использование конкретного класса из публичного API
-			var formatter = new ClassLibrary1.Utilities.StringFormatter();
-			string formatted = formatter.Format("test data");
-			Console.WriteLine($"  Использование класса: StringFormatter.Format('test data') = '{formatted}'");
+            public Double Execute(Double a, Double b)
+            {
+                OperationName = "Multiply";
+                return a * b;
+            }
 
-			// Использование метода с параметрами по умолчанию
-			string upperFormatted = formatter.FormatWithOptions("hello", true);
-			Console.WriteLine($"  Метод с параметрами по умолчанию: FormatWithOptions('hello', true) = '{upperFormatted}'");
+            public Double Power(Double x, Double y)
+            {
+                OperationName = "Power";
+                return Math.Pow(x, y);
+            }
 
-			// Глобальный класс
-			string globalMessage = GlobalUtility.GetGlobalMessage();
-			Console.WriteLine($"  Глобальный класс: GlobalUtility.GetGlobalMessage() = '{globalMessage}'");
+            internal double Logarithm(double x)
+            {
+                OperationName = "Logarithm";
+                return Math.Log(x);
+            }
+        }
 
-			// Устаревший метод (показывает предупреждение при компиляции)
-#pragma warning disable CS0618
-			string oldMessage = GlobalUtility.OldGetMessage();
-#pragma warning restore CS0618
-			Console.WriteLine($"  Устаревший метод: GlobalUtility.OldGetMessage() = '{oldMessage}'");
+        public class SafeCalculator : Core.OperationValidator, Core.IMathOperation
+        {
+            public String OperationName => "Division";
 
-			// Другая реализация того же интерфейса
-			ClassLibrary1.Core.ICalculator advancedCalc = new ClassLibrary1.Implementations.AdvancedCalculator();
-			int advancedResult = advancedCalc.Calculate(3, 4);
-			Console.WriteLine($"  Другая реализация: AdvancedCalculator.Calculate(3, 4) = {advancedResult}");
-		}
+            public Double Execute(Double a, Double b)
+            {
+                if (Validate(a, b)) return a / b;
+                else throw new DivideByZeroException();
+            }
 
-		static void DemonstrateDynamicLoading()
-		{
-			try
-			{
-				// Путь к DLL - CLR ищет в стандартных местах
-				string dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassLibrary1.dll");
+            public override Boolean Validate(Double a, Double b)
+            {
+                return a / b != 0;
+            }
+        }
+    }
 
-				Console.WriteLine($"  Путь поиска DLL: {dllPath}");
+    namespace MathOperations.Utilities
+    {
+        public class MathFormatter
+        {
+            public int FormatResult(double a)
+            {
+                string[] strs = a.ToString().Split('.');
+                return int.Parse(strs[0]);
+            }
 
-				if (!File.Exists(dllPath))
-				{
-					Console.WriteLine($"  ОШИБКА: Файл не найден!");
-					Console.WriteLine($"  CLR проверяет: 1) Директорию с .exe 2) GAC 3) Указанные пути");
-					return;
-				}
+            public double FormatWithPrecision(double a, int decimals = 2)
+            {
+                string[] strs = a.ToString().Split('.');
+                string str = strs[0] + strs[1] + strs[2].Remove(strs[2].Length - decimals);
+                return double.Parse(str);
+            }
 
-				// Загрузка сборки в домен приложения
-				Assembly assembly = Assembly.LoadFrom(dllPath);
+            [Obsolete(message: "Use FormatResult()")]
+            public int OldCalculateFormat(double a)
+            {
+                return int.Parse(a.ToString());
+            }
 
-				// Информация о сборке
-				AssemblyName assemblyName = assembly.GetName();
-				Console.WriteLine($"  Сборка загружена: {assemblyName.Name}");
-				Console.WriteLine($"  Версия: {assemblyName.Version}");
-				Console.WriteLine($"  Архитектура: {assemblyName.ProcessorArchitecture}");
+            public double FormatWithCulture(double a, int decimals = 2, bool abs = false)
+            {
+                double result = FormatWithPrecision(a, decimals);
+                if (abs) result = Math.Abs(result);
+                return result;
+            }
+        }
 
-				// Получение типа по полному имени
-				Type calculatorType = assembly.GetType("ClassLibrary1.Implementations.SimpleCalculator");
-				if (calculatorType == null)
-				{
-					Console.WriteLine($"  Тип не найден в метаданных!");
-					return;
-				}
-
-				// Создание экземпляра
-				object instance = Activator.CreateInstance(calculatorType);
-
-				// Поиск интерфейса в метаданных
-				Type interfaceType = assembly.GetType("ClassLibrary1.Core.ICalculator");
-
-				if (interfaceType != null && interfaceType.IsAssignableFrom(calculatorType))
-				{
-					// Получение метода из метаданных
-					MethodInfo calculateMethod = interfaceType.GetMethod("Calculate");
-
-					// Вызов метода через рефлексию
-					object result = calculateMethod.Invoke(instance, new object[] { 15, 25 });
-					Console.WriteLine($"  Вызов через рефлексию: Calculate(15, 25) = {result}");
-				}
-
-				// Проверка нового метода в SimpleCalculator
-				MethodInfo multiplyMethod = calculatorType.GetMethod("Multiply");
-				if (multiplyMethod != null)
-				{
-					object multiplyResult = multiplyMethod.Invoke(instance, new object[] { 6, 7 });
-					Console.WriteLine($"  Новый метод: Multiply(6, 7) = {multiplyResult}");
-				}
-
-			}
-			catch (FileNotFoundException ex)
-			{
-				Console.WriteLine($"  FileNotFoundException: {ex.Message}");
-				Console.WriteLine($"  Ошибка разрешения зависимостей CLR");
-			}
-			catch (BadImageFormatException ex)
-			{
-				Console.WriteLine($"  BadImageFormatException: {ex.Message}");
-				Console.WriteLine($"  Несовместимость версий .NET");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"  Ошибка: {ex.GetType().Name}: {ex.Message}");
-			}
-		}
-
-		static void ExploreAssemblyMetadata()
-		{
-			try
-			{
-				string dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassLibrary1.dll");
-				Assembly assembly = Assembly.LoadFrom(dllPath);
-
-				Console.WriteLine($"\n  МЕТАДАННЫЕ СБОРКИ:");
-
-				// Информация о версии из метаданных
-				AssemblyName nameInfo = assembly.GetName();
-				Console.WriteLine($"    Имя сборки: {nameInfo.Name}");
-				Console.WriteLine($"    Полное имя: {nameInfo.FullName}");
-				Console.WriteLine($"    Версия: {nameInfo.Version}");
-				Console.WriteLine($"    PublicKeyToken: {BitConverter.ToString(nameInfo.GetPublicKeyToken() ?? new byte[0])}");
-
-				// Целевая платформа из метаданных
-				var targetFramework = assembly.GetCustomAttribute<TargetFrameworkAttribute>();
-				if (targetFramework != null)
-				{
-					Console.WriteLine($"    Целевой фреймворк: {targetFramework.FrameworkName}");
-				}
-
-				// Публичные типы (публичный API)
-				Console.WriteLine($"\n  ПУБЛИЧНЫЕ ТИПЫ (public API):");
-				Type[] exportedTypes = assembly.GetExportedTypes();
-
-				foreach (Type type in exportedTypes)
-				{
-					Console.WriteLine($"\n    Тип: {type.FullName}");
-					Console.WriteLine($"      Namespace: {type.Namespace}");
-					Console.WriteLine($"      IsInterface: {type.IsInterface}");
-					Console.WriteLine($"      IsClass: {type.IsClass}");
-
-					// Публичные методы
-					MethodInfo[] publicMethods = type.GetMethods(
-						BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
-
-					if (publicMethods.Length > 0)
-					{
-						Console.WriteLine($"      Публичные методы:");
-						foreach (MethodInfo method in publicMethods)
-						{
-							// Проверка атрибутов
-							var obsoleteAttr = method.GetCustomAttribute<ObsoleteAttribute>();
-							string obsoleteMarker = obsoleteAttr != null ? " [УСТАРЕЛ]" : "";
-
-							// Параметры метода
-							string parameters = "(";
-							ParameterInfo[] paramInfos = method.GetParameters();
-							for (int i = 0; i < paramInfos.Length; i++)
-							{
-								parameters += $"{paramInfos[i].ParameterType.Name} {paramInfos[i].Name}";
-								if (i < paramInfos.Length - 1) parameters += ", ";
-							}
-							parameters += ")";
-
-							Console.WriteLine($"        - {method.ReturnType.Name} {method.Name}{parameters}{obsoleteMarker}");
-						}
-					}
-				}
-
-				// Internal типы (не видны через GetExportedTypes)
-				Console.WriteLine($"\n  INTERNAL ТИПЫ:");
-				Console.WriteLine($"    Недоступны через публичное API");
-				Console.WriteLine($"    Видны только внутри сборки ClassLibrary1");
-
-				// Зависимости сборки
-				Console.WriteLine($"\n  ЗАВИСИМОСТИ:");
-				AssemblyName[] references = assembly.GetReferencedAssemblies();
-				foreach (var reference in references)
-				{
-					Console.WriteLine($"    - {reference.Name} v{reference.Version}");
-				}
-
-				// Проверка файла DLL
-				FileInfo fileInfo = new FileInfo(dllPath);
-				Console.WriteLine($"\n  ФАЙЛ DLL:");
-				Console.WriteLine($"    Размер: {fileInfo.Length} байт");
-				Console.WriteLine($"    Дата создания: {fileInfo.CreationTime}");
-				Console.WriteLine($"    Дата изменения: {fileInfo.LastWriteTime}");
-
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"  Ошибка при исследовании: {ex.Message}");
-			}
-		}
-	}
+        internal static class Constants
+        {
+            static double Pi = Math.PI;
+            static double E = Math.E;
+        }
+    }
 }
