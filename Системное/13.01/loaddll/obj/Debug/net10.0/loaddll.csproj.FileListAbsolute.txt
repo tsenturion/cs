@@ -13,3 +13,7 @@ C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\refint
 C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.pdb
 C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.genruntimeconfig.cache
 C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\ref\loaddll.dll
+C:\Users\user\repos\cs\Системное\13.01\loaddll\bin\Debug\net10.0\ClassLibrary1.dll
+C:\Users\user\repos\cs\Системное\13.01\loaddll\bin\Debug\net10.0\ClassLibrary1.pdb
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.csproj.AssemblyReference.cache
+C:\Users\user\repos\cs\Системное\13.01\loaddll\obj\Debug\net10.0\loaddll.csproj.Up2Date

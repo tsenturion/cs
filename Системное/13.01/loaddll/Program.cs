@@ -1,221 +1,227 @@
 ﻿using System;
-using System.Reflection;
+using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.Reflection;
 using System.Runtime.Versioning;
 
-namespace LoadDLL
+namespace LibraryConsumer
 {
 	class Program
 	{
 		static void Main()
 		{
-			Console.WriteLine("=== Динамическая загрузка DLL ===\n");
+			Console.WriteLine("=== ИСПОЛЬЗОВАНИЕ БИБЛИОТЕКИ DLL ===\n");
 
-			// 1. Динамическая загрузка DLL
-			Console.WriteLine("1. Загрузка ClassLibrary1.dll:");
-			LoadAndUseDLL();
+			// Способ 1: Статическое подключение (ссылка на проект)
+			Console.WriteLine("1. СТАТИЧЕСКОЕ ПОДКЛЮЧЕНИЕ (ссылка на проект):");
+			DemonstrateStaticReference();
 
-			// 2. Проверка всех методов
-			Console.WriteLine("\n2. Исследование типов библиотеки:");
-			ExploreAssembly();
+			// Способ 2: Динамическая загрузка (готовый DLL файл)
+			Console.WriteLine("\n2. ДИНАМИЧЕСКАЯ ЗАГРУЗКА (готовый DLL):");
+			DemonstrateDynamicLoading();
+
+			// Исследование метаданных
+			Console.WriteLine("\n3. ИССЛЕДОВАНИЕ МЕТАДАННЫХ:");
+			ExploreAssemblyMetadata();
 		}
 
-		static void LoadAndUseDLL()
+		static void DemonstrateStaticReference()
+		{
+			// Компилятор знает типы из метаданных DLL
+			// IntelliSense работает, проверка типов на этапе компиляции
+
+			// Использование интерфейса - зависимость от контракта
+			ClassLibrary1.Core.ICalculator calculator = new ClassLibrary1.Implementations.SimpleCalculator();
+
+			// Вызов методов публичного API
+			int result = calculator.Calculate(10, 20);
+			Console.WriteLine($"  Использование интерфейса: ICalculator.Calculate(10, 20) = {result}");
+
+			// Использование конкретного класса из публичного API
+			var formatter = new ClassLibrary1.Utilities.StringFormatter();
+			string formatted = formatter.Format("test data");
+			Console.WriteLine($"  Использование класса: StringFormatter.Format('test data') = '{formatted}'");
+
+			// Использование метода с параметрами по умолчанию
+			string upperFormatted = formatter.FormatWithOptions("hello", true);
+			Console.WriteLine($"  Метод с параметрами по умолчанию: FormatWithOptions('hello', true) = '{upperFormatted}'");
+
+			// Глобальный класс
+			string globalMessage = GlobalUtility.GetGlobalMessage();
+			Console.WriteLine($"  Глобальный класс: GlobalUtility.GetGlobalMessage() = '{globalMessage}'");
+
+			// Устаревший метод (показывает предупреждение при компиляции)
+#pragma warning disable CS0618
+			string oldMessage = GlobalUtility.OldGetMessage();
+#pragma warning restore CS0618
+			Console.WriteLine($"  Устаревший метод: GlobalUtility.OldGetMessage() = '{oldMessage}'");
+
+			// Другая реализация того же интерфейса
+			ClassLibrary1.Core.ICalculator advancedCalc = new ClassLibrary1.Implementations.AdvancedCalculator();
+			int advancedResult = advancedCalc.Calculate(3, 4);
+			Console.WriteLine($"  Другая реализация: AdvancedCalculator.Calculate(3, 4) = {advancedResult}");
+		}
+
+		static void DemonstrateDynamicLoading()
 		{
 			try
 			{
-				// Получаем путь к текущей директории
-				string currentDirectory = AppDomain.CurrentDomain.BaseDirectory;
-				string dllPath = Path.Combine(currentDirectory, "ClassLibrary1.dll");
+				// Путь к DLL - CLR ищет в стандартных местах
+				string dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassLibrary1.dll");
 
-				Console.WriteLine($"  Ищу DLL по пути: {dllPath}");
+				Console.WriteLine($"  Путь поиска DLL: {dllPath}");
 
-				// Проверяем существование файла
 				if (!File.Exists(dllPath))
 				{
-					Console.WriteLine($"  Файл не найден!");
-					Console.WriteLine($"  Содержимое папки {currentDirectory}:");
-					foreach (var file in Directory.GetFiles(currentDirectory, "*.dll"))
-					{
-						Console.WriteLine($"    - {Path.GetFileName(file)}");
-					}
+					Console.WriteLine($"  ОШИБКА: Файл не найден!");
+					Console.WriteLine($"  CLR проверяет: 1) Директорию с .exe 2) GAC 3) Указанные пути");
 					return;
 				}
 
-				Console.WriteLine($"  Файл найден, размер: {new FileInfo(dllPath).Length} байт");
-
-				// Способ 1: LoadFrom (рекомендуется)
+				// Загрузка сборки в домен приложения
 				Assembly assembly = Assembly.LoadFrom(dllPath);
-				Console.WriteLine($"  Сборка загружена: {assembly.FullName}");
 
-				// Получаем тип Class1
-				Type class1Type = assembly.GetType("ClassLibrary1.Class1");
-				if (class1Type == null)
+				// Информация о сборке
+				AssemblyName assemblyName = assembly.GetName();
+				Console.WriteLine($"  Сборка загружена: {assemblyName.Name}");
+				Console.WriteLine($"  Версия: {assemblyName.Version}");
+				Console.WriteLine($"  Архитектура: {assemblyName.ProcessorArchitecture}");
+
+				// Получение типа по полному имени
+				Type calculatorType = assembly.GetType("ClassLibrary1.Implementations.SimpleCalculator");
+				if (calculatorType == null)
 				{
-					Console.WriteLine("  Тип ClassLibrary1.Class1 не найден!");
-
-					// Показываем все типы в сборке
-					Console.WriteLine("  Доступные типы в сборке:");
-					foreach (Type type in assembly.GetTypes())
-					{
-						Console.WriteLine($"    - {type.FullName}");
-					}
+					Console.WriteLine($"  Тип не найден в метаданных!");
 					return;
 				}
 
-				// Создаем экземпляр
-				object instance = Activator.CreateInstance(class1Type);
-				Console.WriteLine("  Экземпляр класса создан");
+				// Создание экземпляра
+				object instance = Activator.CreateInstance(calculatorType);
 
-				// Вызываем метод GetMessage
-				MethodInfo getMessageMethod = class1Type.GetMethod("GetMessage");
-				if (getMessageMethod != null)
-				{
-					string message = (string)getMessageMethod.Invoke(instance, null);
-					Console.WriteLine($"  GetMessage(): {message}");
-				}
-				else
-				{
-					Console.WriteLine("  Метод GetMessage не найден!");
+				// Поиск интерфейса в метаданных
+				Type interfaceType = assembly.GetType("ClassLibrary1.Core.ICalculator");
 
-					// Показываем все методы
-					Console.WriteLine("  Доступные методы:");
-					foreach (MethodInfo method in class1Type.GetMethods())
-					{
-						Console.WriteLine($"    - {method.ReturnType.Name} {method.Name}()");
-					}
+				if (interfaceType != null && interfaceType.IsAssignableFrom(calculatorType))
+				{
+					// Получение метода из метаданных
+					MethodInfo calculateMethod = interfaceType.GetMethod("Calculate");
+
+					// Вызов метода через рефлексию
+					object result = calculateMethod.Invoke(instance, new object[] { 15, 25 });
+					Console.WriteLine($"  Вызов через рефлексию: Calculate(15, 25) = {result}");
 				}
 
-				// Вызываем метод Calculate
-				MethodInfo calculateMethod = class1Type.GetMethod("Calculate");
-				if (calculateMethod != null)
+				// Проверка нового метода в SimpleCalculator
+				MethodInfo multiplyMethod = calculatorType.GetMethod("Multiply");
+				if (multiplyMethod != null)
 				{
-					object[] parameters = { 25, 17 };
-					int result = (int)calculateMethod.Invoke(instance, parameters);
-					Console.WriteLine($"  Calculate(25, 17): {result}");
-				}
-
-				// Альтернативный способ с dynamic
-				Console.WriteLine("\n  Использование dynamic:");
-				try
-				{
-					dynamic dynamicInstance = Activator.CreateInstance(class1Type);
-					Console.WriteLine($"    dynamic GetMessage(): {dynamicInstance.GetMessage()}");
-					Console.WriteLine($"    dynamic Calculate(100, 200): {dynamicInstance.Calculate(100, 200)}");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"    Ошибка dynamic: {ex.Message}");
+					object multiplyResult = multiplyMethod.Invoke(instance, new object[] { 6, 7 });
+					Console.WriteLine($"  Новый метод: Multiply(6, 7) = {multiplyResult}");
 				}
 
 			}
 			catch (FileNotFoundException ex)
 			{
 				Console.WriteLine($"  FileNotFoundException: {ex.Message}");
+				Console.WriteLine($"  Ошибка разрешения зависимостей CLR");
 			}
 			catch (BadImageFormatException ex)
 			{
 				Console.WriteLine($"  BadImageFormatException: {ex.Message}");
-				Console.WriteLine("  Возможно, DLL скомпилирована для другой версии .NET");
+				Console.WriteLine($"  Несовместимость версий .NET");
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine($"  Ошибка: {ex.GetType().Name}: {ex.Message}");
-				Console.WriteLine($"  StackTrace: {ex.StackTrace}");
 			}
 		}
 
-		static void ExploreAssembly()
+		static void ExploreAssemblyMetadata()
 		{
 			try
 			{
 				string dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassLibrary1.dll");
-
-				if (!File.Exists(dllPath))
-				{
-					Console.WriteLine($"  DLL не найдена: {dllPath}");
-					return;
-				}
-
-				// Загружаем сборку
 				Assembly assembly = Assembly.LoadFrom(dllPath);
 
-				Console.WriteLine($"  Информация о сборке:");
-				AssemblyName assemblyName = assembly.GetName();
-				Console.WriteLine($"    Имя: {assemblyName.Name}");
-				Console.WriteLine($"    Версия: {assemblyName.Version}");
-				Console.WriteLine($"    Архитектура: {assemblyName.ProcessorArchitecture}");
-				Console.WriteLine($"    Расположение: {assembly.Location}");
+				Console.WriteLine($"\n  МЕТАДАННЫЕ СБОРКИ:");
 
-				// Проверяем целевую платформу
-				Console.WriteLine($"\n  Целевая платформа:");
-				var targetFrameworkAttribute = assembly.GetCustomAttribute<TargetFrameworkAttribute>();
-				if (targetFrameworkAttribute != null)
+				// Информация о версии из метаданных
+				AssemblyName nameInfo = assembly.GetName();
+				Console.WriteLine($"    Имя сборки: {nameInfo.Name}");
+				Console.WriteLine($"    Полное имя: {nameInfo.FullName}");
+				Console.WriteLine($"    Версия: {nameInfo.Version}");
+				Console.WriteLine($"    PublicKeyToken: {BitConverter.ToString(nameInfo.GetPublicKeyToken() ?? new byte[0])}");
+
+				// Целевая платформа из метаданных
+				var targetFramework = assembly.GetCustomAttribute<TargetFrameworkAttribute>();
+				if (targetFramework != null)
 				{
-					Console.WriteLine($"    {targetFrameworkAttribute.FrameworkName}");
+					Console.WriteLine($"    Целевой фреймворк: {targetFramework.FrameworkName}");
 				}
 
-				// Получаем все типы
-				Console.WriteLine($"\n  Типы в сборке:");
-				Type[] types = assembly.GetTypes();
-				if (types.Length == 0)
-				{
-					Console.WriteLine($"    (нет типов)");
-				}
+				// Публичные типы (публичный API)
+				Console.WriteLine($"\n  ПУБЛИЧНЫЕ ТИПЫ (public API):");
+				Type[] exportedTypes = assembly.GetExportedTypes();
 
-				foreach (Type type in types)
+				foreach (Type type in exportedTypes)
 				{
-					Console.WriteLine($"    Тип: {type.FullName}");
+					Console.WriteLine($"\n    Тип: {type.FullName}");
 					Console.WriteLine($"      Namespace: {type.Namespace}");
-					Console.WriteLine($"      IsPublic: {type.IsPublic}");
+					Console.WriteLine($"      IsInterface: {type.IsInterface}");
 					Console.WriteLine($"      IsClass: {type.IsClass}");
 
-					// Показываем методы
-					MethodInfo[] methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-					if (methods.Length > 0)
+					// Публичные методы
+					MethodInfo[] publicMethods = type.GetMethods(
+						BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
+
+					if (publicMethods.Length > 0)
 					{
-						Console.WriteLine($"      Методы:");
-						foreach (MethodInfo method in methods)
+						Console.WriteLine($"      Публичные методы:");
+						foreach (MethodInfo method in publicMethods)
 						{
-							string parameters = "";
-							var paramInfos = method.GetParameters();
-							if (paramInfos.Length > 0)
+							// Проверка атрибутов
+							var obsoleteAttr = method.GetCustomAttribute<ObsoleteAttribute>();
+							string obsoleteMarker = obsoleteAttr != null ? " [УСТАРЕЛ]" : "";
+
+							// Параметры метода
+							string parameters = "(";
+							ParameterInfo[] paramInfos = method.GetParameters();
+							for (int i = 0; i < paramInfos.Length; i++)
 							{
-								parameters = "(" + string.Join(", ", paramInfos.Select(p => $"{p.ParameterType.Name} {p.Name}")) + ")";
+								parameters += $"{paramInfos[i].ParameterType.Name} {paramInfos[i].Name}";
+								if (i < paramInfos.Length - 1) parameters += ", ";
 							}
-							else
-							{
-								parameters = "()";
-							}
-							Console.WriteLine($"        - {method.ReturnType.Name} {method.Name}{parameters}");
+							parameters += ")";
+
+							Console.WriteLine($"        - {method.ReturnType.Name} {method.Name}{parameters}{obsoleteMarker}");
 						}
 					}
 				}
 
-				// Проверка зависимостей
-				Console.WriteLine($"\n  Зависимости сборки:");
-				AssemblyName[] referencedAssemblies = assembly.GetReferencedAssemblies();
-				if (referencedAssemblies.Length == 0)
+				// Internal типы (не видны через GetExportedTypes)
+				Console.WriteLine($"\n  INTERNAL ТИПЫ:");
+				Console.WriteLine($"    Недоступны через публичное API");
+				Console.WriteLine($"    Видны только внутри сборки ClassLibrary1");
+
+				// Зависимости сборки
+				Console.WriteLine($"\n  ЗАВИСИМОСТИ:");
+				AssemblyName[] references = assembly.GetReferencedAssemblies();
+				foreach (var reference in references)
 				{
-					Console.WriteLine($"    (нет зависимостей)");
+					Console.WriteLine($"    - {reference.Name} v{reference.Version}");
 				}
-				else
-				{
-					foreach (AssemblyName referencedAssembly in referencedAssemblies)
-					{
-						Console.WriteLine($"    - {referencedAssembly.Name} v{referencedAssembly.Version}");
-					}
-				}
+
+				// Проверка файла DLL
+				FileInfo fileInfo = new FileInfo(dllPath);
+				Console.WriteLine($"\n  ФАЙЛ DLL:");
+				Console.WriteLine($"    Размер: {fileInfo.Length} байт");
+				Console.WriteLine($"    Дата создания: {fileInfo.CreationTime}");
+				Console.WriteLine($"    Дата изменения: {fileInfo.LastWriteTime}");
 
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"  Ошибка при исследовании: {ex.GetType().Name}: {ex.Message}");
-				if (ex.InnerException != null)
-				{
-					Console.WriteLine($"  Внутренняя ошибка: {ex.InnerException.Message}");
-				}
+				Console.WriteLine($"  Ошибка при исследовании: {ex.Message}");
 			}
 		}
 	}
