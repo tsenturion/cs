@@ -3,8 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\13.01\\ClassLibrary1\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{C97ABC7F-E694-4A7C-9045-17B36F2EF0E7}|ClassLibrary1.csproj|c:\\users\\user\\repos\\cs\\\u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\13.01\\classlibrary1\\class1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{C97ABC7F-E694-4A7C-9045-17B36F2EF0E7}|ClassLibrary1.csproj|solutionrelative:class1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{7DA2C200-402B-C754-C5C5-C2AF13AA27CB}|ClassLibrary1.csproj|c:\\users\\user\\repos\\cs\\\u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\13.01\\classlibrary1\\class1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7DA2C200-402B-C754-C5C5-C2AF13AA27CB}|ClassLibrary1.csproj|solutionrelative:class1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -24,7 +24,7 @@
               "RelativeDocumentMoniker": "Class1.cs",
               "ToolTip": "C:\\Users\\user\\repos\\cs\\\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435\\13.01\\ClassLibrary1\\Class1.cs",
               "RelativeToolTip": "Class1.cs",
-              "ViewState": "AgIAAAMAAAAAAAAAAAAAAIsAAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAJwAAAAAAAAAAAAxwMMAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-01-13T13:55:43.68Z",
               "EditorCaption": ""

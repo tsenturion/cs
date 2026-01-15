@@ -1,140 +1,196 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
 
-// Пространство имен - часть дизайна библиотеки
-// Хорошо спроектированные пространства имен делают библиотеку понятной
-namespace ClassLibrary1.Core
+namespace ReflectionDemoLibrary
 {
-	// Интерфейс - лучший способ определения контракта
-	// Потребители зависят от интерфейса, а не от реализации
-	public interface ICalculator
+	// Интерфейс для демонстрации контрактов
+	public interface IPlugin
 	{
-		// Метод интерфейса - чистая часть контракта
-		int Calculate(int a, int b);
+		string Name { get; }
+		void Execute();
+		string GetInfo();
 	}
 
-	// Базовый абстрактный класс - ещё один способ определения контракта
-	public abstract class BaseProcessor
+	// Атрибут для метаданных - может быть прочитан через Reflection
+	[AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+	public class PluginAttribute : Attribute
 	{
-		// Абстрактный метод - должен быть реализован в производных классах
-		public abstract string Process(string input);
+		public string Description { get; }
+		public string Version { get; }
 
-		// Виртуальный метод - может быть переопределен
-		public virtual string GetVersion()
+		public PluginAttribute(string description, string version = "1.0.0")
 		{
-			return "1.0.0.0";
+			Description = description;
+			Version = version;
 		}
 	}
-}
 
-namespace ClassLibrary1.Implementations
-{
-	// Конкретная реализация интерфейса
-	// Можно заменить на другую реализацию без изменения контракта
-	public class SimpleCalculator : Core.ICalculator
+	// Публичные классы - доступны через Reflection
+	[Plugin("Базовая реализация плагина", "1.0.0")]
+	public class SimplePlugin : IPlugin
 	{
-		// Реализация контракта интерфейса
+		public string Name => "Simple Plugin";
+
+		public void Execute()
+		{
+			Console.WriteLine($"[{Name}] Выполнение через прямой вызов");
+		}
+
+		public string GetInfo()
+		{
+			return $"Плагин: {Name}, Версия: 1.0";
+		}
+
+		// Публичный метод с параметрами
 		public int Calculate(int a, int b)
 		{
 			return a + b;
 		}
 
-		// Новый метод - добавлен в новой версии
-		// Показывает эволюцию API
-		public int Multiply(int a, int b)
+		// Приватный метод - не виден через обычный Reflection без флагов
+		private string GetPrivateData()
 		{
-			return a * b;
+			return "Секретные данные";
+		}
+
+		// Internal метод - виден только внутри сборки
+		internal string GetInternalData()
+		{
+			return "Внутренние данные";
 		}
 	}
 
-	// Ещё одна реализация того же интерфейса
-	// Демонстрирует возможность разных реализаций
-	public class AdvancedCalculator : Core.ICalculator
+	// Ещё один плагин с другим атрибутом
+	[Plugin("Расширенная версия плагина", "2.0.0")]
+	public class AdvancedPlugin : IPlugin
 	{
-		public int Calculate(int a, int b)
+		public string Name => "Advanced Plugin";
+
+		public void Execute()
 		{
-			// Сложная реализация может меняться без влияния на контракт
-			return InternalComplexCalculation(a, b);
+			Console.WriteLine($"[{Name}] Расширенное выполнение");
 		}
 
-		// Internal метод - детали реализации
-		internal int InternalComplexCalculation(int x, int y)
+		public string GetInfo()
 		{
-			return (x * x) + (y * y);
-		}
-	}
-}
-
-namespace ClassLibrary1.Utilities
-{
-	// Public класс - часть публичного API
-	// Изменения в публичных членах влияют на совместимость
-	public class StringFormatter
-	{
-		// Public метод - фиксированный контракт
-		public string Format(string input)
-		{
-			// Использование internal метода безопасно
-			return InternalFormatLogic(input);
+			return $"Продвинутый плагин версии 2.0";
 		}
 
-		// Internal метод - может меняться свободно
-		internal string InternalFormatLogic(string text)
+		// Новый метод в расширенной версии
+		public string ProcessData(string input)
 		{
-			return $"Formatted: {text}";
-		}
-
-		// Метод с параметрами по умолчанию - показывает эволюцию API
-		// Новые параметры можно добавлять без нарушения существующего кода
-		public string FormatWithOptions(string input, bool uppercase = false)
-		{
-			var result = InternalFormatLogic(input);
-			return uppercase ? result.ToUpper() : result;
-		}
-	}
-}
-
-namespace ClassLibrary1.Internal
-{
-	// Internal класс - не виден за пределами сборки
-	// Полная свобода изменений
-	internal class ConfigurationManager
-	{
-		internal string GetSetting(string key)
-		{
-			return "Internal configuration value";
+			return $"Обработано: {input.ToUpper()}";
 		}
 	}
 
-	// Internal структура - тоже скрыта от внешнего мира
-	internal struct InternalData
+	// Класс с несколькими методами для демонстрации Reflection
+	public class Calculator
 	{
-		public int Value;
-		public string Name;
-	}
-}
+		public int Add(int a, int b) => a + b;
+		public int Subtract(int a, int b) => a - b;
+		public static int Multiply(int a, int b) => a * b;
 
-// Глобальный класс в корневом namespace
-// Демонстрирует организацию кода по namespace
-public class GlobalUtility
-{
-	// Статический член - тоже часть публичного API
-	public static string GetGlobalMessage()
-	{
-		return "Global utility method";
-	}
+		// Перегруженные методы
+		public double Add(double a, double b) => a + b;
 
-	// Метод, помеченный как устаревший
-	// Показывает управление жизненным циклом API
-	[Obsolete("Use GetGlobalMessage() instead", false)]
-	public static string OldGetMessage()
-	{
-		return "Deprecated method";
+		// Метод с параметрами по умолчанию
+		public string Format(string text, bool uppercase = false)
+		{
+			return uppercase ? text.ToUpper() : text;
+		}
+
+		// Приватный метод
+		private int InternalCalculation() => 42;
 	}
 
-	// Метод с устареванием и ошибкой
-	[Obsolete("This method will be removed in version 2.0", true)]
-	public static string ToBeRemoved()
+	// Структура для демонстрации работы с разными типами
+	public struct DataPoint
 	{
-		return "Will cause compilation error if used";
+		public int X;
+		public int Y;
+		public string Label;
+
+		public DataPoint(int x, int y, string label)
+		{
+			X = x;
+			Y = y;
+			Label = label;
+		}
+
+		public string GetInfo() => $"{Label}: ({X}, {Y})";
+	}
+
+	// Generic класс для демонстрации работы с дженериками через Reflection
+	public class Repository<T> where T : new()
+	{
+		private List<T> items = new List<T>();
+
+		public void Add(T item)
+		{
+			items.Add(item);
+		}
+
+		public T Get(int index)
+		{
+			return items[index];
+		}
+
+		public int Count => items.Count;
+	}
+
+	// Класс с событиями для демонстрации работы с событиями через Reflection
+	public class EventPublisher
+	{
+		public event EventHandler<string> DataProcessed;
+
+		public void ProcessData(string data)
+		{
+			Console.WriteLine($"Обработка данных: {data}");
+			DataProcessed?.Invoke(this, $"Обработано: {data}");
+		}
+	}
+
+	// Класс с свойствами разных типов
+	public class Configuration
+	{
+		public string Name { get; set; }
+		public int MaxConnections { get; set; }
+		public bool Enabled { get; set; }
+
+		public string ReadOnlyProperty => "Read Only Value";
+
+		private string secret = "Секретное значение";
+		public string Secret
+		{
+			get => secret;
+			private set => secret = value;
+		}
+
+		public void SetSecret(string value) => Secret = value;
+	}
+
+	// Internal класс - не доступен извне через обычный Reflection
+	internal class InternalComponent
+	{
+		public void DoWork()
+		{
+			Console.WriteLine("Внутренняя работа");
+		}
+	}
+
+	// Статический класс
+	public static class Utility
+	{
+		public static string GetTimestamp()
+		{
+			return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+		}
+
+		[Obsolete("Используйте новый метод GetTimestamp()", false)]
+		public static string GetOldTimestamp()
+		{
+			return DateTime.Now.ToString();
+		}
 	}
 }
