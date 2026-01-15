@@ -1,264 +1,479 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.Loader;
+using System.IO;
+using System.Linq;
 
-namespace DynamicLoadingDemo
+namespace AssemblyLoadContextDemo
 {
-	// Общие контракты - будут известны и хосту, и плагинам
-	public interface IPlugin
+	// Общие контракты, которые будут загружены в основной контекст
+	public interface ILoadableModule
 	{
-		string Name { get; }
+		string ModuleName { get; }
 		string Version { get; }
-		void Initialize();
-		string Process(string input);
+		void Initialize(ModuleConfiguration config);
+		string Execute(string input);
+		void Shutdown();
 	}
 
-	public interface IDataProcessor
+	public interface IConfigurable
 	{
-		string ProcessData(object data);
-		bool CanProcess(Type dataType);
+		Dictionary<string, object> GetConfiguration();
+		void UpdateConfiguration(Dictionary<string, object> config);
 	}
 
-	// Атрибут для маркировки плагинов
-	[AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-	public class PluginMetadataAttribute : Attribute
+	// Класс для передачи конфигурации между контекстами
+	[Serializable]
+	public class ModuleConfiguration
 	{
-		public string Author { get; }
-		public string Description { get; }
-		public string RequiredHostVersion { get; }
+		public string Id { get; set; } = Guid.NewGuid().ToString();
+		public string BasePath { get; set; }
+		public Dictionary<string, string> Settings { get; set; } = new Dictionary<string, string>();
+		public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 
-		public PluginMetadataAttribute(string author, string description, string requiredHostVersion = "1.0.0")
-		{
-			Author = author;
-			Description = description;
-			RequiredHostVersion = requiredHostVersion;
-		}
+		public override string ToString() => $"Config[{Id}]: {Settings.Count} settings";
 	}
 
-	// Базовый класс для плагинов с общими функциями
-	public abstract class PluginBase
+	// Результат выполнения модуля, передаваемый между контекстами
+	[Serializable]
+	public class ModuleResult
 	{
-		protected bool IsInitialized { get; private set; }
+		public bool Success { get; set; }
+		public string Output { get; set; }
+		public TimeSpan ExecutionTime { get; set; }
+		public DateTime Timestamp { get; set; } = DateTime.Now;
 
-		public virtual void Initialize()
-		{
-			IsInitialized = true;
-		}
-
-		protected void EnsureInitialized()
-		{
-			if (!IsInitialized)
-				throw new InvalidOperationException("Плагин не инициализирован");
-		}
+		public override string ToString() =>
+			$"[{Timestamp:HH:mm:ss}] {(Success ? "✓" : "✗")} {Output} ({ExecutionTime.TotalMilliseconds:F0}ms)";
 	}
 
-	// Пример плагина версии 1.0
-	[PluginMetadata("Company A", "Плагин для обработки текста", "1.0.0")]
-	public class TextProcessorPlugin : PluginBase, IPlugin
+	// Пользовательский контекст загрузки для изоляции модулей
+	public class ModuleLoadContext : AssemblyLoadContext
 	{
-		public string Name => "Text Processor";
-		public string Version => "1.0.0";
+		private readonly string _moduleName;
+		private readonly string _dependenciesPath;
+		private readonly List<Assembly> _loadedAssemblies = new List<Assembly>();
 
-		private List<string> processedItems = new List<string>();
-
-		public override void Initialize()
+		public ModuleLoadContext(string moduleName, string dependenciesPath = null)
+			: base(isCollectible: true) // isCollectible: true позволяет выгрузку
 		{
-			base.Initialize();
-			Console.WriteLine($"[{Name}] Инициализация плагина текстовой обработки");
+			_moduleName = moduleName;
+			_dependenciesPath = dependenciesPath;
+			Console.WriteLine($"[ModuleLoadContext] Создан контекст для модуля: {moduleName}");
 		}
 
-		public string Process(string input)
+		// Переопределение метода загрузки зависимостей
+		protected override Assembly Load(AssemblyName assemblyName)
 		{
-			EnsureInitialized();
+			Console.WriteLine($"[ModuleLoadContext:{_moduleName}] Запрос на загрузку: {assemblyName.Name}");
 
-			string result = $"Обработан текст: {input.ToUpper()}";
-			processedItems.Add(result);
-			return result;
-		}
-
-		public int GetProcessedCount() => processedItems.Count;
-	}
-
-	// Пример плагина версии 2.0 с новым функционалом
-	[PluginMetadata("Company B", "Расширенный плагин обработки", "1.1.0")]
-	public class AdvancedDataPlugin : PluginBase, IPlugin, IDataProcessor
-	{
-		public string Name => "Advanced Data Processor";
-		public string Version => "2.0.0";
-
-		public override void Initialize()
-		{
-			base.Initialize();
-			Console.WriteLine($"[{Name}] Инициализация расширенного плагина");
-			LoadConfiguration();
-		}
-
-		private void LoadConfiguration()
-		{
-			// Симуляция загрузки конфигурации
-			Console.WriteLine($"[{Name}] Загрузка конфигурации...");
-		}
-
-		public string Process(string input)
-		{
-			EnsureInitialized();
-
-			if (string.IsNullOrEmpty(input))
-				throw new ArgumentException("Входные данные не могут быть пустыми");
-
-			return $"Расширенная обработка: {input} (длина: {input.Length})";
-		}
-
-		public string ProcessData(object data)
-		{
-			if (data == null)
-				return "Данные отсутствуют";
-
-			return $"Обработаны данные типа {data.GetType().Name}: {data}";
-		}
-
-		public bool CanProcess(Type dataType)
-		{
-			return dataType != null && dataType != typeof(void);
-		}
-
-		// Новый метод в версии 2.0
-		public string Analyze(string data)
-		{
-			return $"Анализ данных: сложность = {data.Length * 0.5:F1}";
-		}
-	}
-
-	// Плагин с зависимостью от сторонней библиотеки (симуляция)
-	[PluginMetadata("Company C", "Математический плагин с зависимостями")]
-	public class MathPlugin : PluginBase, IPlugin
-	{
-		public string Name => "Math Processor";
-		public string Version => "1.5.0";
-
-		public override void Initialize()
-		{
-			base.Initialize();
-
-			// Симуляция проверки зависимостей
-			if (!CheckDependencies())
-				throw new InvalidOperationException("Не все зависимости удовлетворены");
-		}
-
-		private bool CheckDependencies()
-		{
-			// В реальном приложении здесь проверялись бы версии DLL
-			return true;
-		}
-
-		public string Process(string input)
-		{
-			EnsureInitialized();
-
-			if (double.TryParse(input, out double number))
+			// Сначала пробуем загрузить из кастомной папки зависимостей
+			if (!string.IsNullOrEmpty(_dependenciesPath))
 			{
-				double result = Math.Sqrt(Math.Abs(number));
-				return $"√|{number}| = {result:F4}";
+				string assemblyPath = Path.Combine(_dependenciesPath, $"{assemblyName.Name}.dll");
+				if (File.Exists(assemblyPath))
+				{
+					Console.WriteLine($"[ModuleLoadContext:{_moduleName}] Загружаем из {assemblyPath}");
+					Assembly assembly = LoadFromAssemblyPath(assemblyPath);
+					_loadedAssemblies.Add(assembly);
+					return assembly;
+				}
 			}
 
-			return $"Не удалось распознать число: {input}";
+			// Для системных сборок используем контекст по умолчанию
+			if (assemblyName.Name.StartsWith("System") ||
+				assemblyName.Name == "netstandard" ||
+				assemblyName.Name == "mscorlib")
+			{
+				Console.WriteLine($"[ModuleLoadContext:{_moduleName}] Используем системную сборку: {assemblyName.Name}");
+				return null; // null означает загрузку из контекста по умолчанию
+			}
+
+			// Ищем в папке модуля
+			string moduleAssemblyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+													_moduleName,
+													$"{assemblyName.Name}.dll");
+			if (File.Exists(moduleAssemblyPath))
+			{
+				Console.WriteLine($"[ModuleLoadContext:{_moduleName}] Загружаем из модуля: {assemblyName.Name}");
+				Assembly assembly = LoadFromAssemblyPath(moduleAssemblyPath);
+				_loadedAssemblies.Add(assembly);
+				return assembly;
+			}
+
+			// Если не нашли - используем контекст по умолчанию
+			Console.WriteLine($"[ModuleLoadContext:{_moduleName}] Используем контекст по умолчанию для: {assemblyName.Name}");
+			return null;
 		}
 
-		// Специфичные для математического плагина методы
-		public double CalculateExpression(string expression)
-		{
-			// Упрощённый пример
-			return expression.Length * 2.5;
-		}
-	}
-
-	// Плагин с ошибкой - для демонстрации обработки исключений
-	[PluginMetadata("Unknown", "Проблемный плагин")]
-	public class BuggyPlugin : IPlugin
-	{
-		public string Name => "Buggy Plugin";
-		public string Version => "0.1.0";
-
-		private bool initialized = false;
-
-		public void Initialize()
-		{
-			if (DateTime.Now.Second % 3 == 0) // Случайная ошибка
-				throw new InvalidOperationException("Случайная ошибка при инициализации");
-
-			initialized = true;
-		}
-
-		public string Process(string input)
-		{
-			if (!initialized)
-				throw new InvalidOperationException("Плагин не инициализирован");
-
-			if (input == "crash")
-				throw new ArgumentException("Намеренная ошибка обработки");
-
-			return $"Обработано: {input}";
-		}
-	}
-
-	// Класс с общими утилитами, которые могут использоваться хостами
-	public static class PluginHostUtilities
-	{
-		public static bool ValidatePluginVersion(string pluginVersion, string hostVersion)
+		// Метод для безопасной загрузки сборки
+		public Assembly SafeLoadFromAssemblyPath(string assemblyPath)
 		{
 			try
 			{
-				var pluginVer = new Version(pluginVersion);
-				var hostVer = new Version(hostVersion);
-
-				// Простая проверка: плагин должен быть не старше хоста
-				return pluginVer <= hostVer;
+				Console.WriteLine($"[ModuleLoadContext:{_moduleName}] Загружаем: {Path.GetFileName(assemblyPath)}");
+				Assembly assembly = LoadFromAssemblyPath(assemblyPath);
+				_loadedAssemblies.Add(assembly);
+				return assembly;
 			}
-			catch
+			catch (Exception ex)
 			{
+				Console.WriteLine($"[ModuleLoadContext:{_moduleName}] Ошибка загрузки: {ex.Message}");
+				return null;
+			}
+		}
+
+		// Информация о загруженных сборках
+		public void PrintLoadedAssemblies()
+		{
+			Console.WriteLine($"[ModuleLoadContext:{_moduleName}] Загруженные сборки:");
+			foreach (var assembly in _loadedAssemblies)
+			{
+				Console.WriteLine($"  - {assembly.GetName().Name} v{assembly.GetName().Version}");
+			}
+		}
+
+		// Очистка перед выгрузкой
+		public void PrepareForUnload()
+		{
+			Console.WriteLine($"[ModuleLoadContext:{_moduleName}] Подготовка к выгрузке...");
+			_loadedAssemblies.Clear();
+		}
+	}
+
+	// Базовый класс для модулей в изолированных контекстах
+	public abstract class BaseModule : ILoadableModule, IDisposable
+	{
+		public abstract string ModuleName { get; }
+		public abstract string Version { get; }
+
+		protected ModuleConfiguration Configuration { get; private set; }
+		protected bool IsInitialized { get; private set; }
+		protected bool IsDisposed { get; private set; }
+
+		// Событие для уведомления хоста
+		public event EventHandler<string> ModuleEvent;
+
+		protected virtual void OnModuleEvent(string message)
+		{
+			ModuleEvent?.Invoke(this, message);
+		}
+
+		public virtual void Initialize(ModuleConfiguration config)
+		{
+			if (IsDisposed)
+				throw new ObjectDisposedException(ModuleName);
+
+			Configuration = config;
+			IsInitialized = true;
+			OnModuleEvent($"Модуль {ModuleName} v{Version} инициализирован");
+		}
+
+		public abstract string Execute(string input);
+
+		public virtual void Shutdown()
+		{
+			OnModuleEvent($"Модуль {ModuleName} завершает работу");
+			Dispose();
+		}
+
+		protected virtual void Dispose(bool disposing)
+		{
+			if (!IsDisposed)
+			{
+				if (disposing)
+				{
+					// Освобождение управляемых ресурсов
+					OnModuleEvent($"Модуль {ModuleName} освобождает ресурсы");
+				}
+
+				IsDisposed = true;
+				IsInitialized = false;
+			}
+		}
+
+		public void Dispose()
+		{
+			Dispose(true);
+			GC.SuppressFinalize(this);
+		}
+
+		~BaseModule()
+		{
+			Dispose(false);
+		}
+	}
+
+	// Пример модуля, который должен быть загружен в изолированном контексте
+	public class DataProcessorModule : BaseModule, IConfigurable
+	{
+		public override string ModuleName => "Data Processor";
+		public override string Version => "2.0.0";
+
+		private List<string> _processedItems = new List<string>();
+		private Dictionary<string, object> _config = new Dictionary<string, object>
+		{
+			["MaxItems"] = 100,
+			["EnableLogging"] = true,
+			["ProcessingMode"] = "Standard"
+		};
+
+		public override void Initialize(ModuleConfiguration config)
+		{
+			base.Initialize(config);
+
+			if (config != null && config.Settings != null)
+			{
+				foreach (var setting in config.Settings)
+				{
+					_config[setting.Key] = setting.Value;
+				}
+			}
+
+			Console.WriteLine($"[{ModuleName}] Инициализация в изолированном контексте");
+			Console.WriteLine($"[{ModuleName}] Базовая папка: {config?.BasePath ?? "N/A"}");
+		}
+
+		public override string Execute(string input)
+		{
+			if (!IsInitialized)
+				throw new InvalidOperationException("Модуль не инициализирован");
+
+			string result = $"Обработано: {input} (режим: {_config["ProcessingMode"]})";
+			_processedItems.Add(result);
+
+			// Симуляция нагрузки
+			System.Threading.Thread.Sleep(50);
+
+			return result;
+		}
+
+		public Dictionary<string, object> GetConfiguration()
+		{
+			return new Dictionary<string, object>(_config);
+		}
+
+		public void UpdateConfiguration(Dictionary<string, object> config)
+		{
+			foreach (var item in config)
+			{
+				_config[item.Key] = item.Value;
+			}
+			OnModuleEvent($"Конфигурация обновлена: {string.Join(", ", config.Keys)}");
+		}
+
+		public int GetProcessedCount() => _processedItems.Count;
+
+		public string GetStatistics()
+		{
+			return $"Обработано элементов: {_processedItems.Count}, " +
+				   $"Память: {GC.GetTotalMemory(false) / 1024} KB";
+		}
+	}
+
+	// Другой модуль с разными зависимостями
+	public class AnalyticsModule : BaseModule
+	{
+		public override string ModuleName => "Analytics Engine";
+		public override string Version => "1.5.0";
+
+		private Random _random = new Random();
+		private Dictionary<string, int> _metrics = new Dictionary<string, int>();
+
+		public override void Initialize(ModuleConfiguration config)
+		{
+			base.Initialize(config);
+			Console.WriteLine($"[{ModuleName}] Запуск аналитического движка");
+
+			// Инициализация метрик
+			_metrics["Processed"] = 0;
+			_metrics["Errors"] = 0;
+			_metrics["Warnings"] = 0;
+		}
+
+		public override string Execute(string input)
+		{
+			if (!IsInitialized)
+				throw new InvalidOperationException("Модуль не инициализирован");
+
+			_metrics["Processed"]++;
+
+			// Симуляция анализа
+			int score = AnalyzeData(input);
+			string result = $"Анализ: '{input}' → score: {score}/100";
+
+			if (score < 50)
+				_metrics["Warnings"]++;
+
+			return result;
+		}
+
+		private int AnalyzeData(string data)
+		{
+			// Упрощённый "анализ"
+			int lengthScore = Math.Min(data.Length * 2, 50);
+			int complexityScore = _random.Next(0, 50);
+			return lengthScore + complexityScore;
+		}
+
+		public Dictionary<string, int> GetMetrics()
+		{
+			return new Dictionary<string, int>(_metrics);
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				Console.WriteLine($"[{ModuleName}] Сохранение метрик...");
+				// Здесь могло бы быть сохранение в файл/БД
+			}
+			base.Dispose(disposing);
+		}
+	}
+
+	// Модуль, который симулирует использование разных версий библиотек
+	public class LegacyModule : BaseModule
+	{
+		public override string ModuleName => "Legacy Support";
+		public override string Version => "1.0.0";
+
+		private List<string> _legacyData = new List<string>();
+
+		public override void Initialize(ModuleConfiguration config)
+		{
+			base.Initialize(config);
+			Console.WriteLine($"[{ModuleName}] Запуск legacy-модуля (старая версия API)");
+
+			// Загрузка legacy данных
+			_legacyData.Add("LegacyItem1");
+			_legacyData.Add("LegacyItem2");
+		}
+
+		public override string Execute(string input)
+		{
+			_legacyData.Add(input);
+
+			// Старый формат вывода
+			return $"LEGACY_FORMAT:{input}:{DateTime.Now:yyyyMMdd}:{_legacyData.Count}";
+		}
+
+		public string[] GetLegacyData()
+		{
+			return _legacyData.ToArray();
+		}
+
+		// Устаревший метод (для демонстрации)
+		[Obsolete("Используйте Execute вместо этого метода")]
+		public string ProcessLegacy(string input)
+		{
+			return $"OLD: {input}";
+		}
+	}
+
+	// Класс для управления контекстами загрузки
+	public static class ModuleManager
+	{
+		private static Dictionary<string, (ModuleLoadContext context, WeakReference reference)>
+			_activeContexts = new Dictionary<string, (ModuleLoadContext, WeakReference)>();
+
+		public static ILoadableModule LoadModule(string moduleName, string assemblyPath, ModuleConfiguration config)
+		{
+			Console.WriteLine($"\n[MODULE MANAGER] Загрузка модуля: {moduleName}");
+			Console.WriteLine($"  Assembly: {Path.GetFileName(assemblyPath)}");
+			Console.WriteLine($"  Context: Изолированный");
+
+			// Создаём новый контекст для модуля
+			var moduleContext = new ModuleLoadContext(moduleName);
+
+			// Загружаем сборку в изолированный контекст
+			Assembly moduleAssembly = moduleContext.SafeLoadFromAssemblyPath(assemblyPath);
+			if (moduleAssembly == null)
+			{
+				throw new FileNotFoundException($"Не удалось загрузить сборку: {assemblyPath}");
+			}
+
+			// Ищем тип модуля
+			Type moduleType = moduleAssembly.GetTypes()
+				.FirstOrDefault(t => typeof(ILoadableModule).IsAssignableFrom(t) &&
+									!t.IsInterface && !t.IsAbstract);
+
+			if (moduleType == null)
+			{
+				throw new TypeLoadException($"В сборке не найден тип, реализующий ILoadableModule");
+			}
+
+			// Создаём экземпляр модуля
+			ILoadableModule module = (ILoadableModule)Activator.CreateInstance(moduleType);
+
+			// Инициализируем модуль
+			module.Initialize(config);
+
+			// Сохраняем контекст со слабой ссылкой
+			_activeContexts[moduleName] = (moduleContext, new WeakReference(module));
+
+			Console.WriteLine($"  [MODULE MANAGER] Модуль загружен в изолированный контекст");
+			moduleContext.PrintLoadedAssemblies();
+
+			return module;
+		}
+
+		public static bool TryUnloadModule(string moduleName)
+		{
+			Console.WriteLine($"\n[MODULE MANAGER] Попытка выгрузки модуля: {moduleName}");
+
+			if (!_activeContexts.TryGetValue(moduleName, out var contextInfo))
+			{
+				Console.WriteLine($"  Модуль не найден: {moduleName}");
+				return false;
+			}
+
+			var (context, weakRef) = contextInfo;
+
+			// Проверяем, есть ли активные ссылки на модуль
+			if (weakRef.IsAlive)
+			{
+				Console.WriteLine($"  Модуль всё ещё имеет активные ссылки, выгрузка невозможна");
+				return false;
+			}
+
+			try
+			{
+				// Подготавливаем контекст к выгрузке
+				context.PrepareForUnload();
+
+				// Инициируем выгрузку
+				context.Unload();
+
+				// Удаляем из словаря
+				_activeContexts.Remove(moduleName);
+
+				Console.WriteLine($"  Контекст модуля {moduleName} выгружен");
+				return true;
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"  Ошибка при выгрузке: {ex.Message}");
 				return false;
 			}
 		}
 
-		public static string GetPluginInfo(IPlugin plugin)
+		public static void PrintActiveContexts()
 		{
-			return $"{plugin.Name} v{plugin.Version} (инициализирован: {plugin != null})";
-		}
-	}
+			Console.WriteLine($"\n[MODULE MANAGER] Активные контексты загрузки:");
 
-	// Пример конфигурации плагина
-	public class PluginConfiguration
-	{
-		public string PluginPath { get; set; }
-		public bool AutoInitialize { get; set; }
-		public string[] AllowedAuthors { get; set; }
-		public TimeSpan Timeout { get; set; }
-
-		public PluginConfiguration()
-		{
-			AutoInitialize = true;
-			AllowedAuthors = new[] { "Company A", "Company B", "Company C" };
-			Timeout = TimeSpan.FromSeconds(30);
-		}
-	}
-
-	// Класс для демонстрации передачи сложных данных
-	public class ComplexData
-	{
-		public Guid Id { get; } = Guid.NewGuid();
-		public DateTime Timestamp { get; } = DateTime.Now;
-		public Dictionary<string, object> Properties { get; } = new Dictionary<string, object>();
-
-		public ComplexData(params (string key, object value)[] properties)
-		{
-			foreach (var (key, value) in properties)
+			if (_activeContexts.Count == 0)
 			{
-				Properties[key] = value;
+				Console.WriteLine("  Нет активных контекстов");
+				return;
 			}
-		}
 
-		public override string ToString()
-		{
-			return $"ComplexData[{Id}]: {Properties.Count} свойств";
+			foreach (var kvp in _activeContexts)
+			{
+				bool isAlive = kvp.Value.reference.IsAlive;
+				Console.WriteLine($"  - {kvp.Key}: ссылки активны = {isAlive}");
+			}
 		}
 	}
 }

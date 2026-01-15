@@ -1,401 +1,496 @@
 ﻿using System;
-using System.Reflection;
 using System.IO;
+using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Loader;
+using System.Threading.Tasks;
 
-namespace PluginHostApplication
+namespace AssemblyLoadContextHost
 {
 	class Program
 	{
-		static void Main()
+		static async Task Main()
 		{
-			Console.WriteLine("=== ДИНАМИЧЕСКАЯ ЗАГРУЗКА DLL ВО ВРЕМЯ ВЫПОЛНЕНИЯ ===\n");
+			Console.WriteLine("=== РАБОТА С КОНТЕКСТАМИ ЗАГРУЗКИ (AssemblyLoadContext) ===\n");
 
-			// Часть 1: Загрузка и обнаружение плагинов
-			Console.WriteLine("1. ЗАГРУЗКА И ОБНАРУЖЕНИЕ ПЛАГИНОВ:");
-			LoadAndDiscoverPlugins();
+			// Часть 1: Демонстрация разных контекстов загрузки
+			Console.WriteLine("1. ЗАГРУЗКА МОДУЛЕЙ В РАЗНЫХ КОНТЕКСТАХ:");
+			await DemonstrateMultipleContexts();
 
-			// Часть 2: Работа с контрактами
-			Console.WriteLine("\n2. РАБОТА ЧЕРЕЗ КОНТРАКТЫ:");
-			WorkThroughContracts();
+			// Часть 2: Управление жизненным циклом контекстов
+			Console.WriteLine("\n2. УПРАВЛЕНИЕ ЖИЗНЕННЫМ ЦИКЛОМ КОНТЕКСТОВ:");
+			await DemonstrateContextLifecycle();
 
-			// Часть 3: Обработка зависимостей и версий
-			Console.WriteLine("\n3. УПРАВЛЕНИЕ ЗАВИСИМОСТЯМИ И ВЕРСИЯМИ:");
-			ManageDependenciesAndVersions();
+			// Часть 3: Изоляция зависимостей
+			Console.WriteLine("\n3. ИЗОЛЯЦИЯ ЗАВИСИМОСТЕЙ В КОНТЕКСТАХ:");
+			await DemonstrateDependencyIsolation();
 
-			// Часть 4: Изоляция и обработка ошибок
-			Console.WriteLine("\n4. ИЗОЛЯЦИЯ И ОБРАБОТКА ОШИБОК:");
-			DemonstrateErrorIsolation();
+			// Часть 4: Проблемы с ссылками и их решение
+			Console.WriteLine("\n4. ПРОБЛЕМЫ С ССЫЛКАМИ И ВЫГРУЗКОЙ:");
+			await DemonstrateReferenceIssues();
 
-			// Часть 5: Динамическая замена плагинов
-			Console.WriteLine("\n5. ДИНАМИЧЕСКАЯ ЗАМЕНА ПЛАГИНОВ:");
-			DemonstrateDynamicReplacement();
+			// Часть 5: Работа с несколькими версиями библиотек
+			Console.WriteLine("\n5. НЕСКОЛЬКО ВЕРСИЙ БИБЛИОТЕК В РАЗНЫХ КОНТЕКСТАХ:");
+			await DemonstrateMultipleLibraryVersions();
 		}
 
-		static void LoadAndDiscoverPlugins()
+		static async Task DemonstrateMultipleContexts()
 		{
-			string pluginsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Plugins");
+			Console.WriteLine($"  ДЕМОНСТРАЦИЯ РАЗНЫХ КОНТЕКСТОВ ЗАГРУЗКИ:");
 
-			Console.WriteLine($"  Поиск плагинов в: {pluginsDirectory}");
-
-			if (!Directory.Exists(pluginsDirectory))
+			// Создаём тестовые конфигурации
+			var config1 = new AssemblyLoadContextDemo.ModuleConfiguration
 			{
-				Directory.CreateDirectory(pluginsDirectory);
-				Console.WriteLine($"  Создана директория для плагинов");
-				Console.WriteLine($"  Скопируйте скомпилированные DLL плагинов в эту папку");
-				return;
-			}
-
-			string[] dllFiles = Directory.GetFiles(pluginsDirectory, "*.dll");
-			Console.WriteLine($"  Найдено DLL файлов: {dllFiles.Length}");
-
-			List<Assembly> loadedAssemblies = new List<Assembly>();
-			List<Type> pluginTypes = new List<Type>();
-
-			foreach (string dllPath in dllFiles)
-			{
-				try
+				BasePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules", "DataProcessor"),
+				Settings = new Dictionary<string, string>
 				{
-					Console.WriteLine($"\n  Загрузка: {Path.GetFileName(dllPath)}");
-
-					// Загрузка сборки в домен приложения
-					Assembly assembly = Assembly.LoadFrom(dllPath);
-					loadedAssemblies.Add(assembly);
-
-					Console.WriteLine($"    Сборка загружена: {assembly.GetName().Name}");
-					Console.WriteLine($"    Версия: {assembly.GetName().Version}");
-					Console.WriteLine($"    Расположение: {Path.GetFileName(assembly.Location)}");
-
-					// Поиск типов, реализующих IPlugin
-					Type[] types = assembly.GetTypes();
-					foreach (Type type in types)
-					{
-						// Проверяем, реализует ли тип интерфейс IPlugin
-						if (typeof(DynamicLoadingDemo.IPlugin).IsAssignableFrom(type) &&
-							!type.IsInterface && !type.IsAbstract)
-						{
-							pluginTypes.Add(type);
-							Console.WriteLine($"    Найден плагин: {type.Name}");
-						}
-					}
+					["ProcessingMode"] = "Fast",
+					["LogLevel"] = "Info"
 				}
-				catch (ReflectionTypeLoadException ex)
-				{
-					Console.WriteLine($"    Ошибка загрузки типов: {ex.Message}");
-					Console.WriteLine($"    LoaderExceptions: {string.Join(", ", ex.LoaderExceptions.Select(e => e.Message))}");
-				}
-				catch (FileLoadException ex)
-				{
-					Console.WriteLine($"    Ошибка загрузки файла: {ex.Message}");
-					Console.WriteLine($"    FusionLog: {ex.FusionLog}");
-				}
-				catch (BadImageFormatException ex)
-				{
-					Console.WriteLine($"    Некорректный формат DLL: {ex.Message}");
-					Console.WriteLine($"    Возможно, DLL скомпилирована для другой версии .NET");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"    Общая ошибка: {ex.GetType().Name}: {ex.Message}");
-				}
-			}
-
-			Console.WriteLine($"\n  ИТОГО: Загружено сборок: {loadedAssemblies.Count}, Найдено плагинов: {pluginTypes.Count}");
-
-			// Создание и инициализация плагинов
-			if (pluginTypes.Count > 0)
-			{
-				Console.WriteLine($"\n  ИНИЦИАЛИЗАЦИЯ ПЛАГИНОВ:");
-				List<DynamicLoadingDemo.IPlugin> initializedPlugins = new List<DynamicLoadingDemo.IPlugin>();
-
-				foreach (Type pluginType in pluginTypes)
-				{
-					try
-					{
-						Console.Write($"    {pluginType.Name}: ");
-
-						// Создание экземпляра плагина
-						DynamicLoadingDemo.IPlugin plugin = (DynamicLoadingDemo.IPlugin)Activator.CreateInstance(pluginType);
-
-						// Инициализация
-						plugin.Initialize();
-
-						initializedPlugins.Add(plugin);
-						Console.WriteLine($"успешно");
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine($"ошибка: {ex.Message}");
-					}
-				}
-
-				Console.WriteLine($"\n  Инициализировано плагинов: {initializedPlugins.Count}/{pluginTypes.Count}");
-			}
-		}
-
-		static void WorkThroughContracts()
-		{
-			Console.WriteLine($"  РАБОТА ЧЕРЕЗ ИНТЕРФЕЙСЫ (КОНТРАКТЫ):");
-
-			// Симуляция загрузки плагинов
-			var plugins = new List<DynamicLoadingDemo.IPlugin>
-			{
-				new DynamicLoadingDemo.TextProcessorPlugin(),
-				new DynamicLoadingDemo.AdvancedDataPlugin(),
-				new DynamicLoadingDemo.MathPlugin()
 			};
 
-			// Инициализация всех плагинов
-			foreach (var plugin in plugins)
+			var config2 = new AssemblyLoadContextDemo.ModuleConfiguration
 			{
-				try
+				BasePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules", "Analytics"),
+				Settings = new Dictionary<string, string>
 				{
-					plugin.Initialize();
+					["SamplingRate"] = "0.5",
+					["MaxMemory"] = "100MB"
 				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"    Ошибка инициализации {plugin.Name}: {ex.Message}");
-				}
-			}
+			};
 
-			// Работа через контракт IPlugin
-			Console.WriteLine($"\n  ОБРАБОТКА ДАННЫХ ЧЕРЕЗ IPlugin:");
-			string testData = "Пример данных для обработки";
+			// Получаем путь к текущей сборке (для симуляции загрузки DLL)
+			string currentAssemblyPath = Assembly.GetExecutingAssembly().Location;
+			string currentDirectory = Path.GetDirectoryName(currentAssemblyPath);
 
-			foreach (var plugin in plugins)
-			{
-				try
-				{
-					string result = plugin.Process(testData);
-					Console.WriteLine($"    {plugin.Name}: {result}");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"    {plugin.Name}: ошибка - {ex.Message}");
-				}
-			}
+			// Симуляция загрузки модулей через ModuleManager
+			Console.WriteLine($"\n  Симуляция загрузки модулей...");
 
-			// Работа через дополнительный интерфейс IDataProcessor
-			Console.WriteLine($"\n  ОБРАБОТКА ЧЕРЕЗ ДОПОЛНИТЕЛЬНЫЕ ИНТЕРФЕЙСЫ:");
-
-			var complexData = new DynamicLoadingDemo.ComplexData(
-				("Name", "Test Object"),
-				("Value", 123),
-				("Timestamp", DateTime.Now)
-			);
-
-			foreach (var plugin in plugins)
-			{
-				if (plugin is DynamicLoadingDemo.IDataProcessor dataProcessor)
-				{
-					string result = dataProcessor.ProcessData(complexData);
-					Console.WriteLine($"    {plugin.Name} как IDataProcessor: {result}");
-				}
-			}
-
-			// Вызов специфичных методов (если доступны через конкретный тип)
-			Console.WriteLine($"\n  ДОСТУП К СПЕЦИФИЧНЫМ МЕТОДАМ:");
-
-			foreach (var plugin in plugins)
-			{
-				if (plugin is DynamicLoadingDemo.AdvancedDataPlugin advancedPlugin)
-				{
-					string analysis = advancedPlugin.Analyze(testData);
-					Console.WriteLine($"    AdvancedDataPlugin.Analyze(): {analysis}");
-				}
-				else if (plugin is DynamicLoadingDemo.MathPlugin mathPlugin)
-				{
-					double expression = mathPlugin.CalculateExpression(testData);
-					Console.WriteLine($"    MathPlugin.CalculateExpression(): {expression:F2}");
-				}
-				else if (plugin is DynamicLoadingDemo.TextProcessorPlugin textPlugin)
-				{
-					// Получаем специфичный метод через reflection
-					Type type = plugin.GetType();
-					MethodInfo countMethod = type.GetMethod("GetProcessedCount");
-
-					if (countMethod != null)
-					{
-						int count = (int)countMethod.Invoke(plugin, null);
-						Console.WriteLine($"    TextProcessorPlugin.GetProcessedCount(): {count}");
-					}
-				}
-			}
-		}
-
-		static void ManageDependenciesAndVersions()
-		{
-			Console.WriteLine($"  УПРАВЛЕНИЕ ВЕРСИЯМИ И ЗАВИСИМОСТЯМИ:");
-
-			// Создание плагинов с разными версиями
-			var plugins = new DynamicLoadingDemo.IPlugin[]
-			{
-				new DynamicLoadingDemo.TextProcessorPlugin(),      // v1.0.0
-                new DynamicLoadingDemo.AdvancedDataPlugin(),       // v2.0.0
-                new DynamicLoadingDemo.MathPlugin()                // v1.5.0
-            };
-
-			string hostVersion = "1.1.0";
-			Console.WriteLine($"    Версия хоста: {hostVersion}");
-
-			Console.WriteLine($"\n    ПРОВЕРКА СОВМЕСТИМОСТИ ВЕРСИЙ:");
-			foreach (var plugin in plugins)
-			{
-				bool isCompatible = DynamicLoadingDemo.PluginHostUtilities.ValidatePluginVersion(
-					plugin.Version, hostVersion);
-
-				string status = isCompatible ? "совместим" : "не совместим";
-				Console.WriteLine($"      {plugin.Name} v{plugin.Version}: {status}");
-			}
-
-			Console.WriteLine($"\n    ЧТЕНИЕ МЕТАДАННЫХ ПЛАГИНОВ:");
-			foreach (var plugin in plugins)
-			{
-				Type pluginType = plugin.GetType();
-				var metadataAttr = (DynamicLoadingDemo.PluginMetadataAttribute)
-					Attribute.GetCustomAttribute(pluginType, typeof(DynamicLoadingDemo.PluginMetadataAttribute));
-
-				if (metadataAttr != null)
-				{
-					Console.WriteLine($"      {plugin.Name}:");
-					Console.WriteLine($"        Автор: {metadataAttr.Author}");
-					Console.WriteLine($"        Описание: {metadataAttr.Description}");
-					Console.WriteLine($"        Требуемая версия хоста: {metadataAttr.RequiredHostVersion}");
-				}
-			}
-
-			Console.WriteLine($"\n    ПРОВЕРКА ЗАВИСИМОСТЕЙ:");
-			// Симуляция проверки зависимостей сборки
 			try
 			{
-				Assembly mathAssembly = Assembly.GetAssembly(typeof(DynamicLoadingDemo.MathPlugin));
-				AssemblyName[] references = mathAssembly.GetReferencedAssemblies();
+				// Создаём модули напрямую (в реальности они загружались бы из DLL)
+				// В реальном приложении здесь был бы вызов ModuleManager.LoadModule()
 
-				Console.WriteLine($"      MathPlugin зависимости:");
-				foreach (var reference in references.Take(3)) // Показываем только первые 3
-				{
-					Console.WriteLine($"        - {reference.Name} v{reference.Version}");
-				}
-				if (references.Length > 3)
-					Console.WriteLine($"        ... и ещё {references.Length - 3} зависимостей");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"      Ошибка при проверке зависимостей: {ex.Message}");
-			}
-		}
+				// Создаём первый изолированный контекст
+				Console.WriteLine($"\n  Создаём контекст для DataProcessor:");
+				var context1 = new AssemblyLoadContextDemo.ModuleLoadContext("DataProcessor");
 
-		static void DemonstrateErrorIsolation()
-		{
-			Console.WriteLine($"  ИЗОЛЯЦИЯ ОШИБОК ПЛАГИНОВ:");
+				// Загружаем сборку в контекст (симуляция)
+				Console.WriteLine($"    Контекст создан: DataProcessor (IsCollectible: {context1.IsCollectible})");
 
-			var plugins = new DynamicLoadingDemo.IPlugin[]
-			{
-				new DynamicLoadingDemo.TextProcessorPlugin(),
-				new DynamicLoadingDemo.BuggyPlugin(),  // Плагин с ошибками
-                new DynamicLoadingDemo.MathPlugin()
-			};
+				// Создаём второй изолированный контекст
+				Console.WriteLine($"\n  Создаём контекст для Analytics:");
+				var context2 = new AssemblyLoadContextDemo.ModuleLoadContext("Analytics");
+				Console.WriteLine($"    Контекст создан: Analytics (IsCollectible: {context2.IsCollectible})");
 
-			// Инициализация с изоляцией ошибок
-			Console.WriteLine($"\n    ИНИЦИАЛИЗАЦИЯ С ОБРАБОТКОЙ ОШИБОК:");
-			int successful = 0;
+				// Создаём модули в разных контекстах
+				var module1 = new AssemblyLoadContextDemo.DataProcessorModule();
+				var module2 = new AssemblyLoadContextDemo.AnalyticsModule();
 
-			foreach (var plugin in plugins)
-			{
-				try
-				{
-					plugin.Initialize();
-					successful++;
-					Console.WriteLine($"      {plugin.Name}: успешно");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"      {plugin.Name}: ОШИБКА - {ex.Message}");
-					// Ошибка одного плагина не должна влиять на другие
-				}
-			}
+				// Инициализируем модули
+				module1.Initialize(config1);
+				module2.Initialize(config2);
 
-			Console.WriteLine($"      Инициализировано: {successful}/{plugins.Length}");
+				// Демонстрация работы модулей
+				Console.WriteLine($"\n  ВЫПОЛНЕНИЕ МОДУЛЕЙ В РАЗНЫХ КОНТЕКСТАХ:");
 
-			// Обработка данных с изоляцией ошибок
-			Console.WriteLine($"\n    ОБРАБОТКА ДАННЫХ С ОБРАБОТКОЙ ОШИБОК:");
-			string[] testInputs = { "test", "crash", "123", "" };
-
-			foreach (var plugin in plugins.Where(p => p != null))
-			{
-				Console.WriteLine($"\n      {plugin.Name}:");
+				string[] testInputs = { "Test1", "Test2", "Test3" };
 
 				foreach (string input in testInputs)
 				{
-					try
-					{
-						string result = plugin.Process(input);
-						Console.WriteLine($"        '{input}' -> {result}");
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine($"        '{input}' -> ОШИБКА: {ex.GetType().Name}: {ex.Message}");
-						// Продолжаем обработку следующих входных данных
-					}
+					string result1 = module1.Execute(input);
+					string result2 = module2.Execute(input);
+
+					Console.WriteLine($"    DataProcessor: {result1}");
+					Console.WriteLine($"    Analytics:     {result2}");
 				}
-			}
-		}
 
-		static void DemonstrateDynamicReplacement()
-		{
-			Console.WriteLine($"  ДИНАМИЧЕСКАЯ ЗАМЕНА ПЛАГИНОВ:");
+				// Проверка статистики
+				Console.WriteLine($"\n  СТАТИСТИКА МОДУЛЕЙ:");
+				Console.WriteLine($"    DataProcessor обработал: {GetProcessedCount(module1)} элементов");
+				Console.WriteLine($"    Analytics метрики: {string.Join(", ", GetMetrics(module2))}");
 
-			// Симуляция загрузки плагина из "новой версии"
-			Console.WriteLine($"\n    СИМУЛЯЦИЯ ОБНОВЛЕНИЯ ПЛАГИНА:");
+				// Освобождение ресурсов
+				Console.WriteLine($"\n  ОСВОБОЖДЕНИЕ РЕСУРСОВ:");
+				module1.Shutdown();
+				module2.Shutdown();
 
-			try
-			{
-				// Создаем "старый" плагин
-				DynamicLoadingDemo.IPlugin oldPlugin = new DynamicLoadingDemo.TextProcessorPlugin();
-				oldPlugin.Initialize();
+				// Очистка контекстов
+				context1.PrepareForUnload();
+				context2.PrepareForUnload();
 
-				Console.WriteLine($"      Старый плагин: {oldPlugin.Name} v{oldPlugin.Version}");
-				string oldResult = oldPlugin.Process("test");
-				Console.WriteLine($"      Результат старого: {oldResult}");
-
-				// Симуляция загрузки "нового" плагина
-				Console.WriteLine($"\n      Загрузка новой версии...");
-
-				// В реальном приложении здесь была бы загрузка из новой DLL
-				// Для демонстрации создаем другой плагин
-				DynamicLoadingDemo.IPlugin newPlugin = new DynamicLoadingDemo.AdvancedDataPlugin();
-				newPlugin.Initialize();
-
-				Console.WriteLine($"      Новый плагин: {newPlugin.Name} v{newPlugin.Version}");
-				string newResult = newPlugin.Process("test");
-				Console.WriteLine($"      Результат нового: {newResult}");
-
-				// Демонстрация горячей замены
-				Console.WriteLine($"\n      ГОРЯЧАЯ ЗАМЕНА ПЛАГИНОВ:");
-
-				// Создаем список активных плагинов
-				var activePlugins = new List<DynamicLoadingDemo.IPlugin> { oldPlugin };
-				Console.WriteLine($"      Активные плагины до замены: {string.Join(", ", activePlugins.Select(p => p.Name))}");
-
-				// Заменяем плагин
-				activePlugins.Remove(oldPlugin);
-				activePlugins.Add(newPlugin);
-
-				Console.WriteLine($"      Активные плагины после замены: {string.Join(", ", activePlugins.Select(p => p.Name))}");
-
-				// Проверка работы после замены
-				Console.WriteLine($"\n      ПРОВЕРКА РАБОТЫ ПОСЛЕ ЗАМЕНЫ:");
-				foreach (var plugin in activePlugins)
-				{
-					string result = plugin.Process("новые данные");
-					Console.WriteLine($"        {plugin.Name}: {result}");
-				}
+				Console.WriteLine($"    Контексты подготовлены к выгрузке");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"      Ошибка при динамической замене: {ex.Message}");
+				Console.WriteLine($"    Ошибка: {ex.GetType().Name}: {ex.Message}");
 			}
+		}
+
+		static async Task DemonstrateContextLifecycle()
+		{
+			Console.WriteLine($"  УПРАВЛЕНИЕ ЖИЗНЕННЫМ ЦИКЛОМ КОНТЕКСТОВ:");
+
+			// Демонстрация выгрузки контекстов
+			Console.WriteLine($"\n  ТЕСТ ВЫГРУЗКИ КОНТЕКСТОВ:");
+
+			WeakReference contextRef = null;
+			WeakReference moduleRef = null;
+
+			// Создаём и используем контекст в отдельной области видимости
+			{
+				Console.WriteLine($"\n  1. Создание контекста и модуля...");
+				var config = new AssemblyLoadContextDemo.ModuleConfiguration
+				{
+					BasePath = "TestPath",
+					Settings = new Dictionary<string, string> { ["Test"] = "Value" }
+				};
+
+				var localContext = new AssemblyLoadContextDemo.ModuleLoadContext("TemporaryModule");
+				var localModule = new AssemblyLoadContextDemo.DataProcessorModule();
+				localModule.Initialize(config);
+
+				// Сохраняем слабые ссылки
+				contextRef = new WeakReference(localContext);
+				moduleRef = new WeakReference(localModule);
+
+				// Используем модуль
+				string result = localModule.Execute("Test data");
+				Console.WriteLine($"    Результат: {result}");
+				Console.WriteLine($"    Обработано: {GetProcessedCount(localModule)} элементов");
+
+				// Явно завершаем работу модуля
+				localModule.Shutdown();
+
+				Console.WriteLine($"\n  2. Выход из области видимости...");
+				// localContext и localModule выходят из области видимости
+			}
+
+			// Сборка мусора
+			Console.WriteLine($"\n  3. Принудительная сборка мусора...");
+			GC.Collect();
+			GC.WaitForPendingFinalizers();
+			GC.Collect();
+
+			await Task.Delay(1000); // Даём время на завершение
+
+			// Проверяем, остались ли ссылки
+			Console.WriteLine($"\n  4. Проверка ссылок после сборки мусора:");
+			bool contextAlive = contextRef?.IsAlive == true;
+			bool moduleAlive = moduleRef?.IsAlive == true;
+
+			Console.WriteLine($"    Контекст жив: {contextAlive}");
+			Console.WriteLine($"    Модуль жив: {moduleAlive}");
+
+			if (!contextAlive && !moduleAlive)
+			{
+				Console.WriteLine($"    ✓ Контекст и модуль успешно выгружены!");
+			}
+			else
+			{
+				Console.WriteLine($"    ✗ Обнаружены утечки ссылок!");
+			}
+
+			// Демонстрация с ModuleManager
+			Console.WriteLine($"\n  5. ИСПОЛЬЗОВАНИЕ ModuleManager:");
+
+			// Симуляция загрузки через менеджер
+			Console.WriteLine($"    Загрузка модулей через менеджер...");
+			// В реальном приложении здесь был бы вызов ModuleManager.LoadModule()
+
+			AssemblyLoadContextDemo.ModuleManager.PrintActiveContexts();
+		}
+
+		static async Task DemonstrateDependencyIsolation()
+		{
+			Console.WriteLine($"  ИЗОЛЯЦИЯ ЗАВИСИМОСТЕЙ В РАЗНЫХ КОНТЕКСТАХ:");
+
+			// Создаём два контекста с разными настройками путей зависимостей
+			Console.WriteLine($"\n  Контекст 1: Зависимости из папки 'Deps1'");
+			var context1 = new AssemblyLoadContextDemo.ModuleLoadContext("Module1",
+				Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Deps1"));
+
+			Console.WriteLine($"\n  Контекст 2: Зависимости из папки 'Deps2'");
+			var context2 = new AssemblyLoadContextDemo.ModuleLoadContext("Module2",
+				Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Deps2"));
+
+			// Демонстрация загрузки одной и той же сборки в разные контексты
+			Console.WriteLine($"\n  ДЕМОНСТРАЦИЯ ИЗОЛЯЦИИ:");
+
+			try
+			{
+				// Симуляция загрузки сборок
+				string testAssemblyPath = Assembly.GetExecutingAssembly().Location;
+
+				Console.WriteLine($"\n  Загрузка одной сборки в разные контексты:");
+				Console.WriteLine($"    Сборка: {Path.GetFileName(testAssemblyPath)}");
+
+				// В реальном приложении здесь были бы разные версии DLL
+				var assembly1 = context1.SafeLoadFromAssemblyPath(testAssemblyPath);
+				var assembly2 = context2.SafeLoadFromAssemblyPath(testAssemblyPath);
+
+				if (assembly1 != null && assembly2 != null)
+				{
+					Console.WriteLine($"    Загружено в контекст 1: {assembly1.GetName().Name}");
+					Console.WriteLine($"    Загружено в контекст 2: {assembly2.GetName().Name}");
+
+					// Демонстрация, что это разные экземпляры
+					Console.WriteLine($"    Сборки одинаковые: {assembly1 == assembly2}");
+					Console.WriteLine($"    Сборки эквивалентны: {Equals(assembly1.GetName(), assembly2.GetName())}");
+				}
+
+				// Проверка загрузки системных сборок
+				Console.WriteLine($"\n  ПРОВЕРКА СИСТЕМНЫХ СБОРОК:");
+
+				// System.Runtime должна загружаться из контекста по умолчанию
+				var systemRuntime1 = context1.LoadFromAssemblyName(
+					new AssemblyName("System.Runtime, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a"));
+
+				var systemRuntime2 = context2.LoadFromAssemblyName(
+					new AssemblyName("System.Runtime, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a"));
+
+				Console.WriteLine($"    System.Runtime в контексте 1: {systemRuntime1 != null}");
+				Console.WriteLine($"    System.Runtime в контексте 2: {systemRuntime2 != null}");
+
+				// Очистка
+				context1.PrepareForUnload();
+				context2.PrepareForUnload();
+
+				Console.WriteLine($"\n    Контексты подготовлены к выгрузке");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"    Ошибка: {ex.Message}");
+			}
+		}
+
+		static async Task DemonstrateReferenceIssues()
+		{
+			Console.WriteLine($"  ПРОБЛЕМЫ С ССЫЛКАМИ И ВЫГРУЗКОЙ КОНТЕКСТОВ:");
+
+			// Сценарий 1: Сохранение сильной ссылки
+			Console.WriteLine($"\n  1. ПРОБЛЕМА: СОХРАНЕНИЕ СИЛЬНОЙ ССЫЛКИ");
+
+			AssemblyLoadContextDemo.ModuleLoadContext problematicContext = null;
+			WeakReference weakContextRef = null;
+			WeakReference weakModuleRef = null;
+
+			// Область видимости для демонстрации проблемы
+			{
+				var localContext = new AssemblyLoadContextDemo.ModuleLoadContext("Problematic");
+				var localModule = new AssemblyLoadContextDemo.DataProcessorModule();
+				localModule.Initialize(new AssemblyLoadContextDemo.ModuleConfiguration());
+
+				// ПРОБЛЕМА: сохраняем сильную ссылку вне области видимости
+				problematicContext = localContext;
+
+				weakContextRef = new WeakReference(localContext);
+				weakModuleRef = new WeakReference(localModule);
+
+				Console.WriteLine($"    Создан контекст и модуль");
+				Console.WriteLine($"    Сильная ссылка на контекст сохранена");
+
+				localModule.Execute("Test");
+				localModule.Shutdown();
+			}
+
+			// Попытка сборки мусора
+			GC.Collect();
+			GC.WaitForPendingFinalizers();
+			GC.Collect();
+			await Task.Delay(500);
+
+			Console.WriteLine($"\n    После сборки мусора:");
+			Console.WriteLine($"    Контекст жив (сильная ссылка): {problematicContext != null}");
+			Console.WriteLine($"    Контекст жив (слабая ссылка): {weakContextRef?.IsAlive}");
+			Console.WriteLine($"    Модуль жив: {weakModuleRef?.IsAlive}");
+
+			// Очистка сильной ссылки
+			problematicContext = null;
+			Console.WriteLine($"\n    Сильная ссылка очищена");
+
+			// Ещё одна сборка мусора
+			GC.Collect();
+			GC.WaitForPendingFinalizers();
+			GC.Collect();
+			await Task.Delay(500);
+
+			Console.WriteLine($"\n    После очистки сильной ссылки:");
+			Console.WriteLine($"    Контекст жив: {weakContextRef?.IsAlive}");
+			Console.WriteLine($"    Модуль жив: {weakModuleRef?.IsAlive}");
+
+			// Сценарий 2: События и утечки
+			Console.WriteLine($"\n  2. ПРОБЛЕМА: СОБЫТИЯ И УТЕЧКИ ПАМЯТИ");
+
+			WeakReference eventContextRef = null;
+			WeakReference eventModuleRef = null;
+
+			{
+				var eventContext = new AssemblyLoadContextDemo.ModuleLoadContext("EventTest");
+				var eventModule = new AssemblyLoadContextDemo.DataProcessorModule();
+
+				// ПОДПИСКА НА СОБЫТИЕ создаёт сильную ссылку
+				eventModule.ModuleEvent += (sender, args) =>
+					Console.WriteLine($"      Событие: {args}");
+
+				eventContextRef = new WeakReference(eventContext);
+				eventModuleRef = new WeakReference(eventModule);
+
+				Console.WriteLine($"    Создан модуль с подпиской на событие");
+			}
+
+			// Сборка мусора
+			GC.Collect();
+			GC.WaitForPendingFinalizers();
+			GC.Collect();
+			await Task.Delay(500);
+
+			Console.WriteLine($"\n    Модуль с подпиской на событие:");
+			Console.WriteLine($"    Контекст жив: {eventContextRef?.IsAlive}");
+			Console.WriteLine($"    Модуль жив: {eventModuleRef?.IsAlive}");
+
+			if (eventModuleRef?.IsAlive == true)
+			{
+				Console.WriteLine($"    ✓ Доказана проблема: событие держит ссылку на модуль");
+			}
+		}
+
+		static async Task DemonstrateMultipleLibraryVersions()
+		{
+			Console.WriteLine($"  НЕСКОЛЬКО ВЕРСИЙ БИБЛИОТЕК В РАЗНЫХ КОНТЕКСТАХ:");
+
+			Console.WriteLine($"\n  СЦЕНАРИЙ: Модули с разными версиями библиотек");
+
+			// Конфигурации для модулей
+			var legacyConfig = new AssemblyLoadContextDemo.ModuleConfiguration
+			{
+				BasePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Legacy"),
+				Settings = new Dictionary<string, string> { ["CompatibilityMode"] = "Legacy" }
+			};
+
+			var modernConfig = new AssemblyLoadContextDemo.ModuleConfiguration
+			{
+				BasePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modern"),
+				Settings = new Dictionary<string, string> { ["CompatibilityMode"] = "Modern" }
+			};
+
+			try
+			{
+				// Создаём контексты для разных версий
+				Console.WriteLine($"\n  1. Создание контекстов:");
+				var legacyContext = new AssemblyLoadContextDemo.ModuleLoadContext("LegacyModule");
+				var modernContext = new AssemblyLoadContextDemo.ModuleLoadContext("ModernModule");
+
+				// Создаём модули разных поколений
+				Console.WriteLine($"\n  2. Создание модулей разных версий:");
+				var legacyModule = new AssemblyLoadContextDemo.LegacyModule();
+				var modernModule = new AssemblyLoadContextDemo.DataProcessorModule();
+
+				// Инициализация
+				legacyModule.Initialize(legacyConfig);
+				modernModule.Initialize(modernConfig);
+
+				// Демонстрация работы
+				Console.WriteLine($"\n  3. ВЫПОЛНЕНИЕ В РАЗНЫХ КОНТЕКСТАХ:");
+
+				string testData = "SharedTestData";
+
+				string legacyResult = legacyModule.Execute(testData);
+				string modernResult = modernModule.Execute(testData);
+
+				Console.WriteLine($"    LegacyModule: {legacyResult}");
+				Console.WriteLine($"    ModernModule: {modernResult}");
+
+				// Демонстрация различий в API
+				Console.WriteLine($"\n  4. РАЗЛИЧИЯ В API:");
+
+				Type legacyType = legacyModule.GetType();
+				Type modernType = modernModule.GetType();
+
+				Console.WriteLine($"    LegacyModule методы: {string.Join(", ", legacyType.GetMethods().Select(m => m.Name).Take(5))}");
+				Console.WriteLine($"    ModernModule методы: {string.Join(", ", modernType.GetMethods().Select(m => m.Name).Take(5))}");
+
+				// Проверка устаревших методов
+				var obsoleteMethod = legacyType.GetMethod("ProcessLegacy");
+				if (obsoleteMethod != null)
+				{
+					var obsoleteAttr = obsoleteMethod.GetCustomAttribute<ObsoleteAttribute>();
+					if (obsoleteAttr != null)
+					{
+						Console.WriteLine($"    LegacyModule.ProcessLegacy устарел: {obsoleteAttr.Message}");
+					}
+				}
+
+				// Очистка
+				Console.WriteLine($"\n  5. ОЧИСТКА КОНТЕКСТОВ:");
+				legacyModule.Shutdown();
+				modernModule.Shutdown();
+
+				legacyContext.PrepareForUnload();
+				modernContext.PrepareForUnload();
+
+				Console.WriteLine($"    Контексты подготовлены к выгрузке");
+
+				// Проверка возможности горячей замены
+				Console.WriteLine($"\n  6. ДЕМОНСТРАЦИЯ ГОРЯЧЕЙ ЗАМЕНЫ:");
+
+				// Симуляция: выгружаем старый, загружаем новый
+				Console.WriteLine($"    Выгрузка LegacyModule...");
+				// В реальности: legacyContext.Unload();
+
+				Console.WriteLine($"    Загрузка новой версии...");
+				var newContext = new AssemblyLoadContextDemo.ModuleLoadContext("UpdatedModule");
+				var updatedModule = new AssemblyLoadContextDemo.DataProcessorModule();
+				updatedModule.Initialize(modernConfig);
+
+				string updatedResult = updatedModule.Execute("New data");
+				Console.WriteLine($"    Обновлённый модуль: {updatedResult}");
+
+				updatedModule.Shutdown();
+				newContext.PrepareForUnload();
+
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"    Ошибка: {ex.GetType().Name}: {ex.Message}");
+			}
+		}
+
+		// Вспомогательные методы для доступа к защищённым данным
+		static int GetProcessedCount(AssemblyLoadContextDemo.DataProcessorModule module)
+		{
+			try
+			{
+				var method = module.GetType().GetMethod("GetProcessedCount",
+					System.Reflection.BindingFlags.Public |
+					System.Reflection.BindingFlags.Instance);
+
+				return method != null ? (int)method.Invoke(module, null) : 0;
+			}
+			catch
+			{
+				return 0;
+			}
+		}
+
+		static string GetMetrics(AssemblyLoadContextDemo.AnalyticsModule module)
+		{
+			try
+			{
+				var method = module.GetType().GetMethod("GetMetrics",
+					System.Reflection.BindingFlags.Public |
+					System.Reflection.BindingFlags.Instance);
+
+				if (method != null)
+				{
+					var metrics = (Dictionary<string, int>)method.Invoke(module, null);
+					return string.Join(", ", metrics.Select(kv => $"{kv.Key}: {kv.Value}"));
+				}
+			}
+			catch { }
+
+			return "N/A";
 		}
 	}
 }
