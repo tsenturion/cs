@@ -1,196 +1,264 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 
-namespace ReflectionDemoLibrary
+namespace DynamicLoadingDemo
 {
-	// Интерфейс для демонстрации контрактов
+	// Общие контракты - будут известны и хосту, и плагинам
 	public interface IPlugin
 	{
 		string Name { get; }
-		void Execute();
-		string GetInfo();
+		string Version { get; }
+		void Initialize();
+		string Process(string input);
 	}
 
-	// Атрибут для метаданных - может быть прочитан через Reflection
+	public interface IDataProcessor
+	{
+		string ProcessData(object data);
+		bool CanProcess(Type dataType);
+	}
+
+	// Атрибут для маркировки плагинов
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-	public class PluginAttribute : Attribute
+	public class PluginMetadataAttribute : Attribute
 	{
+		public string Author { get; }
 		public string Description { get; }
-		public string Version { get; }
+		public string RequiredHostVersion { get; }
 
-		public PluginAttribute(string description, string version = "1.0.0")
+		public PluginMetadataAttribute(string author, string description, string requiredHostVersion = "1.0.0")
 		{
+			Author = author;
 			Description = description;
-			Version = version;
+			RequiredHostVersion = requiredHostVersion;
 		}
 	}
 
-	// Публичные классы - доступны через Reflection
-	[Plugin("Базовая реализация плагина", "1.0.0")]
-	public class SimplePlugin : IPlugin
+	// Базовый класс для плагинов с общими функциями
+	public abstract class PluginBase
 	{
-		public string Name => "Simple Plugin";
+		protected bool IsInitialized { get; private set; }
 
-		public void Execute()
+		public virtual void Initialize()
 		{
-			Console.WriteLine($"[{Name}] Выполнение через прямой вызов");
+			IsInitialized = true;
 		}
 
-		public string GetInfo()
+		protected void EnsureInitialized()
 		{
-			return $"Плагин: {Name}, Версия: 1.0";
-		}
-
-		// Публичный метод с параметрами
-		public int Calculate(int a, int b)
-		{
-			return a + b;
-		}
-
-		// Приватный метод - не виден через обычный Reflection без флагов
-		private string GetPrivateData()
-		{
-			return "Секретные данные";
-		}
-
-		// Internal метод - виден только внутри сборки
-		internal string GetInternalData()
-		{
-			return "Внутренние данные";
+			if (!IsInitialized)
+				throw new InvalidOperationException("Плагин не инициализирован");
 		}
 	}
 
-	// Ещё один плагин с другим атрибутом
-	[Plugin("Расширенная версия плагина", "2.0.0")]
-	public class AdvancedPlugin : IPlugin
+	// Пример плагина версии 1.0
+	[PluginMetadata("Company A", "Плагин для обработки текста", "1.0.0")]
+	public class TextProcessorPlugin : PluginBase, IPlugin
 	{
-		public string Name => "Advanced Plugin";
+		public string Name => "Text Processor";
+		public string Version => "1.0.0";
 
-		public void Execute()
+		private List<string> processedItems = new List<string>();
+
+		public override void Initialize()
 		{
-			Console.WriteLine($"[{Name}] Расширенное выполнение");
+			base.Initialize();
+			Console.WriteLine($"[{Name}] Инициализация плагина текстовой обработки");
 		}
 
-		public string GetInfo()
+		public string Process(string input)
 		{
-			return $"Продвинутый плагин версии 2.0";
+			EnsureInitialized();
+
+			string result = $"Обработан текст: {input.ToUpper()}";
+			processedItems.Add(result);
+			return result;
 		}
 
-		// Новый метод в расширенной версии
-		public string ProcessData(string input)
+		public int GetProcessedCount() => processedItems.Count;
+	}
+
+	// Пример плагина версии 2.0 с новым функционалом
+	[PluginMetadata("Company B", "Расширенный плагин обработки", "1.1.0")]
+	public class AdvancedDataPlugin : PluginBase, IPlugin, IDataProcessor
+	{
+		public string Name => "Advanced Data Processor";
+		public string Version => "2.0.0";
+
+		public override void Initialize()
 		{
-			return $"Обработано: {input.ToUpper()}";
+			base.Initialize();
+			Console.WriteLine($"[{Name}] Инициализация расширенного плагина");
+			LoadConfiguration();
+		}
+
+		private void LoadConfiguration()
+		{
+			// Симуляция загрузки конфигурации
+			Console.WriteLine($"[{Name}] Загрузка конфигурации...");
+		}
+
+		public string Process(string input)
+		{
+			EnsureInitialized();
+
+			if (string.IsNullOrEmpty(input))
+				throw new ArgumentException("Входные данные не могут быть пустыми");
+
+			return $"Расширенная обработка: {input} (длина: {input.Length})";
+		}
+
+		public string ProcessData(object data)
+		{
+			if (data == null)
+				return "Данные отсутствуют";
+
+			return $"Обработаны данные типа {data.GetType().Name}: {data}";
+		}
+
+		public bool CanProcess(Type dataType)
+		{
+			return dataType != null && dataType != typeof(void);
+		}
+
+		// Новый метод в версии 2.0
+		public string Analyze(string data)
+		{
+			return $"Анализ данных: сложность = {data.Length * 0.5:F1}";
 		}
 	}
 
-	// Класс с несколькими методами для демонстрации Reflection
-	public class Calculator
+	// Плагин с зависимостью от сторонней библиотеки (симуляция)
+	[PluginMetadata("Company C", "Математический плагин с зависимостями")]
+	public class MathPlugin : PluginBase, IPlugin
 	{
-		public int Add(int a, int b) => a + b;
-		public int Subtract(int a, int b) => a - b;
-		public static int Multiply(int a, int b) => a * b;
+		public string Name => "Math Processor";
+		public string Version => "1.5.0";
 
-		// Перегруженные методы
-		public double Add(double a, double b) => a + b;
-
-		// Метод с параметрами по умолчанию
-		public string Format(string text, bool uppercase = false)
+		public override void Initialize()
 		{
-			return uppercase ? text.ToUpper() : text;
+			base.Initialize();
+
+			// Симуляция проверки зависимостей
+			if (!CheckDependencies())
+				throw new InvalidOperationException("Не все зависимости удовлетворены");
 		}
 
-		// Приватный метод
-		private int InternalCalculation() => 42;
-	}
-
-	// Структура для демонстрации работы с разными типами
-	public struct DataPoint
-	{
-		public int X;
-		public int Y;
-		public string Label;
-
-		public DataPoint(int x, int y, string label)
+		private bool CheckDependencies()
 		{
-			X = x;
-			Y = y;
-			Label = label;
+			// В реальном приложении здесь проверялись бы версии DLL
+			return true;
 		}
 
-		public string GetInfo() => $"{Label}: ({X}, {Y})";
-	}
-
-	// Generic класс для демонстрации работы с дженериками через Reflection
-	public class Repository<T> where T : new()
-	{
-		private List<T> items = new List<T>();
-
-		public void Add(T item)
+		public string Process(string input)
 		{
-			items.Add(item);
+			EnsureInitialized();
+
+			if (double.TryParse(input, out double number))
+			{
+				double result = Math.Sqrt(Math.Abs(number));
+				return $"√|{number}| = {result:F4}";
+			}
+
+			return $"Не удалось распознать число: {input}";
 		}
 
-		public T Get(int index)
+		// Специфичные для математического плагина методы
+		public double CalculateExpression(string expression)
 		{
-			return items[index];
-		}
-
-		public int Count => items.Count;
-	}
-
-	// Класс с событиями для демонстрации работы с событиями через Reflection
-	public class EventPublisher
-	{
-		public event EventHandler<string> DataProcessed;
-
-		public void ProcessData(string data)
-		{
-			Console.WriteLine($"Обработка данных: {data}");
-			DataProcessed?.Invoke(this, $"Обработано: {data}");
+			// Упрощённый пример
+			return expression.Length * 2.5;
 		}
 	}
 
-	// Класс с свойствами разных типов
-	public class Configuration
+	// Плагин с ошибкой - для демонстрации обработки исключений
+	[PluginMetadata("Unknown", "Проблемный плагин")]
+	public class BuggyPlugin : IPlugin
 	{
-		public string Name { get; set; }
-		public int MaxConnections { get; set; }
-		public bool Enabled { get; set; }
+		public string Name => "Buggy Plugin";
+		public string Version => "0.1.0";
 
-		public string ReadOnlyProperty => "Read Only Value";
+		private bool initialized = false;
 
-		private string secret = "Секретное значение";
-		public string Secret
+		public void Initialize()
 		{
-			get => secret;
-			private set => secret = value;
+			if (DateTime.Now.Second % 3 == 0) // Случайная ошибка
+				throw new InvalidOperationException("Случайная ошибка при инициализации");
+
+			initialized = true;
 		}
 
-		public void SetSecret(string value) => Secret = value;
+		public string Process(string input)
+		{
+			if (!initialized)
+				throw new InvalidOperationException("Плагин не инициализирован");
+
+			if (input == "crash")
+				throw new ArgumentException("Намеренная ошибка обработки");
+
+			return $"Обработано: {input}";
+		}
 	}
 
-	// Internal класс - не доступен извне через обычный Reflection
-	internal class InternalComponent
+	// Класс с общими утилитами, которые могут использоваться хостами
+	public static class PluginHostUtilities
 	{
-		public void DoWork()
+		public static bool ValidatePluginVersion(string pluginVersion, string hostVersion)
 		{
-			Console.WriteLine("Внутренняя работа");
+			try
+			{
+				var pluginVer = new Version(pluginVersion);
+				var hostVer = new Version(hostVersion);
+
+				// Простая проверка: плагин должен быть не старше хоста
+				return pluginVer <= hostVer;
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		public static string GetPluginInfo(IPlugin plugin)
+		{
+			return $"{plugin.Name} v{plugin.Version} (инициализирован: {plugin != null})";
 		}
 	}
 
-	// Статический класс
-	public static class Utility
+	// Пример конфигурации плагина
+	public class PluginConfiguration
 	{
-		public static string GetTimestamp()
+		public string PluginPath { get; set; }
+		public bool AutoInitialize { get; set; }
+		public string[] AllowedAuthors { get; set; }
+		public TimeSpan Timeout { get; set; }
+
+		public PluginConfiguration()
 		{
-			return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+			AutoInitialize = true;
+			AllowedAuthors = new[] { "Company A", "Company B", "Company C" };
+			Timeout = TimeSpan.FromSeconds(30);
+		}
+	}
+
+	// Класс для демонстрации передачи сложных данных
+	public class ComplexData
+	{
+		public Guid Id { get; } = Guid.NewGuid();
+		public DateTime Timestamp { get; } = DateTime.Now;
+		public Dictionary<string, object> Properties { get; } = new Dictionary<string, object>();
+
+		public ComplexData(params (string key, object value)[] properties)
+		{
+			foreach (var (key, value) in properties)
+			{
+				Properties[key] = value;
+			}
 		}
 
-		[Obsolete("Используйте новый метод GetTimestamp()", false)]
-		public static string GetOldTimestamp()
+		public override string ToString()
 		{
-			return DateTime.Now.ToString();
+			return $"ComplexData[{Id}]: {Properties.Count} свойств";
 		}
 	}
 }

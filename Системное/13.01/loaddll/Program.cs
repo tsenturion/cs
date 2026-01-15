@@ -1,362 +1,400 @@
 ﻿using System;
 using System.Reflection;
+using System.IO;
 using System.Collections.Generic;
-using ReflectionDemoLibrary;
+using System.Linq;
 
-namespace ReflectionConsumer
+namespace PluginHostApplication
 {
 	class Program
 	{
 		static void Main()
 		{
-			Console.WriteLine("=== ДЕМОНСТРАЦИЯ REFLECTION ===\n");
+			Console.WriteLine("=== ДИНАМИЧЕСКАЯ ЗАГРУЗКА DLL ВО ВРЕМЯ ВЫПОЛНЕНИЯ ===\n");
 
-			// Часть 1: Обычное использование через статическую типизацию
-			Console.WriteLine("1. СТАТИЧЕСКОЕ ИСПОЛЬЗОВАНИЕ ТИПОВ:");
-			DemonstrateStaticUsage();
+			// Часть 1: Загрузка и обнаружение плагинов
+			Console.WriteLine("1. ЗАГРУЗКА И ОБНАРУЖЕНИЕ ПЛАГИНОВ:");
+			LoadAndDiscoverPlugins();
 
-			// Часть 2: Использование Reflection для исследования
-			Console.WriteLine("\n2. ИССЛЕДОВАНИЕ ТИПОВ ЧЕРЕЗ REFLECTION:");
-			DemonstrateReflectionExploration();
+			// Часть 2: Работа с контрактами
+			Console.WriteLine("\n2. РАБОТА ЧЕРЕЗ КОНТРАКТЫ:");
+			WorkThroughContracts();
 
-			// Часть 3: Динамическое создание и вызов
-			Console.WriteLine("\n3. ДИНАМИЧЕСКОЕ СОЗДАНИЕ И ВЫЗОВ:");
-			DemonstrateDynamicCreation();
+			// Часть 3: Обработка зависимостей и версий
+			Console.WriteLine("\n3. УПРАВЛЕНИЕ ЗАВИСИМОСТЯМИ И ВЕРСИЯМИ:");
+			ManageDependenciesAndVersions();
 
-			// Часть 4: Работа с атрибутами
-			Console.WriteLine("\n4. РАБОТА С АТРИБУТАМИ:");
-			DemonstrateAttributeReading();
+			// Часть 4: Изоляция и обработка ошибок
+			Console.WriteLine("\n4. ИЗОЛЯЦИЯ И ОБРАБОТКА ОШИБОК:");
+			DemonstrateErrorIsolation();
 
-			// Часть 5: Сравнение производительности
-			Console.WriteLine("\n5. СРАВНЕНИЕ ПРОИЗВОДИТЕЛЬНОСТИ:");
-			ComparePerformance();
+			// Часть 5: Динамическая замена плагинов
+			Console.WriteLine("\n5. ДИНАМИЧЕСКАЯ ЗАМЕНА ПЛАГИНОВ:");
+			DemonstrateDynamicReplacement();
 		}
 
-		static void DemonstrateStaticUsage()
+		static void LoadAndDiscoverPlugins()
 		{
-			// Компилятор знает типы, IntelliSense работает
-			IPlugin simplePlugin = new SimplePlugin();
-			IPlugin advancedPlugin = new AdvancedPlugin();
+			string pluginsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Plugins");
 
-			Console.WriteLine($"  Простое использование:");
-			Console.WriteLine($"    simplePlugin.Name: {simplePlugin.Name}");
-			Console.WriteLine($"    simplePlugin.GetInfo(): {simplePlugin.GetInfo()}");
+			Console.WriteLine($"  Поиск плагинов в: {pluginsDirectory}");
 
-			Console.WriteLine($"\n  Вызов методов:");
-			simplePlugin.Execute();
-
-			// Приведение к конкретному типу для доступа к специфичным методам
-			SimplePlugin simple = (SimplePlugin)simplePlugin;
-			int result = simple.Calculate(10, 20);
-			Console.WriteLine($"    simple.Calculate(10, 20) = {result}");
-
-			AdvancedPlugin advanced = (AdvancedPlugin)advancedPlugin;
-			string processed = advanced.ProcessData("test");
-			Console.WriteLine($"    advanced.ProcessData('test') = {processed}");
-
-			// Использование статических методов
-			Console.WriteLine($"\n  Статические методы:");
-			string timestamp = Utility.GetTimestamp();
-			Console.WriteLine($"    Utility.GetTimestamp(): {timestamp}");
-
-#pragma warning disable CS0618
-			string oldTimestamp = Utility.GetOldTimestamp();
-#pragma warning restore CS0618
-			Console.WriteLine($"    Utility.GetOldTimestamp(): {oldTimestamp} (устарел)");
-		}
-
-		static void DemonstrateReflectionExploration()
-		{
-			// Получаем тип сборки текущего домена приложения
-			Assembly assembly = Assembly.GetAssembly(typeof(SimplePlugin));
-
-			Console.WriteLine($"  Сборка: {assembly.GetName().Name}");
-			Console.WriteLine($"  Версия: {assembly.GetName().Version}");
-			Console.WriteLine($"  Расположение: {assembly.Location}");
-
-			Console.WriteLine($"\n  ВСЕ ТИПЫ В СБОРКЕ:");
-			Type[] allTypes = assembly.GetTypes();
-			foreach (Type type in allTypes)
+			if (!Directory.Exists(pluginsDirectory))
 			{
-				Console.WriteLine($"    {type.FullName}");
-				Console.WriteLine($"      IsPublic: {type.IsPublic}, IsClass: {type.IsClass}, IsInterface: {type.IsInterface}");
+				Directory.CreateDirectory(pluginsDirectory);
+				Console.WriteLine($"  Создана директория для плагинов");
+				Console.WriteLine($"  Скопируйте скомпилированные DLL плагинов в эту папку");
+				return;
 			}
 
-			Console.WriteLine($"\n  ТОЛЬКО ПУБЛИЧНЫЕ ТИПЫ:");
-			Type[] publicTypes = assembly.GetExportedTypes();
-			foreach (Type type in publicTypes)
+			string[] dllFiles = Directory.GetFiles(pluginsDirectory, "*.dll");
+			Console.WriteLine($"  Найдено DLL файлов: {dllFiles.Length}");
+
+			List<Assembly> loadedAssemblies = new List<Assembly>();
+			List<Type> pluginTypes = new List<Type>();
+
+			foreach (string dllPath in dllFiles)
 			{
-				Console.WriteLine($"    {type.Name} (в namespace: {type.Namespace})");
-			}
-
-			// Исследование конкретного типа
-			Type pluginType = typeof(SimplePlugin);
-			Console.WriteLine($"\n  ИССЛЕДОВАНИЕ ТИПА SimplePlugin:");
-			Console.WriteLine($"    Полное имя: {pluginType.FullName}");
-			Console.WriteLine($"    Базовый тип: {pluginType.BaseType?.Name}");
-			Console.WriteLine($"    Реализует IPlugin: {typeof(IPlugin).IsAssignableFrom(pluginType)}");
-
-			Console.WriteLine($"\n    МЕТОДЫ SimplePlugin:");
-			MethodInfo[] methods = pluginType.GetMethods(BindingFlags.Public | BindingFlags.Instance);
-			foreach (MethodInfo method in methods)
-			{
-				Console.WriteLine($"      {method.ReturnType.Name} {method.Name}()");
-			}
-
-			Console.WriteLine($"\n    СВОЙСТВА Configuration:");
-			Type configType = typeof(Configuration);
-			PropertyInfo[] properties = configType.GetProperties();
-			foreach (PropertyInfo prop in properties)
-			{
-				Console.WriteLine($"      {prop.PropertyType.Name} {prop.Name} {{ get; {(prop.CanWrite ? "set;" : "")} }}");
-			}
-		}
-
-		static void DemonstrateDynamicCreation()
-		{
-			Type pluginType = typeof(SimplePlugin);
-
-			Console.WriteLine($"  ДИНАМИЧЕСКОЕ СОЗДАНИЕ ЭКЗЕМПЛЯРА:");
-
-			// Создание через Activator
-			object instance = Activator.CreateInstance(pluginType);
-			Console.WriteLine($"    Экземпляр создан: {instance.GetType().Name}");
-
-			// Получение свойств через Reflection
-			PropertyInfo nameProperty = pluginType.GetProperty("Name");
-			string nameValue = (string)nameProperty.GetValue(instance);
-			Console.WriteLine($"    Получение свойства Name: {nameValue}");
-
-			// Вызов метода через Reflection
-			Console.WriteLine($"\n  ВЫЗОВ МЕТОДОВ ЧЕРЕЗ REFLECTION:");
-
-			MethodInfo executeMethod = pluginType.GetMethod("Execute");
-			Console.Write($"    executeMethod.Invoke(): ");
-			executeMethod.Invoke(instance, null);
-
-			MethodInfo calculateMethod = pluginType.GetMethod("Calculate", new Type[] { typeof(int), typeof(int) });
-			object calcResult = calculateMethod.Invoke(instance, new object[] { 15, 25 });
-			Console.WriteLine($"    calculateMethod.Invoke(15, 25) = {calcResult}");
-
-			MethodInfo getInfoMethod = pluginType.GetMethod("GetInfo");
-			object infoResult = getInfoMethod.Invoke(instance, null);
-			Console.WriteLine($"    getInfoMethod.Invoke() = {infoResult}");
-
-			Console.WriteLine($"\n  ДОСТУП К ПРИВАТНЫМ ЧЛЕНАМ:");
-			try
-			{
-				// Получение приватного метода
-				MethodInfo privateMethod = pluginType.GetMethod("GetPrivateData",
-					BindingFlags.NonPublic | BindingFlags.Instance);
-
-				if (privateMethod != null)
-				{
-					object privateResult = privateMethod.Invoke(instance, null);
-					Console.WriteLine($"    Приватный метод GetPrivateData() = {privateResult}");
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"    Ошибка доступа к приватному методу: {ex.Message}");
-			}
-
-			Console.WriteLine($"\n  РАБОТА С GENERIC ТИПАМИ:");
-			Type repositoryType = typeof(Repository<>);
-
-			try
-			{
-				// Используем тип с конструктором по умолчанию
-				Type dataPointType = typeof(DataPoint);
-				Type dataPointRepositoryType = repositoryType.MakeGenericType(dataPointType);
-
-				Console.WriteLine($"    Создание Repository<DataPoint>...");
-				object repository = Activator.CreateInstance(dataPointRepositoryType);
-				Console.WriteLine($"    Repository<DataPoint> создан");
-
-				// Создаем DataPoint
-				object dataPoint = Activator.CreateInstance(dataPointType, 10, 20, "Point1");
-
-				// Вызываем метод Add
-				MethodInfo addMethod = dataPointRepositoryType.GetMethod("Add");
-				addMethod.Invoke(repository, new object[] { dataPoint });
-				Console.WriteLine($"    Добавлен DataPoint в репозиторий");
-
-				// Получаем свойство Count
-				PropertyInfo countProperty = dataPointRepositoryType.GetProperty("Count");
-				int count = (int)countProperty.GetValue(repository);
-				Console.WriteLine($"    Repository<DataPoint>.Count = {count}");
-
-				// Вызываем метод Get для получения элемента
-				MethodInfo getMethod = dataPointRepositoryType.GetMethod("Get");
-				object retrievedItem = getMethod.Invoke(repository, new object[] { 0 });
-				Console.WriteLine($"    Получен элемент из репозитория");
-
-				// Получаем информацию о DataPoint
-				MethodInfo getInfoMethodDP = dataPointType.GetMethod("GetInfo");
-				string info = (string)getInfoMethodDP.Invoke(retrievedItem, null);
-				Console.WriteLine($"    DataPoint.GetInfo() = {info}");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"    Ошибка при работе с generic типами: {ex.Message}");
-
-				// Альтернативный вариант с другим типом
 				try
 				{
-					Console.WriteLine($"\n    Альтернативный вариант:");
-					Type listType = typeof(List<>);
-					Type stringListType = listType.MakeGenericType(typeof(string));
-					object stringList = Activator.CreateInstance(stringListType);
+					Console.WriteLine($"\n  Загрузка: {Path.GetFileName(dllPath)}");
 
-					MethodInfo addMethod = stringListType.GetMethod("Add");
-					addMethod.Invoke(stringList, new object[] { "Test Item" });
+					// Загрузка сборки в домен приложения
+					Assembly assembly = Assembly.LoadFrom(dllPath);
+					loadedAssemblies.Add(assembly);
 
-					PropertyInfo countProperty = stringListType.GetProperty("Count");
-					int count = (int)countProperty.GetValue(stringList);
-					Console.WriteLine($"    List<string>.Count = {count}");
+					Console.WriteLine($"    Сборка загружена: {assembly.GetName().Name}");
+					Console.WriteLine($"    Версия: {assembly.GetName().Version}");
+					Console.WriteLine($"    Расположение: {Path.GetFileName(assembly.Location)}");
+
+					// Поиск типов, реализующих IPlugin
+					Type[] types = assembly.GetTypes();
+					foreach (Type type in types)
+					{
+						// Проверяем, реализует ли тип интерфейс IPlugin
+						if (typeof(DynamicLoadingDemo.IPlugin).IsAssignableFrom(type) &&
+							!type.IsInterface && !type.IsAbstract)
+						{
+							pluginTypes.Add(type);
+							Console.WriteLine($"    Найден плагин: {type.Name}");
+						}
+					}
 				}
-				catch (Exception ex2)
+				catch (ReflectionTypeLoadException ex)
 				{
-					Console.WriteLine($"    Ошибка в альтернативном варианте: {ex2.Message}");
+					Console.WriteLine($"    Ошибка загрузки типов: {ex.Message}");
+					Console.WriteLine($"    LoaderExceptions: {string.Join(", ", ex.LoaderExceptions.Select(e => e.Message))}");
 				}
-			}
-
-			Console.WriteLine($"\n  РАБОТА СО СТАТИЧЕСКИМИ МЕТОДАМИ:");
-			Type calculatorType = typeof(Calculator);
-
-			// Создание экземпляра Calculator для нестатических методов
-			object calculatorInstance = Activator.CreateInstance(calculatorType);
-
-			// Вызов нестатического метода
-			MethodInfo addMethodInstance = calculatorType.GetMethod("Add", new Type[] { typeof(int), typeof(int) });
-			object addResult = addMethodInstance.Invoke(calculatorInstance, new object[] { 5, 3 });
-			Console.WriteLine($"    calculator.Add(5, 3) = {addResult}");
-
-			// Вызов статического метода
-			MethodInfo multiplyMethod = calculatorType.GetMethod("Multiply", BindingFlags.Public | BindingFlags.Static);
-			object multiplyResult = multiplyMethod.Invoke(null, new object[] { 4, 6 });
-			Console.WriteLine($"    Calculator.Multiply(4, 6) = {multiplyResult}");
-
-			// Вызов перегруженного метода
-			MethodInfo addDoubleMethod = calculatorType.GetMethod("Add", new Type[] { typeof(double), typeof(double) });
-			object addDoubleResult = addDoubleMethod.Invoke(calculatorInstance, new object[] { 2.5, 3.5 });
-			Console.WriteLine($"    calculator.Add(2.5, 3.5) = {addDoubleResult}");
-
-			Console.WriteLine($"\n  РАБОТА С ПАРАМЕТРАМИ ПО УМОЛЧАНИЮ:");
-			MethodInfo formatMethod = calculatorType.GetMethod("Format", new Type[] { typeof(string), typeof(bool) });
-
-			// Вызов с двумя параметрами
-			object formatResult1 = formatMethod.Invoke(calculatorInstance, new object[] { "hello", true });
-			Console.WriteLine($"    calculator.Format('hello', true) = {formatResult1}");
-
-			// Вызов с одним параметром (используется значение по умолчанию)
-			object formatResult2 = formatMethod.Invoke(calculatorInstance, new object[] { "hello", Type.Missing });
-			Console.WriteLine($"    calculator.Format('hello') = {formatResult2}");
-		}
-
-		static void DemonstrateAttributeReading()
-		{
-			Type simplePluginType = typeof(SimplePlugin);
-			Type advancedPluginType = typeof(AdvancedPlugin);
-
-			Console.WriteLine($"  ЧТЕНИЕ АТРИБУТОВ:");
-
-			// Получение атрибутов типа
-			PluginAttribute simpleAttr = (PluginAttribute)Attribute.GetCustomAttribute(simplePluginType, typeof(PluginAttribute));
-			PluginAttribute advancedAttr = (PluginAttribute)Attribute.GetCustomAttribute(advancedPluginType, typeof(PluginAttribute));
-
-			if (simpleAttr != null)
-			{
-				Console.WriteLine($"    SimplePlugin атрибут:");
-				Console.WriteLine($"      Description: {simpleAttr.Description}");
-				Console.WriteLine($"      Version: {simpleAttr.Version}");
-			}
-
-			if (advancedAttr != null)
-			{
-				Console.WriteLine($"    AdvancedPlugin атрибут:");
-				Console.WriteLine($"      Description: {advancedAttr.Description}");
-				Console.WriteLine($"      Version: {advancedAttr.Version}");
-			}
-
-			Console.WriteLine($"\n  ПОИСК ВСЕХ ТИПОВ С АТРИБУТОМ PluginAttribute:");
-			Assembly assembly = Assembly.GetAssembly(typeof(SimplePlugin));
-
-			foreach (Type type in assembly.GetTypes())
-			{
-				PluginAttribute attr = (PluginAttribute)Attribute.GetCustomAttribute(type, typeof(PluginAttribute));
-				if (attr != null)
+				catch (FileLoadException ex)
 				{
-					Console.WriteLine($"    Найден: {type.Name}");
-					Console.WriteLine($"      Description: {attr.Description}");
-					Console.WriteLine($"      Version: {attr.Version}");
+					Console.WriteLine($"    Ошибка загрузки файла: {ex.Message}");
+					Console.WriteLine($"    FusionLog: {ex.FusionLog}");
+				}
+				catch (BadImageFormatException ex)
+				{
+					Console.WriteLine($"    Некорректный формат DLL: {ex.Message}");
+					Console.WriteLine($"    Возможно, DLL скомпилирована для другой версии .NET");
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"    Общая ошибка: {ex.GetType().Name}: {ex.Message}");
 				}
 			}
 
-			Console.WriteLine($"\n  ЧТЕНИЕ АТРИБУТА Obsolete:");
-			Type utilityType = typeof(Utility);
-			MethodInfo oldMethod = utilityType.GetMethod("GetOldTimestamp");
-			ObsoleteAttribute obsoleteAttr = (ObsoleteAttribute)Attribute.GetCustomAttribute(oldMethod, typeof(ObsoleteAttribute));
+			Console.WriteLine($"\n  ИТОГО: Загружено сборок: {loadedAssemblies.Count}, Найдено плагинов: {pluginTypes.Count}");
 
-			if (obsoleteAttr != null)
+			// Создание и инициализация плагинов
+			if (pluginTypes.Count > 0)
 			{
-				Console.WriteLine($"    Метод GetOldTimestamp помечен как устаревший");
-				Console.WriteLine($"      Message: {obsoleteAttr.Message}");
-				Console.WriteLine($"      IsError: {obsoleteAttr.IsError}");
+				Console.WriteLine($"\n  ИНИЦИАЛИЗАЦИЯ ПЛАГИНОВ:");
+				List<DynamicLoadingDemo.IPlugin> initializedPlugins = new List<DynamicLoadingDemo.IPlugin>();
+
+				foreach (Type pluginType in pluginTypes)
+				{
+					try
+					{
+						Console.Write($"    {pluginType.Name}: ");
+
+						// Создание экземпляра плагина
+						DynamicLoadingDemo.IPlugin plugin = (DynamicLoadingDemo.IPlugin)Activator.CreateInstance(pluginType);
+
+						// Инициализация
+						plugin.Initialize();
+
+						initializedPlugins.Add(plugin);
+						Console.WriteLine($"успешно");
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"ошибка: {ex.Message}");
+					}
+				}
+
+				Console.WriteLine($"\n  Инициализировано плагинов: {initializedPlugins.Count}/{pluginTypes.Count}");
 			}
 		}
 
-		static void ComparePerformance()
+		static void WorkThroughContracts()
 		{
-			const int iterations = 100000;
+			Console.WriteLine($"  РАБОТА ЧЕРЕЗ ИНТЕРФЕЙСЫ (КОНТРАКТЫ):");
 
-			Console.WriteLine($"  Сравнение {iterations:N0} вызовов:");
-
-			// Прямой вызов
-			SimplePlugin plugin = new SimplePlugin();
-
-			var directStart = DateTime.Now;
-			for (int i = 0; i < iterations; i++)
+			// Симуляция загрузки плагинов
+			var plugins = new List<DynamicLoadingDemo.IPlugin>
 			{
-				int result = plugin.Calculate(10, 20);
-			}
-			var directTime = DateTime.Now - directStart;
-			Console.WriteLine($"    Прямой вызов: {directTime.TotalMilliseconds:F2} ms");
+				new DynamicLoadingDemo.TextProcessorPlugin(),
+				new DynamicLoadingDemo.AdvancedDataPlugin(),
+				new DynamicLoadingDemo.MathPlugin()
+			};
 
-			// Вызов через Reflection
-			Type pluginType = typeof(SimplePlugin);
-			object instance = Activator.CreateInstance(pluginType);
-			MethodInfo method = pluginType.GetMethod("Calculate", new Type[] { typeof(int), typeof(int) });
-
-			var reflectStart = DateTime.Now;
-			for (int i = 0; i < iterations; i++)
+			// Инициализация всех плагинов
+			foreach (var plugin in plugins)
 			{
-				object result = method.Invoke(instance, new object[] { 10, 20 });
-			}
-			var reflectTime = DateTime.Now - reflectStart;
-			Console.WriteLine($"    Reflection вызов: {reflectTime.TotalMilliseconds:F2} ms");
-
-			Console.WriteLine($"    Reflection медленнее в {reflectTime.TotalMilliseconds / directTime.TotalMilliseconds:F1} раз");
-
-			// Демонстрация поиска всех плагинов через интерфейс
-			Console.WriteLine($"\n  ОБНАРУЖЕНИЕ ПЛАГИНОВ:");
-			Assembly assembly = Assembly.GetAssembly(typeof(SimplePlugin));
-			List<IPlugin> plugins = new List<IPlugin>();
-
-			foreach (Type type in assembly.GetTypes())
-			{
-				if (typeof(IPlugin).IsAssignableFrom(type) && !type.IsInterface && !type.IsAbstract)
+				try
 				{
-					Console.WriteLine($"    Найден плагин: {type.Name}");
-					IPlugin pluginInstance = (IPlugin)Activator.CreateInstance(type);
-					plugins.Add(pluginInstance);
+					plugin.Initialize();
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"    Ошибка инициализации {plugin.Name}: {ex.Message}");
 				}
 			}
 
-			Console.WriteLine($"\n  ИСПОЛЬЗОВАНИЕ НАЙДЕННЫХ ПЛАГИНОВ:");
-			foreach (var p in plugins)
+			// Работа через контракт IPlugin
+			Console.WriteLine($"\n  ОБРАБОТКА ДАННЫХ ЧЕРЕЗ IPlugin:");
+			string testData = "Пример данных для обработки";
+
+			foreach (var plugin in plugins)
 			{
-				Console.WriteLine($"    {p.Name}: {p.GetInfo()}");
+				try
+				{
+					string result = plugin.Process(testData);
+					Console.WriteLine($"    {plugin.Name}: {result}");
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"    {plugin.Name}: ошибка - {ex.Message}");
+				}
+			}
+
+			// Работа через дополнительный интерфейс IDataProcessor
+			Console.WriteLine($"\n  ОБРАБОТКА ЧЕРЕЗ ДОПОЛНИТЕЛЬНЫЕ ИНТЕРФЕЙСЫ:");
+
+			var complexData = new DynamicLoadingDemo.ComplexData(
+				("Name", "Test Object"),
+				("Value", 123),
+				("Timestamp", DateTime.Now)
+			);
+
+			foreach (var plugin in plugins)
+			{
+				if (plugin is DynamicLoadingDemo.IDataProcessor dataProcessor)
+				{
+					string result = dataProcessor.ProcessData(complexData);
+					Console.WriteLine($"    {plugin.Name} как IDataProcessor: {result}");
+				}
+			}
+
+			// Вызов специфичных методов (если доступны через конкретный тип)
+			Console.WriteLine($"\n  ДОСТУП К СПЕЦИФИЧНЫМ МЕТОДАМ:");
+
+			foreach (var plugin in plugins)
+			{
+				if (plugin is DynamicLoadingDemo.AdvancedDataPlugin advancedPlugin)
+				{
+					string analysis = advancedPlugin.Analyze(testData);
+					Console.WriteLine($"    AdvancedDataPlugin.Analyze(): {analysis}");
+				}
+				else if (plugin is DynamicLoadingDemo.MathPlugin mathPlugin)
+				{
+					double expression = mathPlugin.CalculateExpression(testData);
+					Console.WriteLine($"    MathPlugin.CalculateExpression(): {expression:F2}");
+				}
+				else if (plugin is DynamicLoadingDemo.TextProcessorPlugin textPlugin)
+				{
+					// Получаем специфичный метод через reflection
+					Type type = plugin.GetType();
+					MethodInfo countMethod = type.GetMethod("GetProcessedCount");
+
+					if (countMethod != null)
+					{
+						int count = (int)countMethod.Invoke(plugin, null);
+						Console.WriteLine($"    TextProcessorPlugin.GetProcessedCount(): {count}");
+					}
+				}
+			}
+		}
+
+		static void ManageDependenciesAndVersions()
+		{
+			Console.WriteLine($"  УПРАВЛЕНИЕ ВЕРСИЯМИ И ЗАВИСИМОСТЯМИ:");
+
+			// Создание плагинов с разными версиями
+			var plugins = new DynamicLoadingDemo.IPlugin[]
+			{
+				new DynamicLoadingDemo.TextProcessorPlugin(),      // v1.0.0
+                new DynamicLoadingDemo.AdvancedDataPlugin(),       // v2.0.0
+                new DynamicLoadingDemo.MathPlugin()                // v1.5.0
+            };
+
+			string hostVersion = "1.1.0";
+			Console.WriteLine($"    Версия хоста: {hostVersion}");
+
+			Console.WriteLine($"\n    ПРОВЕРКА СОВМЕСТИМОСТИ ВЕРСИЙ:");
+			foreach (var plugin in plugins)
+			{
+				bool isCompatible = DynamicLoadingDemo.PluginHostUtilities.ValidatePluginVersion(
+					plugin.Version, hostVersion);
+
+				string status = isCompatible ? "совместим" : "не совместим";
+				Console.WriteLine($"      {plugin.Name} v{plugin.Version}: {status}");
+			}
+
+			Console.WriteLine($"\n    ЧТЕНИЕ МЕТАДАННЫХ ПЛАГИНОВ:");
+			foreach (var plugin in plugins)
+			{
+				Type pluginType = plugin.GetType();
+				var metadataAttr = (DynamicLoadingDemo.PluginMetadataAttribute)
+					Attribute.GetCustomAttribute(pluginType, typeof(DynamicLoadingDemo.PluginMetadataAttribute));
+
+				if (metadataAttr != null)
+				{
+					Console.WriteLine($"      {plugin.Name}:");
+					Console.WriteLine($"        Автор: {metadataAttr.Author}");
+					Console.WriteLine($"        Описание: {metadataAttr.Description}");
+					Console.WriteLine($"        Требуемая версия хоста: {metadataAttr.RequiredHostVersion}");
+				}
+			}
+
+			Console.WriteLine($"\n    ПРОВЕРКА ЗАВИСИМОСТЕЙ:");
+			// Симуляция проверки зависимостей сборки
+			try
+			{
+				Assembly mathAssembly = Assembly.GetAssembly(typeof(DynamicLoadingDemo.MathPlugin));
+				AssemblyName[] references = mathAssembly.GetReferencedAssemblies();
+
+				Console.WriteLine($"      MathPlugin зависимости:");
+				foreach (var reference in references.Take(3)) // Показываем только первые 3
+				{
+					Console.WriteLine($"        - {reference.Name} v{reference.Version}");
+				}
+				if (references.Length > 3)
+					Console.WriteLine($"        ... и ещё {references.Length - 3} зависимостей");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"      Ошибка при проверке зависимостей: {ex.Message}");
+			}
+		}
+
+		static void DemonstrateErrorIsolation()
+		{
+			Console.WriteLine($"  ИЗОЛЯЦИЯ ОШИБОК ПЛАГИНОВ:");
+
+			var plugins = new DynamicLoadingDemo.IPlugin[]
+			{
+				new DynamicLoadingDemo.TextProcessorPlugin(),
+				new DynamicLoadingDemo.BuggyPlugin(),  // Плагин с ошибками
+                new DynamicLoadingDemo.MathPlugin()
+			};
+
+			// Инициализация с изоляцией ошибок
+			Console.WriteLine($"\n    ИНИЦИАЛИЗАЦИЯ С ОБРАБОТКОЙ ОШИБОК:");
+			int successful = 0;
+
+			foreach (var plugin in plugins)
+			{
+				try
+				{
+					plugin.Initialize();
+					successful++;
+					Console.WriteLine($"      {plugin.Name}: успешно");
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"      {plugin.Name}: ОШИБКА - {ex.Message}");
+					// Ошибка одного плагина не должна влиять на другие
+				}
+			}
+
+			Console.WriteLine($"      Инициализировано: {successful}/{plugins.Length}");
+
+			// Обработка данных с изоляцией ошибок
+			Console.WriteLine($"\n    ОБРАБОТКА ДАННЫХ С ОБРАБОТКОЙ ОШИБОК:");
+			string[] testInputs = { "test", "crash", "123", "" };
+
+			foreach (var plugin in plugins.Where(p => p != null))
+			{
+				Console.WriteLine($"\n      {plugin.Name}:");
+
+				foreach (string input in testInputs)
+				{
+					try
+					{
+						string result = plugin.Process(input);
+						Console.WriteLine($"        '{input}' -> {result}");
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"        '{input}' -> ОШИБКА: {ex.GetType().Name}: {ex.Message}");
+						// Продолжаем обработку следующих входных данных
+					}
+				}
+			}
+		}
+
+		static void DemonstrateDynamicReplacement()
+		{
+			Console.WriteLine($"  ДИНАМИЧЕСКАЯ ЗАМЕНА ПЛАГИНОВ:");
+
+			// Симуляция загрузки плагина из "новой версии"
+			Console.WriteLine($"\n    СИМУЛЯЦИЯ ОБНОВЛЕНИЯ ПЛАГИНА:");
+
+			try
+			{
+				// Создаем "старый" плагин
+				DynamicLoadingDemo.IPlugin oldPlugin = new DynamicLoadingDemo.TextProcessorPlugin();
+				oldPlugin.Initialize();
+
+				Console.WriteLine($"      Старый плагин: {oldPlugin.Name} v{oldPlugin.Version}");
+				string oldResult = oldPlugin.Process("test");
+				Console.WriteLine($"      Результат старого: {oldResult}");
+
+				// Симуляция загрузки "нового" плагина
+				Console.WriteLine($"\n      Загрузка новой версии...");
+
+				// В реальном приложении здесь была бы загрузка из новой DLL
+				// Для демонстрации создаем другой плагин
+				DynamicLoadingDemo.IPlugin newPlugin = new DynamicLoadingDemo.AdvancedDataPlugin();
+				newPlugin.Initialize();
+
+				Console.WriteLine($"      Новый плагин: {newPlugin.Name} v{newPlugin.Version}");
+				string newResult = newPlugin.Process("test");
+				Console.WriteLine($"      Результат нового: {newResult}");
+
+				// Демонстрация горячей замены
+				Console.WriteLine($"\n      ГОРЯЧАЯ ЗАМЕНА ПЛАГИНОВ:");
+
+				// Создаем список активных плагинов
+				var activePlugins = new List<DynamicLoadingDemo.IPlugin> { oldPlugin };
+				Console.WriteLine($"      Активные плагины до замены: {string.Join(", ", activePlugins.Select(p => p.Name))}");
+
+				// Заменяем плагин
+				activePlugins.Remove(oldPlugin);
+				activePlugins.Add(newPlugin);
+
+				Console.WriteLine($"      Активные плагины после замены: {string.Join(", ", activePlugins.Select(p => p.Name))}");
+
+				// Проверка работы после замены
+				Console.WriteLine($"\n      ПРОВЕРКА РАБОТЫ ПОСЛЕ ЗАМЕНЫ:");
+				foreach (var plugin in activePlugins)
+				{
+					string result = plugin.Process("новые данные");
+					Console.WriteLine($"        {plugin.Name}: {result}");
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"      Ошибка при динамической замене: {ex.Message}");
 			}
 		}
 	}
