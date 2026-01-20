@@ -1,826 +1,912 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace NetworkBasicsDemo
+namespace NetworkTypesAndLayersDemo
 {
 	class Program
 	{
 		static async Task Main()
 		{
-			Console.WriteLine("=== БАЗОВЫЕ КОНЦЕПЦИИ КОМПЬЮТЕРНЫХ СЕТЕЙ ===\n");
+			Console.WriteLine("=== ТИПЫ СЕТЕЙ И УРОВНИ ОРГАНИЗАЦИИ ===\n");
 
-			// Часть 1: Сетевая среда как отдельная среда выполнения
-			Console.WriteLine("1. СЕТЬ КАК СРЕДА ВЫПОЛНЕНИЯ:");
-			DemonstrateNetworkEnvironment();
+			// Часть 1: Типы сетей по масштабу
+			Console.WriteLine("1. ТИПЫ СЕТЕЙ ПО МАСШТАБУ:");
+			DemonstrateNetworkTypesByScale();
 
-			// Часть 2: Ненадёжность сети и асинхронность
-			Console.WriteLine("\n2. НЕНАДЁЖНОСТЬ СЕТИ И АСИНХРОННОСТЬ:");
-			await DemonstrateNetworkUnreliabilityAsync();
+			// Часть 2: Типы сетей по назначению
+			Console.WriteLine("\n2. ТИПЫ СЕТЕЙ ПО НАЗНАЧЕНИЮ:");
+			DemonstrateNetworkTypesByPurpose();
 
-			// Часть 3: Распределённость и взаимодействие компонентов
-			Console.WriteLine("\n3. РАСПРЕДЕЛЁННОСТЬ И ВЗАИМОДЕЙСТВИЕ:");
-			await DemonstrateDistributedComponentsAsync();
+			// Часть 3: Уровневая организация сетей
+			Console.WriteLine("\n3. УРОВНЕВАЯ ОРГАНИЗАЦИЯ СЕТЕЙ:");
+			await DemonstrateNetworkLayersAsync();
 
-			// Часть 4: Границы ответственности в сетевых приложениях
-			Console.WriteLine("\n4. ГРАНИЦЫ ОТВЕТСТВЕННОСТИ:");
-			DemonstrateResponsibilityBoundaries();
+			// Часть 4: Практическое применение уровневого подхода
+			Console.WriteLine("\n4. УРОВНЕВОЙ ПОДХОД В РАЗРАБОТКЕ:");
+			DemonstrateLayeredDevelopment();
 
-			// Часть 5: Практические последствия для разработчика
-			Console.WriteLine("\n5. ПРАКТИЧЕСКИЕ СЛЕДСТВИЯ ДЛЯ РАЗРАБОТЧИКА:");
-			DemonstrateDeveloperImplications();
+			// Часть 5: Масштабирование и совместимость
+			Console.WriteLine("\n5. МАСШТАБИРОВАНИЕ И СОВМЕСТИМОСТЬ:");
+			await DemonstrateScalingAndCompatibilityAsync();
 		}
 
-		static void DemonstrateNetworkEnvironment()
+		static void DemonstrateNetworkTypesByScale()
 		{
-			Console.WriteLine($"  ПРОГРАММА КАК УЧАСТНИК СЕТИ:");
+			Console.WriteLine($"  СЕТИ РАЗНОГО МАСШТАБА:");
 
-			// Получаем информацию о текущем компьютере в сети
-			string hostName = Dns.GetHostName();
-			Console.WriteLine($"\n  Имя текущего хоста: {hostName}");
+			// Локальная сеть (LAN)
+			Console.WriteLine($"\n  1. ЛОКАЛЬНАЯ СЕТЬ (LAN - Local Area Network):");
+			var lanNetwork = new NetworkSimulator("Офисная сеть", NetworkScale.LAN);
+			lanNetwork.SimulateOperation("Передача файла между компьютерами");
+			Console.WriteLine($"    Характеристики:");
+			Console.WriteLine($"      - Радиус: Одно здание/кампус");
+			Console.WriteLine($"      - Задержка: 1-10 мс");
+			Console.WriteLine($"      - Пропускная способность: Высокая");
+			Console.WriteLine($"      - Типичное использование: Общие ресурсы, принтеры");
 
-			IPAddress[] localIPs = Dns.GetHostAddresses(hostName);
-			Console.WriteLine($"  IP адреса текущего хоста:");
-			foreach (var ip in localIPs)
+			// Городская сеть (MAN)
+			Console.WriteLine($"\n  2. ГОРОДСКАЯ СЕТЬ (MAN - Metropolitan Area Network):");
+			var manNetwork = new NetworkSimulator("Городская сеть", NetworkScale.MAN);
+			manNetwork.SimulateOperation("Связь между офисами в разных районах");
+			Console.WriteLine($"    Характеристики:");
+			Console.WriteLine($"      - Радиус: Город");
+			Console.WriteLine($"      - Задержка: 10-50 мс");
+			Console.WriteLine($"      - Пропускная способность: Средняя");
+			Console.WriteLine($"      - Типичное использование: Связь филиалов");
+
+			// Глобальная сеть (WAN)
+			Console.WriteLine($"\n  3. ГЛОБАЛЬНАЯ СЕТЬ (WAN - Wide Area Network):");
+			var wanNetwork = new NetworkSimulator("Корпоративная WAN", NetworkScale.WAN);
+			wanNetwork.SimulateOperation("Синхронизация данных между странами");
+			Console.WriteLine($"    Характеристики:");
+			Console.WriteLine($"      - Радиус: Страна/континент/мир");
+			Console.WriteLine($"      - Задержка: 50-500+ мс");
+			Console.WriteLine($"      - Пропускная способность: Ограниченная");
+			Console.WriteLine($"      - Типичное использование: Распределённые системы");
+
+			// Сравнение характеристик
+			Console.WriteLine($"\n  СРАВНЕНИЕ ХАРАКТЕРИСТИК:");
+			var networks = new[] { lanNetwork, manNetwork, wanNetwork };
+
+			Console.WriteLine($"    {"Сеть",-20} {"Задержка",-15} {"Стабильность",-15} {"Стоимость"}");
+			Console.WriteLine($"    {"".PadRight(60, '-')}");
+
+			foreach (var net in networks)
 			{
-				if (ip.AddressFamily == AddressFamily.InterNetwork) // IPv4
-				{
-					Console.WriteLine($"    - {ip} (IPv4)");
-				}
+				Console.WriteLine($"    {net.Name,-20} {net.GetLatency(),-15} {net.GetStability(),-15} {net.GetCost()}");
 			}
 
-			// Проверяем доступность сетевых интерфейсов
-			Console.WriteLine($"\n  СЕТЕВЫЕ ИНТЕРФЕЙСЫ:");
-			NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
-			int activeInterfaces = 0;
+			// Демонстрация влияния масштаба на приложение
+			Console.WriteLine($"\n  ВЛИЯНИЕ МАСШТАБА НА ПРИЛОЖЕНИЕ:");
 
-			foreach (var ni in interfaces)
+			var testApp = new TestApplication();
+
+			foreach (var net in networks)
 			{
-				if (ni.OperationalStatus == OperationalStatus.Up)
-				{
-					activeInterfaces++;
-					Console.WriteLine($"    {ni.Name}: {ni.Description}");
-
-					// Статистика по интерфейсу
-					IPv4InterfaceStatistics stats = ni.GetIPv4Statistics();
-					Console.WriteLine($"      Получено: {stats.BytesReceived} байт, " +
-									$"Отправлено: {stats.BytesSent} байт");
-				}
-			}
-
-			Console.WriteLine($"\n  Активных интерфейсов: {activeInterfaces}/{interfaces.Length}");
-
-			// Пинг локального хоста (симуляция сетевого взаимодействия)
-			Console.WriteLine($"\n  ПРОВЕРКА ЛОКАЛЬНОЙ СВЯЗИ:");
-			try
-			{
-				Ping ping = new Ping();
-				PingReply reply = ping.Send("127.0.0.1", 1000); // localhost
-
-				if (reply.Status == IPStatus.Success)
-				{
-					Console.WriteLine($"    Ping 127.0.0.1: {reply.RoundtripTime} мс");
-					Console.WriteLine($"    Программа работает в сетевой среде");
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"    Ошибка ping: {ex.Message}");
-			}
-
-			// Демонстрация DNS разрешения
-			Console.WriteLine($"\n  DNS РАЗРЕШЕНИЕ (преобразование имён в IP):");
-			try
-			{
-				IPHostEntry googleEntry = Dns.GetHostEntry("www.google.com");
-				Console.WriteLine($"    www.google.com разрешается в:");
-				foreach (var ip in googleEntry.AddressList)
-				{
-					Console.WriteLine($"      - {ip}");
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"    Ошибка DNS: {ex.Message}");
+				Console.WriteLine($"\n    Тест в сети: {net.Name}");
+				testApp.TestNetworkOperation(net);
 			}
 		}
 
-		static async Task DemonstrateNetworkUnreliabilityAsync()
+		static void DemonstrateNetworkTypesByPurpose()
 		{
-			Console.WriteLine($"  СЕТЬ ПОТЕНЦИАЛЬНО НЕНАДЁЖНА:");
+			Console.WriteLine($"  СЕТИ РАЗНОГО НАЗНАЧЕНИЯ:");
 
-			// Создаём простой сервер для тестирования
-			var server = new SimpleTestServer();
-			server.Start();
+			// Внутренняя сеть
+			Console.WriteLine($"\n  1. ВНУТРЕННЯЯ СЕТЬ (Intranet):");
+			var internalNet = new PurposeNetwork("Корпоративная сеть", NetworkPurpose.Internal);
+			internalNet.SimulateUsage();
+			Console.WriteLine($"    Требования:");
+			Console.WriteLine($"      - Безопасность: Высокая (ограниченный доступ)");
+			Console.WriteLine($"      - Доступность: Высокая (работа критична)");
+			Console.WriteLine($"      - Мониторинг: Полный контроль");
 
-			// Даём серверу время на запуск
-			await Task.Delay(100);
+			// Публичная сеть
+			Console.WriteLine($"\n  2. ПУБЛИЧНАЯ СЕТЬ (Internet):");
+			var publicNet = new PurposeNetwork("Общедоступная сеть", NetworkPurpose.Public);
+			publicNet.SimulateUsage();
+			Console.WriteLine($"    Требования:");
+			Console.WriteLine($"      - Безопасность: Ограниченная (много угроз)");
+			Console.WriteLine($"      - Доступность: Средняя (допустимы сбои)");
+			Console.WriteLine($"      - Мониторинг: Частичный контроль");
 
-			Console.WriteLine($"\n  ТЕСТИРОВАНИЕ НАДЁЖНОСТИ:");
+			// Производственная сеть
+			Console.WriteLine($"\n  3. ПРОИЗВОДСТВЕННАЯ СЕТЬ (Industrial):");
+			var industrialNet = new PurposeNetwork("Заводская сеть", NetworkPurpose.Industrial);
+			industrialNet.SimulateUsage();
+			Console.WriteLine($"    Требования:");
+			Console.WriteLine($"      - Безопасность: Критическая (безопасность людей)");
+			Console.WriteLine($"      - Доступность: Критическая (простой стоит дорого)");
+			Console.WriteLine($"      - Мониторинг: Реальное время");
 
-			// Синхронный подход - что происходит при задержке
-			Console.WriteLine($"\n  1. СИНХРОННЫЙ ПОДХОД (проблемы):");
-			try
-			{
-				string syncResult = server.SimulateSyncRequest("Test1");
-				Console.WriteLine($"    Запрос 1 (быстрый): {syncResult}");
+			// Демонстрация требований к приложениям
+			Console.WriteLine($"\n  ТРЕБОВАНИЯ К ПРИЛОЖЕНИЯМ:");
 
-				// Долгий запрос заблокирует интерфейс
-				Console.Write($"    Запрос 2 (медленный): ");
-				string slowResult = server.SimulateSlowSyncRequest("Test2");
-				Console.WriteLine($"{slowResult}");
+			var appDesigner = new AppDesigner();
 
-				// Запрос с ошибкой
-				Console.Write($"    Запрос 3 (с ошибкой): ");
-				string errorResult = server.SimulateErrorSyncRequest("Test3");
-				Console.WriteLine($"{errorResult}");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"    Исключение: {ex.Message}");
-			}
+			Console.WriteLine($"\n    Дизайн для внутренней сети:");
+			appDesigner.DesignForNetwork(internalNet);
 
-			// Асинхронный подход - правильная работа с сетью
-			Console.WriteLine($"\n  2. АСИНХРОННЫЙ ПОДХОД (правильно):");
+			Console.WriteLine($"\n    Дизайн для публичной сети:");
+			appDesigner.DesignForNetwork(publicNet);
 
-			try
-			{
-				var tasks = new List<Task<string>>
-				{
-					server.SimulateAsyncRequest("Async1"),
-					server.SimulateSlowAsyncRequest("Async2"),
-					server.SimulateErrorAsyncRequest("Async3"),
-					server.SimulateAsyncRequest("Async4")
-				};
-
-				Console.WriteLine($"    Отправлено {tasks.Count} запросов параллельно");
-
-				// Ожидаем завершения с таймаутом
-				Task completedTask = await Task.WhenAny(
-					Task.WhenAll(tasks),
-					Task.Delay(3000));
-
-				if (completedTask == tasks[0]) // Все задачи завершены
-				{
-					for (int i = 0; i < tasks.Count; i++)
-					{
-						try
-						{
-							string result = await tasks[i];
-							Console.WriteLine($"    Запрос {i + 1}: {result}");
-						}
-						catch (Exception ex)
-						{
-							Console.WriteLine($"    Запрос {i + 1}: ОШИБКА - {ex.Message}");
-						}
-					}
-				}
-				else
-				{
-					Console.WriteLine($"    Превышено время ожидания (таймаут)");
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"    Исключение: {ex.Message}");
-			}
-
-			// Демонстрация таймаутов
-			Console.WriteLine($"\n  3. ТАЙМАУТЫ И ПОВТОРНЫЕ ПОПЫТКИ:");
-
-			var retryService = new RetryService();
-			string finalResult = await retryService.ExecuteWithRetriesAsync(
-				async () => await server.SimulateUnreliableRequest("RetryTest"),
-				maxRetries: 3,
-				delayMs: 1000);
-
-			Console.WriteLine($"    Результат после повторов: {finalResult}");
-
-			server.Stop();
+			Console.WriteLine($"\n    Дизайн для производственной сети:");
+			appDesigner.DesignForNetwork(industrialNet);
 		}
 
-		static async Task DemonstrateDistributedComponentsAsync()
+		static async Task DemonstrateNetworkLayersAsync()
 		{
-			Console.WriteLine($"  РАСПРЕДЕЛЁННЫЕ КОМПОНЕНТЫ:");
+			Console.WriteLine($"  УРОВНЕВАЯ ОРГАНИЗАЦИЯ:");
 
-			// Создаём несколько независимых компонентов
-			Console.WriteLine($"\n  СОЗДАНИЕ КОМПОНЕНТОВ:");
+			// Создаём многоуровневую систему
+			Console.WriteLine($"\n  МОДЕЛЬ УРОВНЕВОЙ СИСТЕМЫ:");
 
-			var componentA = new NetworkComponent("Компонент A");
-			var componentB = new NetworkComponent("Компонент B");
-			var componentC = new NetworkComponent("Компонент C");
+			var layeredSystem = new LayeredNetworkSystem();
 
-			// Настраиваем связи между компонентами
-			componentA.ConnectTo(componentB);
-			componentB.ConnectTo(componentC);
+			// Демонстрация передачи данных через уровни
+			Console.WriteLine($"\n  1. ПЕРЕДАЧА ДАННЫХ ЧЕРЕЗ УРОВНИ:");
+			string originalMessage = "Важные данные для передачи";
+			Console.WriteLine($"    Исходное сообщение: '{originalMessage}'");
 
-			Console.WriteLine($"    Создано 3 компонента со связями");
-			Console.WriteLine($"    A → B → C");
+			var transmissionResult = await layeredSystem.TransmitDataAsync(originalMessage);
+			Console.WriteLine($"    Результат передачи: {transmissionResult}");
 
-			// Демонстрация обмена сообщениями
-			Console.WriteLine($"\n  ОБМЕН СООБЩЕНИЯМИ:");
+			// Работа на отдельном уровне
+			Console.WriteLine($"\n  2. РАБОТА НА КОНКРЕТНОМ УРОВНЕ:");
 
-			var messages = new[]
+			var appLayer = layeredSystem.GetLayer(NetworkLayer.Application);
+			string appResult = await appLayer.ProcessAsync("Данные от пользователя");
+			Console.WriteLine($"    Результат прикладного уровня: {appResult}");
+
+			var transportLayer = layeredSystem.GetLayer(NetworkLayer.Transport);
+			string transportResult = await transportLayer.ProcessAsync("Сегменты данных");
+			Console.WriteLine($"    Результат транспортного уровня: {transportResult}");
+
+			// Изменение реализации уровня
+			Console.WriteLine($"\n  3. ИЗМЕНЕНИЕ РЕАЛИЗАЦИИ УРОВНЯ:");
+			Console.WriteLine($"    Меняем реализацию транспортного уровня...");
+
+			layeredSystem.ReplaceLayer(NetworkLayer.Transport, new AdvancedTransportLayer());
+			var newTransmissionResult = await layeredSystem.TransmitDataAsync("Тест после замены");
+			Console.WriteLine($"    Результат с новой реализацией: {newTransmissionResult}");
+
+			// Демонстрация независимости уровней
+			Console.WriteLine($"\n  4. НЕЗАВИСИМОСТЬ УРОВНЕЙ:");
+
+			Console.WriteLine($"    Тестируем каждый уровень отдельно:");
+			foreach (var layer in layeredSystem.GetAllLayers())
 			{
-				"Привет от компонента A",
-				"Данные для обработки",
-				"Запрос статуса",
-				"Важное уведомление"
+				Console.WriteLine($"\n      Уровень: {layer.LayerName}");
+				Console.WriteLine($"        Ответственность: {layer.GetResponsibility()}");
+
+				// Тестируем уровень
+				string testInput = $"Тест для {layer.LayerName}";
+				string testOutput = await layer.ProcessAsync(testInput);
+				Console.WriteLine($"        Вход: '{testInput}' -> Выход: '{testOutput}'");
+
+				Console.WriteLine($"        Может работать автономно: {layer.CanWorkIndependently()}");
+			}
+		}
+
+		static void DemonstrateLayeredDevelopment()
+		{
+			Console.WriteLine($"  УРОВНЕВОЙ ПОДХОД В РАЗРАБОТКЕ:");
+
+			// Пример многоуровневого приложения
+			Console.WriteLine($"\n  ПРИМЕР: СИСТЕМА УПРАВЛЕНИЯ СКЛАДОМ");
+
+			var warehouseSystem = new LayeredWarehouseSystem();
+
+			// Демонстрация обработки заказа через уровни
+			Console.WriteLine($"\n  1. ОБРАБОТКА ЗАКАЗА:");
+			var order = new WarehouseOrder
+			{
+				OrderId = "ORD-001",
+				Customer = "Клиент А",
+				Items = new List<string> { "Товар1", "Товар2", "Товар3" },
+				Priority = OrderPriority.High
 			};
 
-			foreach (string message in messages)
+			Console.WriteLine($"    Новый заказ: {order.OrderId} для {order.Customer}");
+
+			string processingResult = warehouseSystem.ProcessOrder(order);
+			Console.WriteLine($"    Результат обработки: {processingResult}");
+
+			// Изолированная работа на уровне
+			Console.WriteLine($"\n  2. ИЗОЛИРОВАННАЯ РАБОТА УРОВНЕЙ:");
+
+			Console.WriteLine($"    Тестируем уровень бизнес-логики:");
+			var businessLayer = warehouseSystem.GetBusinessLayer();
+			string businessResult = businessLayer.ValidateOrder(order);
+			Console.WriteLine($"      Валидация заказа: {businessResult}");
+
+			Console.WriteLine($"\n    Тестируем уровень данных:");
+			var dataLayer = warehouseSystem.GetDataLayer();
+			string dataResult = dataLayer.SaveOrder(order);
+			Console.WriteLine($"      Сохранение заказа: {dataResult}");
+
+			// Демонстрация замены реализации
+			Console.WriteLine($"\n  3. ЗАМЕНА РЕАЛИЗАЦИИ УРОВНЯ:");
+
+			Console.WriteLine($"    Меняем хранилище данных (старое -> новое)...");
+			var newDataLayer = new AdvancedDataLayer();
+			warehouseSystem.ReplaceDataLayer(newDataLayer);
+
+			string newOrderResult = warehouseSystem.ProcessOrder(new WarehouseOrder
 			{
-				Console.WriteLine($"\n    Отправка: '{message}'");
-
-				try
-				{
-					string result = await componentA.SendMessageAsync(message);
-					Console.WriteLine($"    Результат: {result}");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"    Ошибка: {ex.GetType().Name}: {ex.Message}");
-				}
-
-				await Task.Delay(200);
-			}
-
-			// Демонстрация независимой работы компонентов
-			Console.WriteLine($"\n  НЕЗАВИСИМАЯ РАБОТА:");
-
-			var tasks = new List<Task>
-			{
-				componentA.PerformWorkAsync("Работа A"),
-				componentB.PerformWorkAsync("Работа B"),
-				componentC.PerformWorkAsync("Работа C")
-			};
-
-			Console.WriteLine($"    Все компоненты работают параллельно");
-
-			await Task.WhenAll(tasks);
-			Console.WriteLine($"    Все компоненты завершили работу");
-
-			// Статистика
-			Console.WriteLine($"\n  СТАТИСТИКА КОМПОНЕНТОВ:");
-			Console.WriteLine($"    A: {componentA.GetStatistics()}");
-			Console.WriteLine($"    B: {componentB.GetStatistics()}");
-			Console.WriteLine($"    C: {componentC.GetStatistics()}");
-
-			componentA.Dispose();
-			componentB.Dispose();
-			componentC.Dispose();
-		}
-
-		static void DemonstrateResponsibilityBoundaries()
-		{
-			Console.WriteLine($"  ГРАНИЦЫ ОТВЕТСТВЕННОСТИ:");
-
-			// Сервис с чёткими границами ответственности
-			var boundaryService = new BoundaryService();
-
-			Console.WriteLine($"\n  1. ОБРАБОТКА ВНЕШНИХ ОШИБОК:");
-
-			string[] testInputs =
-			{
-				"valid_data",
-				"", // пустые данные
-                "error_data",
-				"timeout_data",
-				"very_long_data_that_might_cause_problems"
-			};
-
-			foreach (string input in testInputs)
-			{
-				Console.Write($"\n    Ввод: '{input}' -> ");
-
-				try
-				{
-					string result = boundaryService.ProcessWithBoundaries(input);
-					Console.WriteLine($"Результат: {result}");
-				}
-				catch (ValidationException ex)
-				{
-					Console.WriteLine($"ВНУТРЕННЯЯ ошибка: {ex.Message}");
-					// Эту ошибку мы обрабатываем сами
-				}
-				catch (ExternalServiceException ex)
-				{
-					Console.WriteLine($"ВНЕШНЯЯ ошибка: {ex.Message}");
-					// Запрашиваем действие у пользователя
-				}
-				catch (TimeoutException)
-				{
-					Console.WriteLine($"ТАЙМАУТ: Сервис не отвечает");
-					// Предлагаем повторить позже
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"НЕИЗВЕСТНАЯ ошибка: {ex.GetType().Name}");
-					// Логируем и сообщаем о проблеме
-				}
-			}
-
-			Console.WriteLine($"\n  2. КОНТРОЛЬ И КВОТЫ:");
-
-			var quotaService = new QuotaService(maxRequestsPerMinute: 5);
-
-			for (int i = 1; i <= 7; i++)
-			{
-				Console.Write($"    Запрос {i}: ");
-
-				if (quotaService.CanMakeRequest())
-				{
-					Console.WriteLine($"Разрешён");
-					quotaService.RecordRequest();
-				}
-				else
-				{
-					Console.WriteLine($"Отклонён (превышена квота)");
-				}
-			}
-
-			Console.WriteLine($"\n  3. ЛОКАЛЬНОЕ КЭШИРОВАНИЕ:");
-
-			var cacheService = new CacheService();
-
-			string[] keys = { "user:1", "config:app", "data:report" };
-
-			foreach (string key in keys)
-			{
-				string data = cacheService.GetOrFetch(key, () =>
-				{
-					Console.WriteLine($"    Загрузка из внешнего источника: {key}");
-					return $"Данные для {key}";
-				});
-
-				Console.WriteLine($"    Получено: {data}");
-			}
-
-			// Второй проход - данные берутся из кэша
-			Console.WriteLine($"\n    Повторный запрос (из кэша):");
-			foreach (string key in keys)
-			{
-				string data = cacheService.GetOrFetch(key, () =>
-				{
-					Console.WriteLine($"    Этого не должно быть видно!");
-					return "ERROR";
-				});
-
-				Console.WriteLine($"    {key}: {data}");
-			}
-		}
-
-		static void DemonstrateDeveloperImplications()
-		{
-			Console.WriteLine($"  ПРАКТИЧЕСКИЕ СЛЕДСТВИЯ:");
-
-			Console.WriteLine($"\n  1. ПРОИЗВОДИТЕЛЬНОСТЬ И ОТЗЫВЧИВОСТЬ:");
-
-			var uiSimulator = new UISimulator();
-
-			// Синхронная операция блокирует UI
-			Console.WriteLine($"\n    Синхронная операция:");
-			uiSimulator.SimulateUIOperation(() =>
-			{
-				Thread.Sleep(2000); // Сетевая задержка
-				return "Результат";
+				OrderId = "ORD-002",
+				Customer = "Клиент Б",
+				Items = new List<string> { "Товар4" }
 			});
 
-			// Асинхронная операция не блокирует UI
-			Console.WriteLine($"\n    Асинхронная операция:");
-			uiSimulator.SimulateAsyncUIOperation(async () =>
+			Console.WriteLine($"    Результат с новым хранилищем: {newOrderResult}");
+
+			// Демонстрация отладки по уровням
+			Console.WriteLine($"\n  4. ОТЛАДКА ПО УРОВНЯМ:");
+
+			var debugOrder = new WarehouseOrder
 			{
-				await Task.Delay(2000); // Сетевая задержка
-				return "Результат";
-			});
-
-			Console.WriteLine($"\n  2. ОБРАБОТКА ОШИБОК В РАСПРЕДЕЛЁННОЙ СИСТЕМЕ:");
-
-			var errorHandler = new DistributedErrorHandler();
-
-			string[] operations =
-			{
-				"read_database",
-				"call_external_api",
-				"process_file",
-				"send_notification"
+				OrderId = "DEBUG-001",
+				Customer = "Тестовый клиент",
+				Items = new List<string>(),
+				Priority = OrderPriority.Normal
 			};
 
-			foreach (string operation in operations)
+			Console.WriteLine($"    Отладка заказа {debugOrder.OrderId}:");
+			warehouseSystem.DebugOrderProcessing(debugOrder);
+		}
+
+		static async Task DemonstrateScalingAndCompatibilityAsync()
+		{
+			Console.WriteLine($"  МАСШТАБИРОВАНИЕ И СОВМЕСТИМОСТЬ:");
+
+			// Симуляция масштабирования системы
+			Console.WriteLine($"\n  1. МАСШТАБИРОВАНИЕ СИСТЕМЫ:");
+
+			var scalableSystem = new ScalableNetworkSystem();
+
+			Console.WriteLine($"    Начальная конфигурация:");
+			scalableSystem.PrintStatus();
+
+			// Добавляем новые компоненты
+			Console.WriteLine($"\n    Добавляем региональный центр...");
+			scalableSystem.AddComponent("Региональный центр", NetworkScale.MAN);
+			scalableSystem.PrintStatus();
+
+			Console.WriteLine($"\n    Добавляем удалённый филиал...");
+			scalableSystem.AddComponent("Удалённый филиал", NetworkScale.WAN);
+			scalableSystem.PrintStatus();
+
+			// Тестируем совместимость
+			Console.WriteLine($"\n  2. ТЕСТИРОВАНИЕ СОВМЕСТИМОСТИ:");
+
+			var compatibilityTester = new CompatibilityTester();
+
+			Console.WriteLine($"    Тест совместимости протоколов:");
+			bool protocolCompatible = await compatibilityTester.TestProtocolCompatibilityAsync();
+			Console.WriteLine($"      Протоколы совместимы: {protocolCompatible}");
+
+			Console.WriteLine($"\n    Тест совместимости форматов данных:");
+			bool dataCompatible = compatibilityTester.TestDataFormatCompatibility();
+			Console.WriteLine($"      Форматы данных совместимы: {dataCompatible}");
+
+			// Демонстрация постепенного обновления
+			Console.WriteLine($"\n  3. ПОСТЕПЕННОЕ ОБНОВЛЕНИЕ:");
+
+			var upgradeManager = new SystemUpgradeManager();
+
+			Console.WriteLine($"    Начинаем обновление системы...");
+
+			var upgradeSteps = new[]
 			{
-				Console.WriteLine($"\n    Операция: {operation}");
-				errorHandler.ExecuteWithErrorHandling(operation);
+				"Обновление уровня представления",
+				"Обновление бизнес-логики",
+				"Миграция данных",
+				"Обновление сетевого уровня"
+			};
+
+			foreach (var step in upgradeSteps)
+			{
+				Console.Write($"      {step}... ");
+				bool success = await upgradeManager.PerformUpgradeStepAsync(step);
+				Console.WriteLine(success ? "✓" : "✗");
+
+				if (!success)
+				{
+					Console.WriteLine($"      Откат изменений...");
+					await upgradeManager.RollbackAsync();
+					break;
+				}
 			}
 
-			Console.WriteLine($"\n  3. МОНИТОРИНГ И ЛОГИРОВАНИЕ:");
+			// Демонстрация работы с устаревшими компонентами
+			Console.WriteLine($"\n  4. РАБОТА С УСТАРЕВШИМИ КОМПОНЕНТАМИ:");
 
-			var monitoredService = new MonitoredService();
+			var legacyAdapter = new LegacySystemAdapter();
 
-			monitoredService.DoSomethingImportant("Важная операция 1");
-			monitoredService.DoSomethingImportant("Важная операция 2");
+			Console.WriteLine($"    Старая система отправляет данные...");
+			string legacyData = legacyAdapter.GetLegacyData();
+			Console.WriteLine($"      Данные в старом формате: {legacyData}");
 
-			Console.WriteLine($"\n    Статистика сервиса:");
-			Console.WriteLine($"    Успешных операций: {monitoredService.SuccessCount}");
-			Console.WriteLine($"    Ошибок: {monitoredService.ErrorCount}");
-			Console.WriteLine($"    Среднее время: {monitoredService.AverageTimeMs:F0} мс");
+			Console.WriteLine($"\n    Адаптер преобразует данные...");
+			string modernData = legacyAdapter.AdaptForModernSystem(legacyData);
+			Console.WriteLine($"      Данные в новом формате: {modernData}");
 
-			Console.WriteLine($"\n  4. ТЕСТИРОВАНИЕ СЕТЕВЫХ СЦЕНАРИЕВ:");
-
-			var testScenarios = new NetworkTestScenarios();
-			testScenarios.RunAllTests();
+			Console.WriteLine($"\n    Совместимость обеспечена: {legacyAdapter.IsCompatible}");
 		}
 	}
 
 	// Вспомогательные классы для демонстрации
 
-	class SimpleTestServer
+	enum NetworkScale { LAN, MAN, WAN }
+	enum NetworkPurpose { Internal, Public, Industrial }
+	enum NetworkLayer { Physical, DataLink, Network, Transport, Session, Presentation, Application }
+	enum OrderPriority { Low, Normal, High, Critical }
+
+	class NetworkSimulator
 	{
-		private Random _random = new Random();
-		private bool _isRunning = false;
-
-		public void Start() => _isRunning = true;
-		public void Stop() => _isRunning = false;
-
-		public string SimulateSyncRequest(string data)
-		{
-			if (!_isRunning) throw new InvalidOperationException("Сервер не запущен");
-			return $"Обработано: {data}";
-		}
-
-		public string SimulateSlowSyncRequest(string data)
-		{
-			Thread.Sleep(3000); // Долгая обработка
-			return $"Медленно обработано: {data}";
-		}
-
-		public string SimulateErrorSyncRequest(string data)
-		{
-			throw new InvalidOperationException($"Ошибка обработки: {data}");
-		}
-
-		public async Task<string> SimulateAsyncRequest(string data)
-		{
-			await Task.Delay(_random.Next(50, 200)); // Случайная задержка
-			return $"Асинхронно: {data}";
-		}
-
-		public async Task<string> SimulateSlowAsyncRequest(string data)
-		{
-			await Task.Delay(2000); // Долгая задержка
-			return $"Медленно асинхронно: {data}";
-		}
-
-		public async Task<string> SimulateErrorAsyncRequest(string data)
-		{
-			await Task.Delay(100);
-			if (_random.Next(0, 2) == 0) // 50% вероятность ошибки
-				throw new InvalidOperationException($"Случайная ошибка: {data}");
-			return $"Успешно: {data}";
-		}
-
-		public async Task<string> SimulateUnreliableRequest(string data)
-		{
-			await Task.Delay(100);
-			// 70% вероятность ошибки в первый раз
-			if (_random.Next(0, 10) < 7)
-				throw new IOException("Временная сетевая ошибка");
-			return $"Стабильно: {data}";
-		}
-	}
-
-	class RetryService
-	{
-		public async Task<string> ExecuteWithRetriesAsync(
-			Func<Task<string>> operation,
-			int maxRetries,
-			int delayMs)
-		{
-			for (int attempt = 1; attempt <= maxRetries; attempt++)
-			{
-				try
-				{
-					return await operation();
-				}
-				catch (Exception ex) when (attempt < maxRetries)
-				{
-					Console.WriteLine($"      Попытка {attempt} неудачна: {ex.Message}");
-					Console.WriteLine($"      Повтор через {delayMs} мс...");
-					await Task.Delay(delayMs);
-				}
-			}
-
-			throw new InvalidOperationException($"Все {maxRetries} попыток неудачны");
-		}
-	}
-
-	class NetworkComponent : IDisposable
-	{
-		private string _name;
-		private List<NetworkComponent> _connections = new List<NetworkComponent>();
-		private int _messagesSent = 0;
-		private int _messagesReceived = 0;
+		public string Name { get; }
+		public NetworkScale Scale { get; }
 		private Random _random = new Random();
 
-		public NetworkComponent(string name)
+		public NetworkSimulator(string name, NetworkScale scale)
 		{
-			_name = name;
+			Name = name;
+			Scale = scale;
 		}
 
-		public void ConnectTo(NetworkComponent other)
+		public void SimulateOperation(string operation)
 		{
-			_connections.Add(other);
-		}
+			Console.Write($"    {operation}... ");
 
-		public async Task<string> SendMessageAsync(string message)
-		{
-			_messagesSent++;
-
-			// Случайная задержка сети
-			await Task.Delay(_random.Next(50, 500));
-
-			// Случайная ошибка сети
-			if (_random.Next(0, 10) == 0)
-				throw new SocketException((int)SocketError.ConnectionReset);
-
-			if (_connections.Count > 0)
+			// Имитация задержки в зависимости от масштаба
+			int delay = Scale switch
 			{
-				var target = _connections[_random.Next(_connections.Count)];
-				_messagesReceived++;
-				return $"[{_name} → {target._name}] {message}";
-			}
+				NetworkScale.LAN => _random.Next(1, 10),
+				NetworkScale.MAN => _random.Next(10, 50),
+				NetworkScale.WAN => _random.Next(50, 300),
+				_ => 100
+			};
 
-			return $"[{_name}] {message} (нет получателей)";
+			Thread.Sleep(delay);
+
+			// Имитация надёжности
+			bool success = _random.Next(0, 10) > (int)Scale; // Чем больше сеть, тем менее надёжна
+
+			Console.WriteLine(success ? "✓ Успешно" : "✗ Ошибка");
+			if (!success)
+				Console.WriteLine($"      Причина: {GetFailureReason()}");
 		}
 
-		public async Task PerformWorkAsync(string work)
+		public string GetLatency()
 		{
-			Console.WriteLine($"      [{_name}] Начинает: {work}");
-
-			// Симуляция независимой работы
-			await Task.Delay(_random.Next(1000, 3000));
-
-			// Случайный результат
-			if (_random.Next(0, 10) > 1) // 80% успеха
-				Console.WriteLine($"      [{_name}] Завершил: {work} ✓");
-			else
-				Console.WriteLine($"      [{_name}] Ошибка в: {work} ✗");
+			return Scale switch
+			{
+				NetworkScale.LAN => "1-10 мс",
+				NetworkScale.MAN => "10-50 мс",
+				NetworkScale.WAN => "50-300+ мс",
+				_ => "Неизвестно"
+			};
 		}
 
-		public string GetStatistics()
+		public string GetStability()
 		{
-			return $"Отправлено: {_messagesSent}, Получено: {_messagesReceived}";
+			return Scale switch
+			{
+				NetworkScale.LAN => "Высокая",
+				NetworkScale.MAN => "Средняя",
+				NetworkScale.WAN => "Низкая",
+				_ => "Неизвестно"
+			};
 		}
 
-		public void Dispose()
+		public string GetCost()
 		{
-			_connections.Clear();
+			return Scale switch
+			{
+				NetworkScale.LAN => "Низкая",
+				NetworkScale.MAN => "Средняя",
+				NetworkScale.WAN => "Высокая",
+				_ => "Неизвестно"
+			};
+		}
+
+		private string GetFailureReason()
+		{
+			return Scale switch
+			{
+				NetworkScale.LAN => "Оборудование ЛВС",
+				NetworkScale.MAN => "Провайдер",
+				NetworkScale.WAN => "Межконтинентальная связь",
+				_ => "Неизвестная причина"
+			};
 		}
 	}
 
-	class ValidationException : Exception
+	class TestApplication
 	{
-		public ValidationException(string message) : base(message) { }
-	}
-
-	class ExternalServiceException : Exception
-	{
-		public ExternalServiceException(string message) : base(message) { }
-	}
-
-	class BoundaryService
-	{
-		public string ProcessWithBoundaries(string input)
+		public void TestNetworkOperation(NetworkSimulator network)
 		{
-			// Внутренняя валидация
-			if (string.IsNullOrEmpty(input))
-				throw new ValidationException("Входные данные не могут быть пустыми");
-
-			if (input == "error_data")
-				throw new ExternalServiceException("Внешний сервис вернул ошибку");
-
-			if (input == "timeout_data")
-				throw new TimeoutException("Превышено время ожидания ответа");
-
-			if (input.Length > 50)
-				throw new ArgumentException("Слишком длинные данные");
-
-			return $"Обработано: {input}";
-		}
-	}
-
-	class QuotaService
-	{
-		private int _maxRequestsPerMinute;
-		private Queue<DateTime> _requestTimes = new Queue<DateTime>();
-
-		public QuotaService(int maxRequestsPerMinute)
-		{
-			_maxRequestsPerMinute = maxRequestsPerMinute;
-		}
-
-		public bool CanMakeRequest()
-		{
-			DateTime now = DateTime.Now;
-			DateTime cutoff = now.AddMinutes(-1);
-
-			// Удаляем старые записи
-			while (_requestTimes.Count > 0 && _requestTimes.Peek() < cutoff)
-				_requestTimes.Dequeue();
-
-			return _requestTimes.Count < _maxRequestsPerMinute;
-		}
-
-		public void RecordRequest()
-		{
-			_requestTimes.Enqueue(DateTime.Now);
-		}
-	}
-
-	class CacheService
-	{
-		private Dictionary<string, (string value, DateTime expiry)> _cache = new();
-
-		public string GetOrFetch(string key, Func<string> fetchFunction)
-		{
-			if (_cache.TryGetValue(key, out var cached) && cached.expiry > DateTime.Now)
-				return cached.value;
-
-			string value = fetchFunction();
-			_cache[key] = (value, DateTime.Now.AddMinutes(5));
-			return value;
-		}
-	}
-
-	class UISimulator
-	{
-		public void SimulateUIOperation(Func<string> operation)
-		{
-			Console.Write("      UI: Операция начата... ");
-			Stopwatch sw = Stopwatch.StartNew();
-
-			// Блокирующий вызов
-			string result = operation();
-
-			sw.Stop();
-			Console.WriteLine($"Завершено за {sw.ElapsedMilliseconds} мс: {result}");
-		}
-
-		public async void SimulateAsyncUIOperation(Func<Task<string>> operation)
-		{
-			Console.Write("      UI: Асинхронная операция начата... ");
-			Stopwatch sw = Stopwatch.StartNew();
-
-			// Неблокирующий вызов
-			var task = operation();
-
-			// UI остаётся отзывчивым
-			Console.Write("(UI остаётся отзывчивым) ");
-
-			string result = await task;
-			sw.Stop();
-
-			Console.WriteLine($"\n      UI: Завершено за {sw.ElapsedMilliseconds} мс: {result}");
-		}
-	}
-
-	class DistributedErrorHandler
-	{
-		public void ExecuteWithErrorHandling(string operation)
-		{
-			try
+			// Тестируем разные типы операций
+			string[] operations =
 			{
-				// Симуляция операции, которая может завершиться по-разному
-				Random rnd = new Random();
-				int outcome = rnd.Next(0, 4);
+				"Маленький запрос (1 КБ)",
+				"Средний запрос (100 КБ)",
+				"Большой запрос (10 МБ)",
+				"Потоковая передача"
+			};
 
-				switch (outcome)
-				{
-					case 0:
-						Console.WriteLine($"      ✓ Успешно");
-						break;
-					case 1:
-						throw new IOException("Ошибка ввода-вывода");
-					case 2:
-						throw new UnauthorizedAccessException("Нет доступа");
-					case 3:
-						throw new InvalidOperationException("Некорректная операция");
-				}
-			}
-			catch (IOException ex)
+			foreach (var op in operations)
 			{
-				Console.WriteLine($"      Сетевая ошибка: {ex.Message}");
-				Console.WriteLine($"      Действие: Повторить позже");
-			}
-			catch (UnauthorizedAccessException ex)
-			{
-				Console.WriteLine($"      Ошибка доступа: {ex.Message}");
-				Console.WriteLine($"      Действие: Запросить права");
-			}
-			catch (InvalidOperationException ex)
-			{
-				Console.WriteLine($"      Логическая ошибка: {ex.Message}");
-				Console.WriteLine($"      Действие: Исправить код");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"      Неизвестная ошибка: {ex.GetType().Name}");
-				Console.WriteLine($"      Действие: Записать в лог и уведомить");
-			}
-		}
-	}
+				Console.Write($"      {op}: ");
+				Stopwatch sw = Stopwatch.StartNew();
 
-	class MonitoredService
-	{
-		private int _successCount = 0;
-		private int _errorCount = 0;
-		private long _totalTimeMs = 0;
-		private int _operationCount = 0;
+				network.SimulateOperation(op);
 
-		public int SuccessCount => _successCount;
-		public int ErrorCount => _errorCount;
-		public double AverageTimeMs => _operationCount > 0 ? (double)_totalTimeMs / _operationCount : 0;
-
-		public void DoSomethingImportant(string operation)
-		{
-			Stopwatch sw = Stopwatch.StartNew();
-
-			try
-			{
-				// Симуляция работы
-				Thread.Sleep(new Random().Next(100, 500));
-
-				// Случайная ошибка
-				if (new Random().Next(0, 10) == 0)
-					throw new InvalidOperationException("Случайная ошибка");
-
-				_successCount++;
-				Console.WriteLine($"      {operation}: Успешно ✓");
-			}
-			catch
-			{
-				_errorCount++;
-				Console.WriteLine($"      {operation}: Ошибка ✗");
-			}
-			finally
-			{
 				sw.Stop();
-				_totalTimeMs += sw.ElapsedMilliseconds;
-				_operationCount++;
+
+				if (network.Scale == NetworkScale.WAN && op.Contains("Большой"))
+					Console.WriteLine($"        Предупреждение: В WAN большие запросы неэффективны");
+				else if (network.Scale == NetworkScale.LAN && op.Contains("Потоковая"))
+					Console.WriteLine($"        Отлично: LAN идеален для потоковой передачи");
 			}
 		}
 	}
 
-	class NetworkTestScenarios
+	class PurposeNetwork
 	{
-		public void RunAllTests()
-		{
-			Console.WriteLine($"\n    Тестовые сценарии:");
+		public string Name { get; }
+		public NetworkPurpose Purpose { get; }
 
-			TestScenario("Быстрый успех", () => Task.FromResult("OK"));
-			TestScenario("Долгий ответ", async () =>
-			{
-				await Task.Delay(2000);
-				return "Slow";
-			});
-			TestScenario("Сетевая ошибка", async () =>
-			{
-				await Task.Delay(100);
-				throw new IOException("Network failure");
-			});
-			TestScenario("Таймаут", async () =>
-			{
-				await Task.Delay(5000);
-				return "Too late";
-			});
+		public PurposeNetwork(string name, NetworkPurpose purpose)
+		{
+			Name = name;
+			Purpose = purpose;
 		}
 
-		private async void TestScenario(string name, Func<Task<string>> test)
+		public void SimulateUsage()
 		{
-			Console.Write($"\n      {name}: ");
+			Console.Write($"    Использование: ");
 
+			switch (Purpose)
+			{
+				case NetworkPurpose.Internal:
+					Console.WriteLine("Доступ к корпоративным ресурсам");
+					break;
+				case NetworkPurpose.Public:
+					Console.WriteLine("Обслуживание внешних пользователей");
+					break;
+				case NetworkPurpose.Industrial:
+					Console.WriteLine("Управление производственным оборудованием");
+					break;
+			}
+		}
+	}
+
+	class AppDesigner
+	{
+		public void DesignForNetwork(PurposeNetwork network)
+		{
+			Console.WriteLine($"      Архитектурные решения:");
+
+			switch (network.Purpose)
+			{
+				case NetworkPurpose.Internal:
+					Console.WriteLine($"        - Верификация пользователей (LDAP/AD)");
+					Console.WriteLine($"        - Подробное логирование");
+					Console.WriteLine($"        - Высокая доступность (кластеризация)");
+					break;
+
+				case NetworkPurpose.Public:
+					Console.WriteLine($"        - Защита от DDoS атак");
+					Console.WriteLine($"        - Балансировка нагрузки");
+					Console.WriteLine($"        - Геораспределение (CDN)");
+					break;
+
+				case NetworkPurpose.Industrial:
+					Console.WriteLine($"        - Детерминированное время отклика");
+					Console.WriteLine($"        - Избыточность систем");
+					Console.WriteLine($"        - Протоколы реального времени");
+					break;
+			}
+		}
+	}
+
+	interface INetworkLayer
+	{
+		NetworkLayer LayerType { get; }
+		string LayerName { get; }
+		string GetResponsibility();
+		Task<string> ProcessAsync(string input);
+		bool CanWorkIndependently();
+	}
+
+	class PhysicalLayer : INetworkLayer
+	{
+		public NetworkLayer LayerType => NetworkLayer.Physical;
+		public string LayerName => "Физический уровень";
+
+		public string GetResponsibility() =>
+			"Передача битов по среде (кабель, Wi-Fi, оптика)";
+
+		public async Task<string> ProcessAsync(string input)
+		{
+			await Task.Delay(10);
+			return $"Биты: {ConvertToBits(input)}";
+		}
+
+		public bool CanWorkIndependently() => false; // Зависит от среды
+
+		private string ConvertToBits(string data)
+		{
+			byte[] bytes = Encoding.UTF8.GetBytes(data);
+			return string.Join("", bytes.Select(b => Convert.ToString(b, 2).PadLeft(8, '0')));
+		}
+	}
+
+	class TransportLayer : INetworkLayer
+	{
+		public NetworkLayer LayerType => NetworkLayer.Transport;
+		public string LayerName => "Транспортный уровень";
+
+		public string GetResponsibility() =>
+			"Надёжная доставка данных, управление потоками";
+
+		public async Task<string> ProcessAsync(string input)
+		{
+			await Task.Delay(15);
+			return $"Сегмент[{input.Length}]: {input}";
+		}
+
+		public bool CanWorkIndependently() => true;
+	}
+
+	class ApplicationLayer : INetworkLayer
+	{
+		public NetworkLayer LayerType => NetworkLayer.Application;
+		public string LayerName => "Прикладной уровень";
+
+		public string GetResponsibility() =>
+			"Интерфейс для приложений (HTTP, FTP, SMTP)";
+
+		public async Task<string> ProcessAsync(string input)
+		{
+			await Task.Delay(5);
+			return $"Приложение: {input}";
+		}
+
+		public bool CanWorkIndependently() => true;
+	}
+
+	class AdvancedTransportLayer : INetworkLayer
+	{
+		public NetworkLayer LayerType => NetworkLayer.Transport;
+		public string LayerName => "Улучшенный транспортный уровень";
+
+		public string GetResponsibility() =>
+			"Надёжная доставка с сжатием и шифрованием";
+
+		public async Task<string> ProcessAsync(string input)
+		{
+			await Task.Delay(20);
+			return $"Сжатый_сегмент[{input.Length}->{input.Length / 2}]: {input.Substring(0, Math.Min(input.Length, 10))}...";
+		}
+
+		public bool CanWorkIndependently() => true;
+	}
+
+	class LayeredNetworkSystem
+	{
+		private Dictionary<NetworkLayer, INetworkLayer> _layers = new();
+
+		public LayeredNetworkSystem()
+		{
+			// Инициализируем уровни
+			_layers[NetworkLayer.Physical] = new PhysicalLayer();
+			_layers[NetworkLayer.Transport] = new TransportLayer();
+			_layers[NetworkLayer.Application] = new ApplicationLayer();
+		}
+
+		public async Task<string> TransmitDataAsync(string data)
+		{
+			Console.WriteLine($"      Начинаем передачу данных...");
+
+			string currentData = data;
+
+			// Проход через уровни от прикладного к физическому
+			var layersInOrder = new[]
+			{
+				NetworkLayer.Application,
+				NetworkLayer.Transport,
+				NetworkLayer.Physical
+			};
+
+			foreach (var layerType in layersInOrder)
+			{
+				var layer = _layers[layerType];
+				Console.WriteLine($"        {layer.LayerName}: {currentData}");
+				currentData = await layer.ProcessAsync(currentData);
+			}
+
+			Console.WriteLine($"      Данные переданы по сети");
+
+			// Обратный проход (получение)
+			Console.WriteLine($"      Получаем данные...");
+
+			foreach (var layerType in layersInOrder.Reverse())
+			{
+				var layer = _layers[layerType];
+				currentData = await layer.ProcessAsync(currentData);
+				Console.WriteLine($"        {layer.LayerName}: {currentData}");
+			}
+
+			return currentData;
+		}
+
+		public INetworkLayer GetLayer(NetworkLayer layerType)
+		{
+			return _layers[layerType];
+		}
+
+		public IEnumerable<INetworkLayer> GetAllLayers()
+		{
+			return _layers.Values;
+		}
+
+		public void ReplaceLayer(NetworkLayer layerType, INetworkLayer newLayer)
+		{
+			_layers[layerType] = newLayer;
+			Console.WriteLine($"      Уровень {layerType} заменён");
+		}
+	}
+
+	class WarehouseOrder
+	{
+		public string OrderId { get; set; }
+		public string Customer { get; set; }
+		public List<string> Items { get; set; }
+		public OrderPriority Priority { get; set; }
+
+		public override string ToString() =>
+			$"{OrderId} ({Customer}): {Items.Count} товаров";
+	}
+
+	interface IWarehouseLayer
+	{
+		string ProcessOrder(WarehouseOrder order);
+		string GetLayerInfo();
+	}
+
+	class PresentationLayer : IWarehouseLayer
+	{
+		public string ProcessOrder(WarehouseOrder order)
+		{
+			return $"Подготовка UI: Заказ {order.OrderId}";
+		}
+
+		public string GetLayerInfo() => "UI и взаимодействие с пользователем";
+	}
+
+	class BusinessLogicLayer : IWarehouseLayer
+	{
+		public string ProcessOrder(WarehouseOrder order)
+		{
+			if (order.Items == null || order.Items.Count == 0)
+				return "Ошибка: Нет товаров в заказе";
+
+			if (order.Priority == OrderPriority.Critical)
+				return "Срочная обработка заказа";
+
+			return $"Бизнес-логика: Проверка заказа {order.OrderId}";
+		}
+
+		public string ValidateOrder(WarehouseOrder order)
+		{
+			return order.Items.Count > 10 ?
+				"Требуется дополнительная проверка" :
+				"Заказ валиден";
+		}
+
+		public string GetLayerInfo() => "Бизнес-правила и валидация";
+	}
+
+	class DataAccessLayer : IWarehouseLayer
+	{
+		public string ProcessOrder(WarehouseOrder order)
+		{
+			// Симуляция сохранения в БД
+			Thread.Sleep(50);
+			return $"Сохранено в БД: {order.OrderId}";
+		}
+
+		public string SaveOrder(WarehouseOrder order)
+		{
+			return $"Заказ сохранён с ID: {order.OrderId}";
+		}
+
+		public string GetLayerInfo() => "Работа с базой данных";
+	}
+
+	class AdvancedDataLayer : IWarehouseLayer
+	{
+		public string ProcessOrder(WarehouseOrder order)
+		{
+			// Новая реализация с кэшированием
+			Thread.Sleep(20);
+			return $"Сохранено с кэшированием: {order.OrderId}";
+		}
+
+		public string GetLayerInfo() => "Продвинутая работа с данными + кэш";
+	}
+
+	class LayeredWarehouseSystem
+	{
+		private IWarehouseLayer _presentationLayer;
+		private IWarehouseLayer _businessLayer;
+		private IWarehouseLayer _dataLayer;
+
+		public LayeredWarehouseSystem()
+		{
+			_presentationLayer = new PresentationLayer();
+			_businessLayer = new BusinessLogicLayer();
+			_dataLayer = new DataAccessLayer();
+		}
+
+		public string ProcessOrder(WarehouseOrder order)
+		{
+			Console.WriteLine($"      Уровни обработки:");
+
+			string result1 = _presentationLayer.ProcessOrder(order);
+			Console.WriteLine($"        UI: {result1}");
+
+			string result2 = _businessLayer.ProcessOrder(order);
+			Console.WriteLine($"        Бизнес-логика: {result2}");
+
+			string result3 = _dataLayer.ProcessOrder(order);
+			Console.WriteLine($"        Данные: {result3}");
+
+			return $"Заказ {order.OrderId} обработан через 3 уровня";
+		}
+
+		public BusinessLogicLayer GetBusinessLayer() => (BusinessLogicLayer)_businessLayer;
+		public DataAccessLayer GetDataLayer() => (DataAccessLayer)_dataLayer;
+
+		public void ReplaceDataLayer(IWarehouseLayer newLayer)
+		{
+			_dataLayer = newLayer;
+		}
+
+		public void DebugOrderProcessing(WarehouseOrder order)
+		{
+			// Проверяем каждый уровень отдельно
 			try
 			{
-				var timeoutTask = Task.Delay(3000);
-				var testTask = test();
+				string step1 = _presentationLayer.ProcessOrder(order);
+				Console.WriteLine($"      UI уровень: {step1}");
 
-				var completedTask = await Task.WhenAny(testTask, timeoutTask);
+				string step2 = _businessLayer.ProcessOrder(order);
+				Console.WriteLine($"      Бизнес-уровень: {step2}");
 
-				if (completedTask == timeoutTask)
-					Console.WriteLine("ТАЙМАУТ");
-				else
-					Console.WriteLine($"УСПЕХ: {await testTask}");
+				string step3 = _dataLayer.ProcessOrder(order);
+				Console.WriteLine($"      Уровень данных: {step3}");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"ОШИБКА: {ex.GetType().Name}");
+				Console.WriteLine($"      Ошибка на уровне: {ex.Message}");
+				// Можно точно определить, на каком уровне проблема
 			}
+		}
+	}
+
+	class ScalableNetworkSystem
+	{
+		private List<NetworkComponent> _components = new();
+
+		public void AddComponent(string name, NetworkScale scale)
+		{
+			_components.Add(new NetworkComponent(name, scale));
+		}
+
+		public void PrintStatus()
+		{
+			Console.WriteLine($"      Компоненты системы ({_components.Count}):");
+			foreach (var comp in _components)
+			{
+				Console.WriteLine($"        - {comp.Name} ({comp.Scale})");
+			}
+		}
+	}
+
+	class NetworkComponent
+	{
+		public string Name { get; }
+		public NetworkScale Scale { get; }
+
+		public NetworkComponent(string name, NetworkScale scale)
+		{
+			Name = name;
+			Scale = scale;
+		}
+	}
+
+	class CompatibilityTester
+	{
+		public async Task<bool> TestProtocolCompatibilityAsync()
+		{
+			await Task.Delay(100);
+			return new Random().Next(0, 10) > 2; // 70% совместимости
+		}
+
+		public bool TestDataFormatCompatibility()
+		{
+			// Тестируем разные форматы данных
+			var formats = new[] { "JSON", "XML", "Protobuf", "CSV" };
+			return formats.All(f => f != "CSV"); // CSV несовместим
+		}
+	}
+
+	class SystemUpgradeManager
+	{
+		public async Task<bool> PerformUpgradeStepAsync(string step)
+		{
+			await Task.Delay(200);
+
+			// Симуляция возможной ошибки
+			bool success = new Random().Next(0, 10) > 1; // 80% успеха
+
+			if (!success)
+				Console.WriteLine($"Ошибка на шаге: {step}");
+
+			return success;
+		}
+
+		public async Task RollbackAsync()
+		{
+			Console.WriteLine($"      Восстановление предыдущей версии...");
+			await Task.Delay(300);
+			Console.WriteLine($"      Откат завершён");
+		}
+	}
+
+	class LegacySystemAdapter
+	{
+		public bool IsCompatible => true;
+
+		public string GetLegacyData()
+		{
+			// Старый формат данных
+			return "LEGACY|ORDER|123|ITEM1,ITEM2,ITEM3|2024-01-15";
+		}
+
+		public string AdaptForModernSystem(string legacyData)
+		{
+			// Преобразование в новый формат
+			var parts = legacyData.Split('|');
+
+			if (parts.Length < 5)
+				return "{}";
+
+			// Исправлено: правильное использование LINQ
+			var items = parts[3].Split(',');
+			var jsonItems = string.Join(", ", items.Select(item => $"\"{item}\""));
+
+			return $@"
+{{
+    ""system"": ""{parts[0]}"",
+    ""type"": ""{parts[1]}"",
+    ""id"": {parts[2]},
+    ""items"": [{jsonItems}],
+    ""date"": ""{parts[4]}""
+}}".Trim();
 		}
 	}
 }
