@@ -4,931 +4,672 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace SocketArchitectureDemo
+namespace SocketDotNetImplementation
 {
-	// Архитектура: Слой управления состояниями соединения
-	public enum ConnectionState
+	// Демонстрация базовых классов System.Net
+	public class SystemNetDemonstration
 	{
-		Created,     // Сокет создан
-		Bound,       // Привязан к конечной точке
-		Listening,   // Ожидает подключений (сервер)
-		Connecting,  // Устанавливает соединение (клиент)
-		Connected,   // Соединение установлено
-		Receiving,   // Получает данные
-		Sending,     // Отправляет данные
-		Closing,     // Закрывается
-		Closed,      // Закрыт
-		Error        // Ошибка
-	}
-
-	// Архитектура: Абстракция конечной точки с контекстом
-	public class NetworkEndpoint
-	{
-		public IPAddress Address { get; }
-		public int Port { get; }
-		public string Identifier { get; }
-		public DateTime CreatedAt { get; }
-
-		public NetworkEndpoint(IPAddress address, int port, string identifier = null)
+		public static void DemonstrateAddressing()
 		{
-			Address = address ?? throw new ArgumentNullException(nameof(address));
-			Port = port;
-			Identifier = identifier ?? $"{address}:{port}";
-			CreatedAt = DateTime.UtcNow;
-		}
+			Console.WriteLine("=== SYSTEM.NET: АДРЕСАЦИЯ И КОНЕЧНЫЕ ТОЧКИ ===\n");
 
-		public override string ToString() => Identifier;
+			// 1. Класс IPAddress - строго типизированный сетевой адрес
+			Console.WriteLine("1. КЛАСС IPAddress:");
 
-		public static NetworkEndpoint FromString(string endpoint, string identifier = null)
-		{
-			var parts = endpoint.Split(':');
-			if (parts.Length != 2)
-				throw new ArgumentException("Формат конечной точки: адрес:порт");
+			// Различные способы создания IP-адресов
+			IPAddress loopback = IPAddress.Loopback;           // 127.0.0.1
+			IPAddress any = IPAddress.Any;                    // 0.0.0.0
+			IPAddress broadcast = IPAddress.Broadcast;        // 255.255.255.255
+			IPAddress ipv6Loopback = IPAddress.IPv6Loopback; // ::1
 
-			return new NetworkEndpoint(
-				IPAddress.Parse(parts[0]),
-				int.Parse(parts[1]),
-				identifier
-			);
-		}
-	}
+			Console.WriteLine($"   IPAddress.Loopback: {loopback}");
+			Console.WriteLine($"   IPAddress.Any: {any}");
+			Console.WriteLine($"   IPAddress.Broadcast: {broadcast}");
+			Console.WriteLine($"   IPAddress.IPv6Loopback: {ipv6Loopback}");
 
-	// Архитектура: Базовый класс для сокетного взаимодействия (инкапсуляция слоя)
-	public abstract class SocketInteractionLayer : IDisposable
-	{
-		protected Socket _socket;
-		protected ConnectionState _state;
-		protected readonly object _stateLock = new object();
-		protected readonly NetworkEndpoint _endpoint;
-		protected readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+			// Создание из строки с валидацией
+			IPAddress parsed = IPAddress.Parse("192.168.1.1");
+			Console.WriteLine($"   IPAddress.Parse('192.168.1.1'): {parsed}");
 
-		// Архитектура: События для уведомления о изменениях состояния
-		public event EventHandler<ConnectionState> StateChanged;
-		public event EventHandler<string> ErrorOccurred;
-		public event EventHandler<byte[]> DataReceived;
-		public event EventHandler<int> DataSent;
+			// Проверка на корректность перед парсингом
+			bool isValid = IPAddress.TryParse("256.300.1.1", out IPAddress invalid);
+			Console.WriteLine($"   TryParse('256.300.1.1'): {isValid}, результат: {invalid}");
 
-		public ConnectionState CurrentState
-		{
-			get
+			// Свойства адреса
+			Console.WriteLine($"\n   Свойства IPAddress {parsed}:");
+			Console.WriteLine($"     AddressFamily: {parsed.AddressFamily}");
+			Console.WriteLine($"     IsIPv4MappedToIPv6: {parsed.IsIPv4MappedToIPv6}");
+			Console.WriteLine($"     IsIPv6LinkLocal: {parsed.IsIPv6LinkLocal}");
+			Console.WriteLine($"     IsIPv6SiteLocal: {parsed.IsIPv6SiteLocal}");
+			Console.WriteLine($"     IsIPv6Multicast: {parsed.IsIPv6Multicast}");
+
+			// 2. Класс IPEndPoint - связка адреса и порта
+			Console.WriteLine("\n2. КЛАСС IPEndPoint:");
+
+			// Создание конечных точек
+			var endpoint1 = new IPEndPoint(loopback, 8080);
+			var endpoint2 = new IPEndPoint(IPAddress.Parse("10.0.0.1"), 80);
+			var endpoint3 = new IPEndPoint(IPAddress.IPv6Any, 443);
+
+			Console.WriteLine($"   IPEndPoint(127.0.0.1, 8080): {endpoint1}");
+			Console.WriteLine($"   IPEndPoint(10.0.0.1, 80): {endpoint2}");
+			Console.WriteLine($"   IPEndPoint(IPv6Any, 443): {endpoint3}");
+
+			// Свойства конечной точки
+			Console.WriteLine($"\n   Свойства {endpoint1}:");
+			Console.WriteLine($"     Address: {endpoint1.Address}");
+			Console.WriteLine($"     Port: {endpoint1.Port}");
+			Console.WriteLine($"     AddressFamily: {endpoint1.AddressFamily}");
+
+			// Сериализация/десериализация конечных точек
+			Console.WriteLine($"\n   Сериализация конечных точек:");
+
+			// Сериализация IPEndPoint в SocketAddress
+			SocketAddress socketAddress = endpoint1.Serialize();
+			Console.WriteLine($"     Serialize(): Семейство адресов: {socketAddress.Family}");
+			Console.WriteLine($"     Размер буфера: {socketAddress.Size}");
+
+			// Получение байтов из Memory<byte>
+			var bufferSpan = socketAddress.Buffer.Span;
+			Console.Write($"     Байты (первые {Math.Min(16, socketAddress.Size)}): ");
+			for (int i = 0; i < Math.Min(16, socketAddress.Size); i++)
 			{
-				lock (_stateLock) return _state;
+				Console.Write($"{bufferSpan[i]:X2} ");
+				if (i % 8 == 7) Console.Write(" ");
 			}
-			protected set
+			Console.WriteLine();
+
+			// Альтернативный способ с ToArray()
+			Console.Write($"     Байты (через ToArray()): ");
+			byte[] bufferArray = socketAddress.Buffer.ToArray();
+			Console.WriteLine(BitConverter.ToString(bufferArray, 0, Math.Min(16, bufferArray.Length)));
+
+			// Восстановление IPEndPoint из SocketAddress
+			var restoredEndpoint = (IPEndPoint)endpoint1.Create(socketAddress);
+			Console.WriteLine($"     Восстановленный: {restoredEndpoint}");
+
+			// Демонстрация ручного создания SocketAddress
+			Console.WriteLine($"\n   Ручное создание SocketAddress:");
+			var manualSocketAddress = new SocketAddress(AddressFamily.InterNetwork, 16);
+			Console.WriteLine($"     Размер: {manualSocketAddress.Size}");
+			Console.WriteLine($"     Семейство: {manualSocketAddress.Family}");
+
+			// Получение отдельных байтов из SocketAddress
+			Console.WriteLine($"\n   Анализ SocketAddress:");
+			Console.WriteLine($"     Байт 0 (семейство): {socketAddress[0]}");
+			Console.WriteLine($"     Байт 1 (порт MSB): {socketAddress[1]}");
+			Console.WriteLine($"     Байт 2 (порт LSB): {socketAddress[2]}");
+
+			// IPv6 пример
+			Console.WriteLine($"\n   SocketAddress для IPv6:");
+			var ipv6Endpoint = new IPEndPoint(IPAddress.IPv6Loopback, 8080);
+			SocketAddress ipv6SocketAddress = ipv6Endpoint.Serialize();
+			Console.WriteLine($"     Размер IPv6 SocketAddress: {ipv6SocketAddress.Size}");
+			Console.WriteLine($"     Семейство: {ipv6SocketAddress.Family}");
+
+			// Сравнение SocketAddress
+			Console.WriteLine($"\n   Сравнение SocketAddress:");
+			var socketAddress1 = endpoint1.Serialize();
+			var socketAddress2 = endpoint1.Serialize();
+			Console.WriteLine($"     Equals: {socketAddress1.Equals(socketAddress2)}");
+			Console.WriteLine($"     GetHashCode одинаковые: {socketAddress1.GetHashCode() == socketAddress2.GetHashCode()}");
+
+			// 3. DNS-разрешение - часть System.Net
+			Console.WriteLine("\n3. КЛАСС Dns:");
+
+			try
 			{
-				lock (_stateLock)
+				var hostEntry = Dns.GetHostEntry("localhost");
+				Console.WriteLine($"   Dns.GetHostEntry('localhost'):");
+				Console.WriteLine($"     HostName: {hostEntry.HostName}");
+
+				Console.WriteLine($"     Addresses:");
+				foreach (var addr in hostEntry.AddressList)
 				{
-					var oldState = _state;
-					_state = value;
-					OnStateChanged(oldState, value);
+					Console.WriteLine($"       - {addr} ({addr.AddressFamily})");
 				}
 			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"   Ошибка DNS: {ex.Message}");
+			}
+		}
+	}
+
+	// Демонстрация классов System.Net.Sockets
+	public class SystemNetSocketsDemonstration : IDisposable
+	{
+		private Socket _serverSocket;
+		private Socket _clientSocket;
+		private Thread _serverThread;
+		private bool _isRunning;
+		private readonly int _port;
+
+		public SystemNetSocketsDemonstration(int port = 11010)
+		{
+			_port = port;
 		}
 
-		public NetworkEndpoint Endpoint => _endpoint;
-		public bool IsActive => CurrentState != ConnectionState.Closed &&
-							   CurrentState != ConnectionState.Error;
-
-		protected SocketInteractionLayer(NetworkEndpoint endpoint)
+		public void DemonstrateSocketClass()
 		{
-			_endpoint = endpoint ?? throw new ArgumentNullException(nameof(endpoint));
-			_state = ConnectionState.Created;
-		}
+			Console.WriteLine("\n=== SYSTEM.NET.SOCKETS: КЛАСС Socket ===\n");
 
-		// Архитектура: Абстрактные методы, которые должны реализовать конкретные роли
-		protected abstract void InitializeSocket();
-		protected abstract Task EstablishConnectionAsync(CancellationToken cancellationToken);
+			// 1. Создание сокета - инициализация системного ресурса
+			Console.WriteLine("1. СОЗДАНИЕ СОКЕТА:");
 
-		// Архитектура: Общая логика создания сокета
-		protected virtual Socket CreateSocket()
-		{
+			// Параметры конструктора определяют тип сокета
+			// AddressFamily.InterNetwork - IPv4
+			// SocketType.Stream - TCP сокет
+			// ProtocolType.Tcp - протокол TCP
 			var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
-			// Настройка параметров ОС через сокет
-			socket.LingerState = new LingerOption(true, 3);
-			socket.NoDelay = true;
-			socket.ReceiveBufferSize = 8192;
-			socket.SendBufferSize = 8192;
-			socket.ReceiveTimeout = 30000;
-			socket.SendTimeout = 30000;
+			Console.WriteLine($"   Socket(InterNetwork, Stream, Tcp) создан:");
+			Console.WriteLine($"     Дескриптор: {socket.Handle}");
+			Console.WriteLine($"     AddressFamily: {socket.AddressFamily}");
+			Console.WriteLine($"     SocketType: {socket.SocketType}");
+			Console.WriteLine($"     ProtocolType: {socket.ProtocolType}");
+			Console.WriteLine($"     Blocking: {socket.Blocking}");
+			Console.WriteLine($"     Connected: {socket.Connected}");
 
-			return socket;
+			// 2. Конфигурация сокета - передача параметров ОС
+			Console.WriteLine("\n2. КОНФИГУРАЦИЯ СОКЕТА:");
+
+			// Настройка параметров через свойства
+			socket.LingerState = new LingerOption(true, 3); // Задержка при закрытии
+			socket.NoDelay = true;                          // Отключение алгоритма Нагля
+			socket.ReceiveBufferSize = 8192;                // Размер буфера приёма
+			socket.SendBufferSize = 8192;                   // Размер буфера отправки
+			socket.ReceiveTimeout = 5000;                   // Таймаут приёма (мс)
+			socket.SendTimeout = 5000;                      // Таймаут отправки (мс)
+			socket.Ttl = 64;                                // Time To Live для пакетов
+
+			Console.WriteLine($"   Параметры установлены:");
+			Console.WriteLine($"     LingerState: Enabled={socket.LingerState.Enabled}, LingerTime={socket.LingerState.LingerTime}s");
+			Console.WriteLine($"     NoDelay: {socket.NoDelay}");
+			Console.WriteLine($"     ReceiveBufferSize: {socket.ReceiveBufferSize}");
+			Console.WriteLine($"     SendBufferSize: {socket.SendBufferSize}");
+			Console.WriteLine($"     ReceiveTimeout: {socket.ReceiveTimeout}");
+			Console.WriteLine($"     SendTimeout: {socket.SendTimeout}");
+			Console.WriteLine($"     Ttl: {socket.Ttl}");
+
+			// 3. Вспомогательные типы и перечисления
+			Console.WriteLine("\n3. ВСПОМОГАТЕЛЬНЫЕ ТИПЫ И ПЕРЕЧИСЛЕНИЯ:");
+
+			Console.WriteLine("   AddressFamily:");
+			Console.WriteLine($"     InterNetwork: {AddressFamily.InterNetwork} - IPv4");
+			Console.WriteLine($"     InterNetworkV6: {AddressFamily.InterNetworkV6} - IPv6");
+			Console.WriteLine($"     Unix: {AddressFamily.Unix} - UNIX domain sockets");
+
+			Console.WriteLine("\n   SocketType:");
+			Console.WriteLine($"     Stream: {SocketType.Stream} - TCP");
+			Console.WriteLine($"     Dgram: {SocketType.Dgram} - UDP");
+			Console.WriteLine($"     Raw: {SocketType.Raw} - RAW сокеты");
+
+			Console.WriteLine("\n   ProtocolType:");
+			Console.WriteLine($"     Tcp: {ProtocolType.Tcp}");
+			Console.WriteLine($"     Udp: {ProtocolType.Udp}");
+			Console.WriteLine($"     Raw: {ProtocolType.Raw}");
+
+			// 4. Состояния сокета
+			Console.WriteLine("\n4. СОСТОЯНИЯ СОКЕТА:");
+
+			Console.WriteLine($"   До Bind: IsBound={socket.IsBound}, Connected={socket.Connected}");
+
+			// Привязка к локальному адресу
+			socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+			Console.WriteLine($"   После Bind: IsBound={socket.IsBound}, Connected={socket.Connected}");
+
+			Console.WriteLine($"   До Listen: IsBound={socket.IsBound}");
+			socket.Listen(10);
+			Console.WriteLine($"   После Listen: IsBound={socket.IsBound}");
+
+			// Освобождение ресурса
+			socket.Close();
+			Console.WriteLine($"\n   Ресурс сокета освобождён");
 		}
 
-		// Архитектура: Переходы между состояниями
-		protected bool TransitionToState(ConnectionState newState, bool validateTransition = true)
+		public void DemonstrateThreadSafety()
 		{
-			lock (_stateLock)
+			Console.WriteLine("\n5. ПУТЕБОЗОПАСНОСТЬ:");
+
+			var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+			// Демонстрация работы из нескольких потоков
+			Console.WriteLine("   Тест работы из нескольких потоков:");
+
+			var tasks = new List<Task>();
+			var exceptions = new List<Exception>();
+			var counter = 0;
+
+			for (int i = 0; i < 3; i++)
 			{
-				var oldState = _state;
-
-				// Валидация переходов
-				if (validateTransition && !IsValidTransition(oldState, newState))
-				{
-					var error = $"Недопустимый переход состояния: {oldState} -> {newState}";
-					Console.WriteLine($"[{_endpoint.Identifier}] {error}");
-
-					// Вызываем OnErrorOccurred напрямую, а не через TransitionToState
-					_state = ConnectionState.Error;
-					OnErrorOccurred(error, false); // false - не валидируем переход
-					return false;
-				}
-
-				_state = newState;
-				OnStateChanged(oldState, newState);
-				Console.WriteLine($"[{_endpoint.Identifier}] Переход состояния: {oldState} -> {newState}");
-				return true;
-			}
-		}
-
-		private bool IsValidTransition(ConnectionState from, ConnectionState to)
-		{
-			// Архитектура: Матрица допустимых переходов состояний
-			var validTransitions = new Dictionary<ConnectionState, List<ConnectionState>>
-			{
-				[ConnectionState.Created] = new List<ConnectionState>
-					{ ConnectionState.Bound, ConnectionState.Connecting, ConnectionState.Closing, ConnectionState.Error },
-				[ConnectionState.Bound] = new List<ConnectionState>
-					{ ConnectionState.Listening, ConnectionState.Closing, ConnectionState.Error },
-				[ConnectionState.Listening] = new List<ConnectionState>
-					{ ConnectionState.Connected, ConnectionState.Closing, ConnectionState.Error },
-				[ConnectionState.Connecting] = new List<ConnectionState>
-					{ ConnectionState.Connected, ConnectionState.Closing, ConnectionState.Error },
-				[ConnectionState.Connected] = new List<ConnectionState>
-					{ ConnectionState.Receiving, ConnectionState.Sending, ConnectionState.Closing, ConnectionState.Error },
-				[ConnectionState.Receiving] = new List<ConnectionState>
-					{ ConnectionState.Connected, ConnectionState.Closing, ConnectionState.Error },
-				[ConnectionState.Sending] = new List<ConnectionState>
-					{ ConnectionState.Connected, ConnectionState.Closing, ConnectionState.Error },
-				[ConnectionState.Closing] = new List<ConnectionState>
-					{ ConnectionState.Closed, ConnectionState.Error },
-				[ConnectionState.Closed] = new List<ConnectionState> { },
-				[ConnectionState.Error] = new List<ConnectionState> { ConnectionState.Closing, ConnectionState.Closed }
-			};
-
-			return validTransitions.ContainsKey(from) &&
-				   validTransitions[from].Contains(to);
-		}
-
-		// Архитектура: Защищённые методы для отправки событий
-		protected virtual void OnStateChanged(ConnectionState oldState, ConnectionState newState)
-		{
-			StateChanged?.Invoke(this, newState);
-		}
-
-		protected virtual void OnErrorOccurred(string error, bool validateTransition = true)
-		{
-			Console.WriteLine($"[{_endpoint.Identifier}] Ошибка: {error}");
-
-			// Переход в состояние Error без валидации, чтобы избежать рекурсии
-			lock (_stateLock)
-			{
-				var oldState = _state;
-				_state = ConnectionState.Error;
-				ErrorOccurred?.Invoke(this, error);
-				OnStateChanged(oldState, ConnectionState.Error);
-			}
-		}
-
-		protected virtual void OnDataReceived(byte[] data)
-		{
-			DataReceived?.Invoke(this, data);
-		}
-
-		protected virtual void OnDataSent(int bytesSent)
-		{
-			DataSent?.Invoke(this, bytesSent);
-		}
-
-		// Архитектура: Обработка сетевых ошибок
-		protected void HandleSocketError(SocketException ex, string operation)
-		{
-			var error = $"Сетевая ошибка при {operation}: {ex.SocketErrorCode} - {ex.Message}";
-			OnErrorOccurred(error);
-		}
-
-		// Архитектура: Безопасное освобождение ресурсов
-		protected virtual void Dispose(bool disposing)
-		{
-			if (disposing)
-			{
-				_cancellationTokenSource.Cancel();
-				_cancellationTokenSource.Dispose();
-
-				if (_socket != null)
+				tasks.Add(Task.Run(() =>
 				{
 					try
 					{
-						if (_socket.Connected)
-						{
-							TransitionToState(ConnectionState.Closing, false);
-							_socket.Shutdown(SocketShutdown.Both);
-						}
+						// Каждый поток пытается настроить сокет
+						// Это вызовет исключение, т.к. сокет не потокобезопасен
+						socket.ReceiveTimeout = 1000 * (Thread.CurrentThread.ManagedThreadId % 5);
+						Interlocked.Increment(ref counter);
 					}
-					catch { }
+					catch (Exception ex)
+					{
+						lock (exceptions)
+							exceptions.Add(ex);
+					}
+				}));
+			}
 
-					_socket.Close();
-					_socket.Dispose();
-					_socket = null;
+			Task.WaitAll(tasks.ToArray());
+
+			Console.WriteLine($"   Успешных операций: {counter}/3");
+			Console.WriteLine($"   Исключений: {exceptions.Count}");
+			if (exceptions.Count > 0)
+			{
+				Console.WriteLine($"   Пример исключения: {exceptions[0].GetType().Name}");
+			}
+
+			socket.Dispose();
+		}
+
+		public void DemonstrateClientServerInteraction()
+		{
+			Console.WriteLine("\n6. КЛИЕНТ-СЕРВЕРНОЕ ВЗАИМОДЕЙСТВИЕ:");
+
+			_isRunning = true;
+
+			// Запуск сервера
+			_serverThread = new Thread(RunServer);
+			_serverThread.IsBackground = true;
+			_serverThread.Start();
+
+			Thread.Sleep(1000); // Даём время серверу запуститься
+
+			// Клиентское подключение
+			try
+			{
+				_clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+				Console.WriteLine("   Клиент подключается...");
+				_clientSocket.Connect(new IPEndPoint(IPAddress.Loopback, _port));
+				Console.WriteLine($"   Подключение установлено: {_clientSocket.Connected}");
+				Console.WriteLine($"   Локальная точка: {_clientSocket.LocalEndPoint}");
+				Console.WriteLine($"   Удалённая точка: {_clientSocket.RemoteEndPoint}");
+
+				// Отправка данных
+				string message = "Hello from client!";
+				byte[] sendBuffer = Encoding.UTF8.GetBytes(message);
+
+				Console.WriteLine($"\n   Отправка сообщения: '{message}'");
+				int bytesSent = _clientSocket.Send(sendBuffer);
+				Console.WriteLine($"   Отправлено байт: {bytesSent}");
+
+				// Получение ответа
+				byte[] receiveBuffer = new byte[1024];
+				int bytesReceived = _clientSocket.Receive(receiveBuffer);
+
+				string response = Encoding.UTF8.GetString(receiveBuffer, 0, bytesReceived);
+				Console.WriteLine($"   Получен ответ: '{response}'");
+				Console.WriteLine($"   Получено байт: {bytesReceived}");
+
+				// Проверка состояния
+				Console.WriteLine($"\n   Состояние после обмена:");
+				Console.WriteLine($"     Connected: {_clientSocket.Connected}");
+				Console.WriteLine($"     Available: {_clientSocket.Available}");
+
+				// Корректное закрытие
+				Console.WriteLine("\n   Корректное закрытие соединения...");
+				_clientSocket.Shutdown(SocketShutdown.Both);
+				_clientSocket.Close();
+				Console.WriteLine($"   Соединение закрыто: {!_clientSocket.Connected}");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"   Ошибка: {ex.Message}");
+			}
+
+			_isRunning = false;
+			Thread.Sleep(1000);
+		}
+
+		private void RunServer()
+		{
+			try
+			{
+				_serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+				_serverSocket.Bind(new IPEndPoint(IPAddress.Loopback, _port));
+				_serverSocket.Listen(1);
+
+				Console.WriteLine($"   Сервер запущен на порту {_port}");
+
+				while (_isRunning)
+				{
+					Socket client = _serverSocket.Accept();
+					Console.WriteLine($"   Сервер принял подключение от {client.RemoteEndPoint}");
+
+					// Обработка клиента
+					byte[] buffer = new byte[1024];
+					int bytesRead = client.Receive(buffer);
+
+					string received = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+					Console.WriteLine($"   Сервер получил: '{received}'");
+
+					// Эхо-ответ
+					string response = $"Echo: {received}";
+					byte[] responseBytes = Encoding.UTF8.GetBytes(response);
+					client.Send(responseBytes);
+
+					client.Shutdown(SocketShutdown.Both);
+					client.Close();
+
+					break; // Для демонстрации обрабатываем только одно подключение
 				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"   Ошибка сервера: {ex.Message}");
+			}
+		}
 
-				TransitionToState(ConnectionState.Closed, false);
+		public void DemonstrateWrapperClasses()
+		{
+			Console.WriteLine("\n7. КЛАССЫ-ОБЁРТКИ:");
+
+			// 1. TcpClient/TcpListener - высокоуровневые обёртки
+			Console.WriteLine("\n   TcpClient/TcpListener:");
+
+			var listener = new TcpListener(IPAddress.Loopback, _port + 1);
+			listener.Start();
+
+			Console.WriteLine($"   TcpListener запущен на порту {_port + 1}");
+
+			// Асинхронное принятие подключения
+			var acceptTask = listener.AcceptTcpClientAsync();
+
+			// Клиентское подключение
+			var client = new TcpClient();
+			client.Connect(IPAddress.Loopback, _port + 1);
+			Console.WriteLine($"   TcpClient подключён");
+
+			var serverClient = acceptTask.Result;
+			Console.WriteLine($"   Сервер принял TcpClient");
+
+			// Обмен данными через NetworkStream
+			var message = "Test через TcpClient";
+			var data = Encoding.UTF8.GetBytes(message);
+
+			client.GetStream().Write(data, 0, data.Length);
+			Console.WriteLine($"   Клиент отправил: '{message}'");
+
+			byte[] buffer = new byte[1024];
+			int bytesRead = serverClient.GetStream().Read(buffer, 0, buffer.Length);
+			string received = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+			Console.WriteLine($"   Сервер получил: '{received}'");
+
+			// Освобождение ресурсов
+			client.Close();
+			serverClient.Close();
+			listener.Stop();
+
+			// 2. UdpClient - обёртка для UDP сокетов
+			Console.WriteLine("\n   UdpClient:");
+
+			var udpServer = new UdpClient(_port + 2);
+			var udpClient = new UdpClient();
+
+			udpClient.Connect(IPAddress.Loopback, _port + 2);
+
+			var udpMessage = "UDP сообщение";
+			var udpData = Encoding.UTF8.GetBytes(udpMessage);
+
+			udpClient.Send(udpData, udpData.Length);
+			Console.WriteLine($"   UDP клиент отправил: '{udpMessage}'");
+
+			IPEndPoint remoteEndpoint = new IPEndPoint(IPAddress.Any, 0);
+			byte[] udpReceived = udpServer.Receive(ref remoteEndpoint);
+			string udpReceivedMessage = Encoding.UTF8.GetString(udpReceived);
+			Console.WriteLine($"   UDP сервер получил: '{udpReceivedMessage}' от {remoteEndpoint}");
+
+			udpClient.Close();
+			udpServer.Close();
+		}
+
+		public void DemonstrateResourceManagement()
+		{
+			Console.WriteLine("\n8. УПРАВЛЕНИЕ РЕСУРСАМИ:");
+
+			Console.WriteLine("   Тест утечки ресурсов:");
+
+			// Создаём сокет без освобождения
+			var socket1 = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			Console.WriteLine($"   Создан сокет #{socket1.Handle}");
+
+			// Используем using для автоматического освобождения
+			using (var socket2 = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+			{
+				Console.WriteLine($"   Создан сокет #{socket2.Handle} в using");
+			}
+
+			// Явный вызов Dispose
+			var socket3 = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			Console.WriteLine($"   Создан сокет #{socket3.Handle}");
+			socket3.Dispose();
+
+			Console.WriteLine($"   Сокет #{socket3.Handle} освобождён через Dispose");
+
+			// Проверка состояния после Dispose
+			try
+			{
+				socket3.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+				Console.WriteLine($"   ОШИБКА: Операция после Dispose не вызвала исключение");
+			}
+			catch (ObjectDisposedException)
+			{
+				Console.WriteLine($"   Корректно: ObjectDisposedException после Dispose");
+			}
+
+			// Забытый сокет
+			Console.WriteLine($"\n   ВНИМАНИЕ: Сокет #{socket1.Handle} не освобождён!");
+			// socket1 должен быть освобождён в Dispose класса
+
+			// Демонстрация финализатора
+			var weakRef = new WeakReference<Socket>(socket1);
+			socket1 = null; // Убираем сильную ссылку
+
+			GC.Collect();
+			GC.WaitForPendingFinalizers();
+
+			if (weakRef.TryGetTarget(out Socket releasedSocket))
+			{
+				Console.WriteLine($"   Сокет всё ещё в памяти");
+			}
+			else
+			{
+				Console.WriteLine($"   Сокет был собран сборщиком мусора");
 			}
 		}
 
 		public void Dispose()
 		{
-			Dispose(true);
+			_isRunning = false;
+
+			_clientSocket?.Dispose();
+			_serverSocket?.Dispose();
+
+			_serverThread?.Join(1000);
+
 			GC.SuppressFinalize(this);
 		}
-
-		~SocketInteractionLayer()
-		{
-			Dispose(false);
-		}
 	}
 
-	// Архитектура: Сторона, ожидающая взаимодействия (серверная роль)
-	public class SocketAcceptor : SocketInteractionLayer
+	// Архитектурное разделение слоёв
+	public class ArchitectureLayers
 	{
-		private readonly ConcurrentDictionary<string, SocketConnection> _activeConnections = new();
-		private Task _acceptLoopTask;
-
-		public int ActiveConnectionsCount => _activeConnections.Count;
-
-		public SocketAcceptor(NetworkEndpoint endpoint) : base(endpoint)
+		// Слой System.Net - описание и идентификация
+		public class NetworkAddressingLayer
 		{
-		}
-
-		// Архитектура: Инициализация сокета для ожидания подключений
-		protected override void InitializeSocket()
-		{
-			try
+			public IPEndPoint ParseEndpoint(string address, int port)
 			{
-				_socket = CreateSocket();
-				_socket.Bind(new IPEndPoint(_endpoint.Address, _endpoint.Port));
-				TransitionToState(ConnectionState.Bound);
+				// Валидация и создание конечной точки
+				if (!IPAddress.TryParse(address, out IPAddress ipAddress))
+					throw new ArgumentException($"Некорректный IP-адрес: {address}");
 
-				_socket.Listen(100);
-				TransitionToState(ConnectionState.Listening);
-
-				Console.WriteLine($"[Acceptor {_endpoint}] Ожидает подключений на {_endpoint.Address}:{_endpoint.Port}");
+				return new IPEndPoint(ipAddress, port);
 			}
-			catch (Exception ex)
+
+			public IPAddress[] ResolveHost(string hostname)
 			{
-				OnErrorOccurred($"Ошибка при инициализации сокета: {ex.Message}");
-				throw;
+				// DNS-разрешение
+				return Dns.GetHostAddresses(hostname);
 			}
 		}
 
-		protected override async Task EstablishConnectionAsync(CancellationToken cancellationToken)
+		// Слой System.Net.Sockets - инфраструктура
+		public class SocketInfrastructureLayer : IDisposable
 		{
-			// Архитектура: Асинхронный цикл приёма подключений
-			_acceptLoopTask = Task.Run(async () =>
+			private Socket _socket;
+			private readonly IPEndPoint _endpoint;
+
+			public SocketInfrastructureLayer(IPEndPoint endpoint)
 			{
-				Console.WriteLine($"[Acceptor {_endpoint}] Запущен цикл приёма подключений");
-
-				while (!cancellationToken.IsCancellationRequested &&
-					   CurrentState == ConnectionState.Listening)
-				{
-					try
-					{
-						// Архитектура: Асинхронное ожидание подключения
-						var clientSocket = await Task.Factory.FromAsync(
-							_socket.BeginAccept(null, null),
-							_socket.EndAccept);
-
-						if (clientSocket != null)
-						{
-							var clientEndpoint = (IPEndPoint)clientSocket.RemoteEndPoint;
-							var connectionId = $"{clientEndpoint.Address}:{clientEndpoint.Port}";
-
-							Console.WriteLine($"[Acceptor {_endpoint}] Принято подключение от {connectionId}");
-
-							// Архитектура: Создание отдельного объекта для управления соединением
-							var connection = new SocketConnection(
-								new NetworkEndpoint(clientEndpoint.Address, clientEndpoint.Port, connectionId),
-								clientSocket);
-
-							_activeConnections[connectionId] = connection;
-
-							// Архитектура: Запуск обработки соединения в отдельном контексте
-							_ = Task.Run(() => HandleConnectionAsync(connection, cancellationToken), cancellationToken);
-						}
-					}
-					catch (OperationCanceledException)
-					{
-						Console.WriteLine($"[Acceptor {_endpoint}] Приём подключений прерван");
-						break;
-					}
-					catch (SocketException ex)
-					{
-						HandleSocketError(ex, "приёме подключения");
-						break;
-					}
-					catch (Exception ex)
-					{
-						OnErrorOccurred($"Ошибка при приёме подключения: {ex.Message}");
-						await Task.Delay(1000, cancellationToken);
-					}
-				}
-
-				Console.WriteLine($"[Acceptor {_endpoint}] Цикл приёма подключений завершён");
-			}, cancellationToken);
-
-			await _acceptLoopTask;
-		}
-
-		// Архитектура: Обработка отдельного соединения
-		private async Task HandleConnectionAsync(SocketConnection connection, CancellationToken cancellationToken)
-		{
-			Console.WriteLine($"[Connection {connection.Endpoint}] Начало обработки");
-
-			try
-			{
-				// Архитектура: Цикл взаимодействия
-				while (!cancellationToken.IsCancellationRequested &&
-					   connection.CurrentState == ConnectionState.Connected)
-				{
-					// Архитектура: Асинхронный приём данных
-					var data = await connection.ReceiveAsync(cancellationToken);
-					if (data == null || data.Length == 0)
-					{
-						Console.WriteLine($"[Connection {connection.Endpoint}] Соединение закрыто удалённой стороной");
-						break;
-					}
-
-					// Архитектура: Обработка полученных данных
-					Console.WriteLine($"[Connection {connection.Endpoint}] Получено {data.Length} байт");
-					OnDataReceived(data);
-
-					// Архитектура: Эхо-ответ (пример бизнес-логики)
-					var response = Encoding.UTF8.GetBytes($"Эхо: {Encoding.UTF8.GetString(data)}");
-					await connection.SendAsync(response, cancellationToken);
-
-					Console.WriteLine($"[Connection {connection.Endpoint}] Отправлено {response.Length} байт");
-				}
+				_endpoint = endpoint;
+				_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 			}
-			catch (OperationCanceledException)
-			{
-				Console.WriteLine($"[Connection {connection.Endpoint}] Обработка прервана");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"[Connection {connection.Endpoint}] Ошибка обработки: {ex.Message}");
-			}
-			finally
-			{
-				// Архитектура: Корректное завершение соединения
-				connection.Dispose();
-				_activeConnections.TryRemove(connection.Endpoint.Identifier, out _);
 
-				Console.WriteLine($"[Connection {connection.Endpoint}] Обработка завершена. Активных соединений: {_activeConnections.Count}");
+			public void Configure(SocketConfiguration config)
+			{
+				// Конфигурация системного ресурса
+				_socket.ReceiveTimeout = config.ReceiveTimeout;
+				_socket.SendTimeout = config.SendTimeout;
+				_socket.ReceiveBufferSize = config.BufferSize;
+				_socket.SendBufferSize = config.BufferSize;
+				_socket.NoDelay = config.NoDelay;
+			}
+
+			public void Bind()
+			{
+				_socket.Bind(_endpoint);
+			}
+
+			public void Listen(int backlog)
+			{
+				_socket.Listen(backlog);
+			}
+
+			public Socket Accept()
+			{
+				return _socket.Accept();
+			}
+
+			public void Connect()
+			{
+				_socket.Connect(_endpoint);
+			}
+
+			public void Send(byte[] data)
+			{
+				_socket.Send(data);
+			}
+
+			public byte[] Receive(int bufferSize)
+			{
+				var buffer = new byte[bufferSize];
+				int received = _socket.Receive(buffer);
+
+				var result = new byte[received];
+				Array.Copy(buffer, result, received);
+				return result;
+			}
+
+			public void Dispose()
+			{
+				_socket?.Dispose();
 			}
 		}
 
-		public async Task StartAsync(CancellationToken cancellationToken = default)
+		// Слой бизнес-логики - использует инфраструктуру
+		public class BusinessLogicLayer
 		{
-			if (CurrentState != ConnectionState.Created)
-				throw new InvalidOperationException("Acceptor уже запущен");
+			private readonly SocketInfrastructureLayer _infrastructure;
 
-			InitializeSocket();
-			await EstablishConnectionAsync(cancellationToken);
-		}
-
-		public void Stop()
-		{
-			Console.WriteLine($"[Acceptor {_endpoint}] Остановка...");
-
-			// Архитектура: Остановка всех активных соединений
-			foreach (var connection in _activeConnections.Values)
+			public BusinessLogicLayer(SocketInfrastructureLayer infrastructure)
 			{
-				connection.Dispose();
+				_infrastructure = infrastructure;
 			}
-			_activeConnections.Clear();
 
-			Dispose();
-		}
-	}
-
-	// Архитектура: Сторона, инициирующая взаимодействие (клиентская роль)
-	public class SocketConnector : SocketInteractionLayer
-	{
-		public SocketConnector(NetworkEndpoint endpoint) : base(endpoint)
-		{
-		}
-
-		protected override void InitializeSocket()
-		{
-			try
+			public string ProcessRequest(string request)
 			{
-				_socket = CreateSocket();
-				Console.WriteLine($"[Connector {_endpoint}] Сокет создан");
-			}
-			catch (Exception ex)
-			{
-				OnErrorOccurred($"Ошибка при создании сокета: {ex.Message}");
-				throw;
+				// Бизнес-логика не зависит от деталей реализации сокетов
+				return $"Обработано: {request}";
 			}
 		}
 
-		protected override async Task EstablishConnectionAsync(CancellationToken cancellationToken)
+		public record SocketConfiguration
 		{
-			if (!TransitionToState(ConnectionState.Connecting))
-			{
-				throw new InvalidOperationException("Не удалось перейти в состояние Connecting");
-			}
-
-			Console.WriteLine($"[Connector {_endpoint}] Установка соединения с {_endpoint.Address}:{_endpoint.Port}...");
-
-			try
-			{
-				// Архитектура: Асинхронное подключение
-				await Task.Factory.FromAsync(
-					_socket.BeginConnect(_endpoint.Address, _endpoint.Port, null, null),
-					_socket.EndConnect);
-
-				TransitionToState(ConnectionState.Connected);
-				Console.WriteLine($"[Connector {_endpoint}] Соединение установлено");
-			}
-			catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionRefused ||
-											ex.SocketErrorCode == SocketError.TimedOut)
-			{
-				// Это ожидаемые ошибки при подключении к несуществующему серверу
-				OnErrorOccurred($"Не удалось подключиться: {ex.SocketErrorCode}");
-				throw;
-			}
-			catch (SocketException ex)
-			{
-				HandleSocketError(ex, "установке соединения");
-				throw;
-			}
-			catch (Exception ex)
-			{
-				OnErrorOccurred($"Неизвестная ошибка при подключении: {ex.Message}");
-				throw;
-			}
+			public int ReceiveTimeout { get; init; } = 30000;
+			public int SendTimeout { get; init; } = 30000;
+			public int BufferSize { get; init; } = 8192;
+			public bool NoDelay { get; init; } = true;
 		}
 
-		// Архитектура: Отправка данных
-		public async Task SendAsync(byte[] data, CancellationToken cancellationToken = default)
+		public static void DemonstrateLayerSeparation()
 		{
-			if (CurrentState != ConnectionState.Connected)
-				throw new InvalidOperationException("Соединение не установлено");
+			Console.WriteLine("\n=== АРХИТЕКТУРНОЕ РАЗДЕЛЕНИЕ СЛОЁВ ===\n");
 
-			if (!TransitionToState(ConnectionState.Sending))
-				return;
+			// 1. Слой описания (System.Net)
+			var addressing = new NetworkAddressingLayer();
+			var endpoint = addressing.ParseEndpoint("127.0.0.1", 11011);
+			Console.WriteLine($"1. Слой описания создал конечную точку: {endpoint}");
 
-			try
+			// 2. Слой инфраструктуры (System.Net.Sockets)
+			var infrastructure = new SocketInfrastructureLayer(endpoint);
+			var config = new SocketConfiguration
 			{
-				int totalSent = 0;
-
-				// Архитектура: Отправка данных по частям
-				while (totalSent < data.Length && !cancellationToken.IsCancellationRequested)
-				{
-					int sent = await Task.Factory.FromAsync<int>(
-						(callback, state) => _socket.BeginSend(
-							data, totalSent, data.Length - totalSent,
-							SocketFlags.None, callback, state),
-						_socket.EndSend,
-						null);
-
-					if (sent == 0)
-						throw new SocketException((int)SocketError.ConnectionReset);
-
-					totalSent += sent;
-					OnDataSent(sent);
-
-					Console.WriteLine($"[Connector {_endpoint}] Отправлено {sent} байт, всего {totalSent}/{data.Length}");
-				}
-
-				TransitionToState(ConnectionState.Connected);
-				Console.WriteLine($"[Connector {_endpoint}] Всего отправлено {totalSent} байт");
-			}
-			catch (SocketException ex)
-			{
-				HandleSocketError(ex, "отправке данных");
-				throw;
-			}
-		}
-
-		// Архитектура: Получение данных
-		public async Task<byte[]> ReceiveAsync(CancellationToken cancellationToken = default)
-		{
-			if (CurrentState != ConnectionState.Connected)
-				throw new InvalidOperationException("Соединение не установлено");
-
-			if (!TransitionToState(ConnectionState.Receiving))
-				return null;
-
-			try
-			{
-				var buffer = new byte[4096];
-
-				// Архитектура: Асинхронное получение
-				int bytesRead = await Task.Factory.FromAsync<int>(
-					(callback, state) => _socket.BeginReceive(
-						buffer, 0, buffer.Length,
-						SocketFlags.None, callback, state),
-					_socket.EndReceive,
-					null);
-
-				TransitionToState(ConnectionState.Connected);
-
-				if (bytesRead == 0)
-				{
-					Console.WriteLine($"[Connector {_endpoint}] Соединение закрыто удалённой стороной");
-					return null;
-				}
-
-				var receivedData = new byte[bytesRead];
-				Array.Copy(buffer, 0, receivedData, 0, bytesRead);
-
-				OnDataReceived(receivedData);
-				Console.WriteLine($"[Connector {_endpoint}] Получено {bytesRead} байт");
-
-				return receivedData;
-			}
-			catch (SocketException ex)
-			{
-				HandleSocketError(ex, "получении данных");
-				throw;
-			}
-		}
-
-		public async Task ConnectAsync(CancellationToken cancellationToken = default)
-		{
-			if (CurrentState != ConnectionState.Created && CurrentState != ConnectionState.Error)
-				throw new InvalidOperationException("Connector уже используется");
-
-			InitializeSocket();
-			await EstablishConnectionAsync(cancellationToken);
-		}
-	}
-
-	// Архитектура: Управление активным соединением
-	public class SocketConnection : SocketInteractionLayer
-	{
-		public SocketConnection(NetworkEndpoint endpoint, Socket socket) : base(endpoint)
-		{
-			_socket = socket ?? throw new ArgumentNullException(nameof(socket));
-			TransitionToState(ConnectionState.Connected, false);
-		}
-
-		protected override void InitializeSocket()
-		{
-			// Уже инициализировано в конструкторе
-		}
-
-		protected override Task EstablishConnectionAsync(CancellationToken cancellationToken)
-		{
-			// Соединение уже установлено
-			return Task.CompletedTask;
-		}
-
-		public async Task<byte[]> ReceiveAsync(CancellationToken cancellationToken)
-		{
-			if (CurrentState != ConnectionState.Connected)
-				throw new InvalidOperationException("Соединение не установлено");
-
-			if (!TransitionToState(ConnectionState.Receiving))
-				return null;
-
-			try
-			{
-				var buffer = new byte[4096];
-				int bytesRead = await Task.Factory.FromAsync<int>(
-					(callback, state) => _socket.BeginReceive(
-						buffer, 0, buffer.Length,
-						SocketFlags.None, callback, state),
-					_socket.EndReceive,
-					null);
-
-				TransitionToState(ConnectionState.Connected);
-
-				if (bytesRead == 0)
-					return null;
-
-				var data = new byte[bytesRead];
-				Array.Copy(buffer, 0, data, 0, bytesRead);
-
-				return data;
-			}
-			catch (SocketException ex)
-			{
-				HandleSocketError(ex, "получении данных");
-				return null;
-			}
-		}
-
-		public async Task SendAsync(byte[] data, CancellationToken cancellationToken)
-		{
-			if (CurrentState != ConnectionState.Connected)
-				throw new InvalidOperationException("Соединение не установлено");
-
-			if (!TransitionToState(ConnectionState.Sending))
-				return;
-
-			try
-			{
-				int totalSent = 0;
-				while (totalSent < data.Length && !cancellationToken.IsCancellationRequested)
-				{
-					int sent = await Task.Factory.FromAsync<int>(
-						(callback, state) => _socket.BeginSend(
-							data, totalSent, data.Length - totalSent,
-							SocketFlags.None, callback, state),
-						_socket.EndSend,
-						null);
-
-					totalSent += sent;
-				}
-
-				TransitionToState(ConnectionState.Connected);
-			}
-			catch (SocketException ex)
-			{
-				HandleSocketError(ex, "отправке данных");
-				throw;
-			}
-		}
-	}
-
-	// Архитектура: Демонстрационный модуль
-	public static class ArchitectureDemonstration
-	{
-		public static async Task RunDemoAsync()
-		{
-			Console.WriteLine("=== АРХИТЕКТУРА ВЗАИМОДЕЙСТВИЯ ЧЕРЕЗ СОКЕТЫ ===\n");
-
-			// Часть 1: Демонстрация состояний и переходов
-			Console.WriteLine("1. ДЕМОНСТРАЦИЯ СОСТОЯНИЙ И ПЕРЕХОДОВ:");
-			await DemonstrateStateTransitions();
-
-			// Часть 2: Архитектура взаимодействия
-			Console.WriteLine("\n\n2. АРХИТЕКТУРА ВЗАИМОДЕЙСТВИЯ:");
-			await DemonstrateInteractionArchitecture();
-
-			// Часть 3: Обработка ошибок и отказоустойчивость
-			Console.WriteLine("\n\n3. ОТКАЗОУСТОЙЧИВОСТЬ:");
-			await DemonstrateFaultTolerance();
-
-			// Часть 4: Масштабирование
-			Console.WriteLine("\n\n4. МАСШТАБИРУЕМОСТЬ:");
-			await DemonstrateScalability();
-		}
-
-		private static async Task DemonstrateStateTransitions()
-		{
-			Console.WriteLine("   Создание и управление состояниями сокета:");
-
-			var endpoint = new NetworkEndpoint(IPAddress.Loopback, 11001, "StateTest");
-
-			using (var connector = new SocketConnector(endpoint))
-			{
-				connector.StateChanged += (sender, state) =>
-				{
-					Console.WriteLine($"     [State Change] {state}");
-				};
-
-				connector.ErrorOccurred += (sender, error) =>
-				{
-					Console.WriteLine($"     [Error] {error}");
-				};
-
-				try
-				{
-					Console.WriteLine($"\n   Исходное состояние: {connector.CurrentState}");
-					Console.WriteLine($"   Попытка подключения к несуществующему серверу...");
-
-					// Используем короткий таймаут для демонстрации
-					var cts = new CancellationTokenSource(2000);
-					await connector.ConnectAsync(cts.Token);
-				}
-				catch (SocketException ex)
-				{
-					Console.WriteLine($"   Ожидаемая ошибка подключения: {ex.SocketErrorCode}");
-				}
-				catch (OperationCanceledException)
-				{
-					Console.WriteLine($"   Подключение отменено по таймауту");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"   Другая ошибка: {ex.Message}");
-				}
-
-				Console.WriteLine($"\n   Финальное состояние: {connector.CurrentState}");
-			}
-		}
-
-		private static async Task DemonstrateInteractionArchitecture()
-		{
-			Console.WriteLine("   Архитектура клиент-серверного взаимодействия:");
-
-			var serverEndpoint = new NetworkEndpoint(IPAddress.Loopback, 11002, "Server");
-			var clientEndpoint = new NetworkEndpoint(IPAddress.Loopback, 11002, "Client");
-
-			var cts = new CancellationTokenSource();
-			cts.CancelAfter(TimeSpan.FromSeconds(8));
-
-			// Архитектура: Запуск сервера
-			var server = new SocketAcceptor(serverEndpoint);
-
-			server.StateChanged += (sender, state) =>
-			{
-				Console.WriteLine($"     [Server State] {state}");
+				ReceiveTimeout = 5000,
+				SendTimeout = 5000,
+				BufferSize = 4096
 			};
 
-			// Запуск сервера в фоне
-			var serverTask = Task.Run(async () =>
-			{
-				try
-				{
-					await server.StartAsync(cts.Token);
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"     [Server Error] {ex.Message}");
-				}
-			}, cts.Token);
+			infrastructure.Configure(config);
+			Console.WriteLine($"2. Слой инфраструктуры настроил сокет");
 
-			await Task.Delay(1000); // Даём время серверу запуститься
+			// 3. Слой бизнес-логики
+			var businessLogic = new BusinessLogicLayer(infrastructure);
+			var result = businessLogic.ProcessRequest("тестовый запрос");
+			Console.WriteLine($"3. Слой бизнес-логики обработал запрос: {result}");
 
-			// Архитектура: Подключение клиента
-			using (var client = new SocketConnector(clientEndpoint))
-			{
-				try
-				{
-					Console.WriteLine($"\n   Подключение клиента...");
-					await client.ConnectAsync(cts.Token);
-
-					Console.WriteLine($"   Отправка тестового сообщения...");
-					var message = "Тестовое сообщение";
-					var data = Encoding.UTF8.GetBytes(message);
-
-					await client.SendAsync(data, cts.Token);
-					Console.WriteLine($"     Отправлено: {message}");
-
-					var response = await client.ReceiveAsync(cts.Token);
-					if (response != null)
-					{
-						var responseText = Encoding.UTF8.GetString(response);
-						Console.WriteLine($"     Получено: {responseText}");
-					}
-
-					Console.WriteLine($"   Отключение...");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"     [Client Error] {ex.Message}");
-				}
-			}
-
-			// Остановка сервера
-			server.Stop();
-			await Task.Delay(500);
-			cts.Cancel();
-
-			try { await serverTask; } catch { }
-
-			Console.WriteLine($"   Сервер обработал соединений: {server.ActiveConnectionsCount}");
-		}
-
-		private static async Task DemonstrateFaultTolerance()
-		{
-			Console.WriteLine("   Демонстрация отказоустойчивости:");
-
-			var endpoint = new NetworkEndpoint(IPAddress.Loopback, 11003, "ResilienceTest");
-			var cts = new CancellationTokenSource();
-			cts.CancelAfter(TimeSpan.FromSeconds(5));
-
-			// Архитектура: Сервер с обработкой ошибок
-			var server = new SocketAcceptor(endpoint);
-
-			var serverTask = Task.Run(async () =>
-			{
-				try
-				{
-					await server.StartAsync(cts.Token);
-				}
-				catch { }
-			}, cts.Token);
-
-			await Task.Delay(500);
-
-			// Тесты отказоустойчивости
-			Console.WriteLine($"\n   Тест 1: Множественные подключения");
-
-			var clients = new List<SocketConnector>();
-			for (int i = 0; i < 3; i++)
-			{
-				var client = new SocketConnector(endpoint);
-				clients.Add(client);
-
-				try
-				{
-					await client.ConnectAsync(cts.Token);
-					Console.WriteLine($"     Клиент {i + 1}: Подключён");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"     Клиент {i + 1}: Ошибка - {ex.Message}");
-				}
-			}
-
-			// Очистка
-			foreach (var client in clients)
-			{
-				client.Dispose();
-			}
-
-			cts.Cancel();
-			server.Stop();
-
-			try { await serverTask; } catch { }
-
-			Console.WriteLine($"\n   Тесты отказоустойчивости завершены");
-		}
-
-		private static async Task DemonstrateScalability()
-		{
-			Console.WriteLine("   Демонстрация масштабируемости:");
-
-			var endpoint = new NetworkEndpoint(IPAddress.Loopback, 11004, "ScalabilityTest");
-			var cts = new CancellationTokenSource();
-			cts.CancelAfter(TimeSpan.FromSeconds(3));
-
-			var server = new SocketAcceptor(endpoint);
-
-			var serverTask = Task.Run(async () =>
-			{
-				try
-				{
-					await server.StartAsync(cts.Token);
-				}
-				catch { }
-			}, cts.Token);
-
-			await Task.Delay(500);
-
-			// Множественные подключения
-			var tasks = new List<Task>();
-
-			Console.WriteLine($"\n   Создание 5 одновременных подключений...");
-
-			for (int i = 0; i < 5; i++)
-			{
-				var task = Task.Run(async () =>
-				{
-					using (var client = new SocketConnector(endpoint))
-					{
-						try
-						{
-							await client.ConnectAsync(cts.Token);
-							await client.SendAsync(Encoding.UTF8.GetBytes("Test"), cts.Token);
-							await Task.Delay(100, cts.Token);
-						}
-						catch { }
-					}
-				}, cts.Token);
-
-				tasks.Add(task);
-			}
-
-			try
-			{
-				await Task.WhenAll(tasks);
-				await Task.Delay(500);
-			}
-			finally
-			{
-				cts.Cancel();
-				server.Stop();
-				try { await serverTask; } catch { }
-			}
-
-			Console.WriteLine($"   Демонстрация масштабируемости завершена");
+			// Освобождение ресурсов
+			infrastructure.Dispose();
+			Console.WriteLine($"4. Ресурсы корректно освобождены");
 		}
 	}
 
 	// Главная программа
 	class Program
 	{
-		static async Task Main(string[] args)
+		static void Main(string[] args)
 		{
-			try
+			Console.WriteLine("РЕАЛИЗАЦИЯ СОКЕТОВ В .NET");
+			Console.WriteLine("========================\n");
+
+			// Демонстрация классов System.Net
+			SystemNetDemonstration.DemonstrateAddressing();
+
+			// Демонстрация классов System.Net.Sockets
+			using (var socketsDemo = new SystemNetSocketsDemonstration())
 			{
-				await ArchitectureDemonstration.RunDemoAsync();
+				socketsDemo.DemonstrateSocketClass();
+				socketsDemo.DemonstrateThreadSafety();
+				socketsDemo.DemonstrateClientServerInteraction();
+				socketsDemo.DemonstrateWrapperClasses();
+				socketsDemo.DemonstrateResourceManagement();
 			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"\nКритическая ошибка: {ex}");
-			}
+
+			// Демонстрация архитектурного разделения
+			ArchitectureLayers.DemonstrateLayerSeparation();
 		}
 	}
 }
