@@ -1,871 +1,661 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Runtime.InteropServices;
+using static CommunicationProtocols.ComplexProtocolServer;
 
-namespace TCPDataTransfer
+namespace CommunicationProtocols
 {
-	// Демонстрация передачи данных по TCP
-	public class TCPDataTransferDemo
+	// Базовый класс для демонстрации протоколов общения
+	public class ProtocolDemonstration
 	{
-		public static async Task DemonstrateDataTransfer()
+		public static async Task DemonstrateProtocols()
 		{
-			Console.WriteLine("=== ПЕРЕДАЧА ДАННЫХ ПО TCP ===\n");
+			Console.WriteLine("=== ПРОТОКОЛЫ ОБЩЕНИЯ ПОВЕРХ TCP ===\n");
 
-			// 1. Поток байтов - фундаментальное понятие
-			Console.WriteLine("1. ТЕОРИЯ: TCP КАК ПОТОК БАЙТОВ:");
-			DemonstrateByteStreamTheory();
+			// 1. Простейший текстовый протокол
+			Console.WriteLine("1. ТЕКСТОВЫЙ ПРОТОКОЛ (разделитель строк):");
+			await DemonstrateTextProtocol();
 
-			// 2. Коварные моменты: несоответствие отправки и чтения
-			Console.WriteLine("\n2. КОВАРСТВО: НЕСООТВЕТСТВИЕ ОТПРАВКИ И ЧТЕНИЯ:");
-			await DemonstrateSendReceiveMismatch();
+			// 2. Протокол с указанием длины сообщения
+			Console.WriteLine("\n2. ПРОТОКОЛ С УКАЗАНИЕМ ДЛИНЫ:");
+			await DemonstrateLengthPrefixProtocol();
 
-			// 3. Кодировки и преобразование данных
-			Console.WriteLine("\n3. КОДИРОВКИ: ПРЕОБРАЗОВАНИЕ ДАННЫХ:");
-			await DemonstrateEncodings();
+			// 3. Бинарный протокол с фиксированной структурой
+			Console.WriteLine("\n3. БИНАРНЫЙ ПРОТОКОЛ С ФИКСИРОВАННОЙ СТРУКТУРОЙ:");
+			await DemonstrateBinaryProtocol();
 
-			// 4. Блокирующее поведение операций
-			Console.WriteLine("\n4. БЛОКИРОВКИ: КОГДА ПРОГРАММА ЖДЁТ:");
-			await DemonstrateBlockingBehavior();
+			// 4. Stateful протокол (с состоянием)
+			Console.WriteLine("\n4. STATEFUL ПРОТОКОЛ (с сессиями):");
+			await DemonstrateStatefulProtocol();
 
-			// 5. Определение границ сообщений
-			Console.WriteLine("\n5. ГРАНИЦЫ: КАК ОТДЕЛИТЬ СООБЩЕНИЯ:");
-			await DemonstrateMessageBoundaries();
-
-			// 6. Обработка ошибок и разрывов
-			Console.WriteLine("\n6. ОШИБКИ: КОГДА ВСЁ ИДЁТ НЕ ТАК:");
+			// 5. Обработка ошибок и устойчивость
+			Console.WriteLine("\n5. ОБРАБОТКА ОШИБОК В ПРОТОКОЛЕ:");
 			await DemonstrateErrorHandling();
 
-			// 7. Практические паттерны передачи
-			Console.WriteLine("\n7. ПРАКТИКА: ПАТТЕРНЫ ПЕРЕДАЧИ:");
-			await DemonstratePracticalPatterns();
-
-			// 8. Сравнение локальной и реальной передачи
-			Console.WriteLine("\n8. РЕАЛЬНОСТЬ: ЛОКАЛЬНЫЕ VS УДАЛЁННЫЕ ТЕСТЫ:");
-			await DemonstrateLocalVsRemote();
+			// 6. Реализация комплексного протокола
+			Console.WriteLine("\n6. КОМПЛЕКСНЫЙ ПРОТОКОЛ В ДЕЙСТВИИ:");
+			await DemonstrateComplexProtocol();
 		}
 
-		private static void DemonstrateByteStreamTheory()
+		private static async Task DemonstrateTextProtocol()
 		{
-			Console.WriteLine("   Понимание потока байтов:");
-
-			Console.WriteLine($"\n   КЛЮЧЕВАЯ ИДЕЯ:");
-			Console.WriteLine($"     TCP не знает о 'строках', 'сообщениях' или 'командах'");
-			Console.WriteLine($"     TCP знает только о байтах, идущих в одном направлении");
-
-			Console.WriteLine($"\n   ПРОЦЕСС ПЕРЕДАЧИ:");
-			Console.WriteLine($"     1. Приложение → Буфер отправки: байты");
-			Console.WriteLine($"     2. TCP → Сеть: сегменты (разбивка/объединение)");
-			Console.WriteLine($"     3. Сеть → Буфер приёма: байты");
-			Console.WriteLine($"     4. Буфер приёма → Приложение: по запросу");
-
-			Console.WriteLine($"\n   РЕАЛЬНЫЕ ДАННЫЕ:");
-
-			string text = "Hello TCP";
-			Console.WriteLine($"\n   Исходный текст: '{text}'");
-
-			// Преобразование в байты
-			byte[] bytes = Encoding.UTF8.GetBytes(text);
-			Console.WriteLine($"   Байтовое представление (UTF-8):");
-			Console.WriteLine($"     Длина: {bytes.Length} байт");
-			Console.WriteLine($"     Байты: {BitConverter.ToString(bytes)}");
-			Console.WriteLine($"     Hex: {string.Join(" ", bytes.Select(b => b.ToString("X2")))}");
-
-			// Разные кодировки дают разные байты
-			Console.WriteLine($"\n   Разные кодировки - разные байты:");
-
-			byte[] utf8Bytes = Encoding.UTF8.GetBytes(text);
-			byte[] utf32Bytes = Encoding.UTF32.GetBytes(text);
-			byte[] unicodeBytes = Encoding.Unicode.GetBytes(text);
-
-			Console.WriteLine($"     UTF-8:    {utf8Bytes.Length} байт");
-			Console.WriteLine($"     UTF-32:   {utf32Bytes.Length} байт");
-			Console.WriteLine($"     Unicode:  {unicodeBytes.Length} байт");
-
-			Console.WriteLine($"\n   ВЫВОД: TCP передаёт байты, приложение отвечает за смысл");
-		}
-
-		private static async Task DemonstrateSendReceiveMismatch()
-		{
-			Console.WriteLine("   Демонстрация несоответствия отправки и чтения:");
+			Console.WriteLine("   Протокол: каждое сообщение заканчивается \\n");
 
 			const int port = 11040;
-
-			// Тест 1: Одно отправление - много чтений
-			Console.WriteLine($"\n   ТЕСТ 1: Одна отправка, много чтений");
-
-			var server1 = new SimpleTCPServer(port);
-			var serverTask1 = server1.StartAsync();
-			await Task.Delay(500);
-
-			using (var client1 = new SimpleTCPClient(port))
-			{
-				await client1.ConnectAsync();
-
-				string longMessage = new string('A', 1000); // 1000 символов 'A'
-				Console.WriteLine($"   Клиент отправляет: 1000 символов одной операцией");
-				await client1.SendAsync(longMessage);
-
-				// Сервер читает маленькими частями
-				var chunks = await server1.ReceiveWithSmallBuffer(100, 2000);
-				Console.WriteLine($"   Сервер получил: {chunks.Count} чанками");
-				Console.WriteLine($"     Первый чанк: {chunks.First().Length} символов");
-				Console.WriteLine($"     Последний чанк: {chunks.Last().Length} символов");
-
-				// Проверяем, что данные не потерялись
-				string reconstructed = string.Concat(chunks);
-				bool correct = reconstructed.Length == 1000 && reconstructed.All(c => c == 'A');
-				Console.WriteLine($"   Данные целы: {correct} (длина: {reconstructed.Length})");
-			}
-
-			server1.Stop();
-			await serverTask1;
-
-			// Тест 2: Много отправлений - одно чтение
-			Console.WriteLine($"\n   ТЕСТ 2: Много отправлений, одно чтение");
-
-			var server2 = new SimpleTCPServer(port + 1);
-			var serverTask2 = server2.StartAsync();
-			await Task.Delay(500);
-
-			using (var client2 = new SimpleTCPClient(port + 1))
-			{
-				await client2.ConnectAsync();
-
-				Console.WriteLine($"   Клиент отправляет 5 сообщений подряд:");
-				string[] messages = { "Hello", " ", "World", "!", "\n" };
-
-				foreach (var message in messages)
-				{
-					Console.WriteLine($"     Отправка: '{message}'");
-					await client2.SendAsync(message);
-					await Task.Delay(50); // Небольшая задержка между отправками
-				}
-
-				// Сервер читает одним вызовом
-				string received = await server2.WaitForDataAsync(2000);
-				Console.WriteLine($"   Сервер получил одним чтением: '{received}'");
-				Console.WriteLine($"   Ожидалось: 'Hello World!\\n'");
-				Console.WriteLine($"   Совпало: {received == "Hello World!\n"}");
-			}
-
-			server2.Stop();
-			await serverTask2;
-
-			// Тест 3: Частичные чтения
-			Console.WriteLine($"\n   ТЕСТ 3: Частичные чтения (самый коварный случай)");
-
-			var server3 = new SimpleTCPServer(port + 2);
-			var serverTask3 = server3.StartAsync();
-			await Task.Delay(500);
-
-			using (var client3 = new SimpleTCPClient(port + 2))
-			{
-				await client3.ConnectAsync();
-
-				// Клиент отправляет два сообщения без задержки
-				await client3.SendAsync("Message1");
-				await client3.SendAsync("Message2");
-
-				// Сервер пытается прочитать с фиксированным буфером
-				string received1 = await server3.ReceiveExactAsync(8, 1000); // "Message1"
-				Console.WriteLine($"   Сервер прочитал 8 байт: '{received1}'");
-
-				// Но мог получить больше!
-				string remaining = await server3.ReceiveAnyAsync(1000);
-				Console.WriteLine($"   Осталось в буфере: '{remaining}'");
-
-				Console.WriteLine($"\n   ВЫВОД: Одна отправка ≠ одно чтение");
-				Console.WriteLine($"   TCP может разбивать и объединять данные произвольно");
-			}
-
-			server3.Stop();
-			await serverTask3;
-		}
-
-		private static async Task DemonstrateEncodings()
-		{
-			Console.WriteLine("   Демонстрация работы с кодировками:");
-
-			const int port = 11045;
-
-			// Тест 1: UTF-8 как стандартная кодировка
-			Console.WriteLine($"\n   ТЕСТ 1: UTF-8 - универсальная кодировка");
-
-			var server = new EncodingAwareServer(port);
+			var server = new TextLineServer(port);
 			var serverTask = server.StartAsync();
+
 			await Task.Delay(500);
 
-			using (var client = new SimpleTCPClient(port))
+			using (var client = new TextLineClient(port))
 			{
 				await client.ConnectAsync();
 
-				// Текст с разными символами
-				string[] testMessages =
+				Console.WriteLine("\n   Тест 1: Простая отправка сообщений");
+				await client.SendAsync("HELLO");
+				await client.SendAsync("USER Alice");
+				await client.SendAsync("QUIT");
+
+				var responses = await server.GetResponsesAsync(3, 1000);
+				Console.WriteLine($"   Сервер получил сообщения:");
+				foreach (var response in responses)
 				{
-			"Hello ASCII",           // ASCII символы
-            "Привет мир",            // Кириллица
-            "🎉🎊",                    // Эмодзи
-            "©®™"                    // Спецсимволы
-        };
+					Console.WriteLine($"     - '{response}'");
+				}
 
-				foreach (var message in testMessages)
+				Console.WriteLine("\n   Тест 2: Проблема многострочных сообщений");
+				await client.SendAsync("MESSAGE Hello\\nWorld\\nHow are you?");
+				var multilineResponse = await server.GetLastResponseAsync(1000);
+				Console.WriteLine($"   Сервер получил: '{multilineResponse}'");
+				Console.WriteLine($"   Проблема: \\n в данных ломает протокол");
+
+				Console.WriteLine("\n   Тест 3: Разные размеры сообщений");
+				var longMessage = new string('A', 5000);
+				await client.SendAsync(longMessage);
+				var longResponse = await server.GetLastResponseAsync(1000);
+				Console.WriteLine($"   Сервер получил {longResponse.Length} символов");
+				Console.WriteLine($"   Превышение длины буфера может вызвать проблемы");
+			}
+
+			server.Stop();
+			await serverTask;
+
+			Console.WriteLine("\n   Выводы:");
+			Console.WriteLine("   + Простота реализации и отладки");
+			Console.WriteLine("   + Читаемость данных");
+			Console.WriteLine("   - Зависимость от разделителя в данных");
+			Console.WriteLine("   - Проблемы с бинарными данными");
+			Console.WriteLine("   - Нет защиты от переполнения буфера");
+		}
+
+		private static async Task DemonstrateLengthPrefixProtocol()
+		{
+			Console.WriteLine("   Протокол: [4 байта длины][данные]");
+
+			const int port = 11041;
+			var server = new LengthPrefixServer(port);
+			var serverTask = server.StartAsync();
+
+			await Task.Delay(500);
+
+			using (var client = new LengthPrefixClient(port))
+			{
+				await client.ConnectAsync();
+
+				Console.WriteLine("\n   Тест 1: Текстовые сообщения разной длины");
+				await client.SendAsync("Short");
+				await client.SendAsync("Medium length message");
+				await client.SendAsync("Очень длинное сообщение на русском языке с дополнительными символами");
+
+				var messages = await server.GetMessagesAsync(3, 1000);
+				Console.WriteLine($"   Сервер получил {messages.Count} сообщений:");
+				foreach (var msg in messages)
 				{
-					Console.WriteLine($"\n   Отправка: '{message}'");
+					Console.WriteLine($"     - '{msg}' ({msg.Length} байт)");
+				}
 
-					byte[] bytes = Encoding.UTF8.GetBytes(message);
-					Console.WriteLine($"     Байтов: {bytes.Length}");
-					Console.WriteLine($"     Hex: {BitConverter.ToString(bytes)}");
+				Console.WriteLine("\n   Тест 2: Бинарные данные");
+				var binaryData = new byte[] { 0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD };
+				await client.SendAsync(binaryData);
+				var binaryResponse = await server.GetLastBinaryMessageAsync(1000);
+				Console.WriteLine($"   Сервер получил бинарные данные: {binaryResponse.Length} байт");
 
-					await client.SendAsync(message);
+				Console.WriteLine("\n   Тест 3: Большие сообщения");
+				var largeData = new byte[10000];
+				new Random().NextBytes(largeData);
+				await client.SendAsync(largeData);
+				var largeResponse = await server.GetLastBinaryMessageAsync(2000);
+				Console.WriteLine($"   Сервер получил {largeResponse.Length} байт");
+				Console.WriteLine($"   Сообщение передано корректно независимо от содержимого");
+			}
 
-					string received = await server.WaitForMessageAsync(1000);
-					Console.WriteLine($"   Сервер получил: '{received}'");
-					Console.WriteLine($"     Совпало: {received == message}");
+			server.Stop();
+			await serverTask;
+
+			Console.WriteLine("\n   Выводы:");
+			Console.WriteLine("   + Надёжное разделение сообщений");
+			Console.WriteLine("   + Поддержка бинарных данных");
+			Console.WriteLine("   + Нет проблем с разделителями в данных");
+			Console.WriteLine("   - Сложнее в отладке (нужен hex-просмотрщик)");
+			Console.WriteLine("   - Требует строгого соблюдения формата");
+		}
+
+		private static async Task DemonstrateBinaryProtocol()
+		{
+			Console.WriteLine("   Бинарный протокол с фиксированной структурой:");
+			Console.WriteLine("   Заголовок: [CommandID: 1 байт][DataLength: 2 байта]");
+
+			const int port = 11042;
+			var server = new BinaryProtocolServer(port);
+			var serverTask = server.StartAsync();
+
+			await Task.Delay(500);
+
+			using (var client = new BinaryProtocolClient(port))
+			{
+				await client.ConnectAsync();
+
+				Console.WriteLine("\n   Тест 1: Разные команды");
+				await client.SendCommandAsync(0x01, "Login:Alice");
+				await client.SendCommandAsync(0x02, "GetData:123");
+				await client.SendCommandAsync(0x03, new byte[] { 0xAA, 0xBB, 0xCC });
+
+				var commands = await server.GetCommandsAsync(3, 1000);
+				Console.WriteLine($"   Сервер обработал {commands.Count} команд:");
+				foreach (var cmd in commands)
+				{
+					Console.WriteLine($"     - ID: {cmd.CommandId}, Данные: {BitConverter.ToString(cmd.Data)}");
+				}
+
+				Console.WriteLine("\n   Тест 2: Валидация команд");
+				try
+				{
+					// Попытка отправить неизвестную команду
+					await client.SendCommandAsync(0xFF, "Unknown");
+					Console.WriteLine($"   Ошибка: сервер должен был отклонить команду");
+				}
+				catch (ProtocolException ex)
+				{
+					Console.WriteLine($"   Ожидаемая ошибка: {ex.Message}");
+				}
+
+				Console.WriteLine("\n   Тест 3: Ограничение размера данных");
+				try
+				{
+					var hugeData = new byte[65536]; // Больше, чем позволяет 2 байта
+					await client.SendCommandAsync(0x01, hugeData);
+					Console.WriteLine($"   Ошибка: размер должен быть ограничен");
+				}
+				catch (ProtocolException ex)
+				{
+					Console.WriteLine($"   Ожидаемая ошибка: {ex.Message}");
 				}
 			}
 
 			server.Stop();
 			await serverTask;
 
-			// Тест 2: Проблемы с разными кодировками
-			Console.WriteLine($"\n   ТЕСТ 2: Проблема разных кодировок");
-
-			// Регистрируем провайдер кодировок
-			Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
-			string russianText = "Привет";
-
-			byte[] utf8Bytes = Encoding.UTF8.GetBytes(russianText);
-
-			// Используем EncodingHelper или прямую регистрацию
-			Encoding win1251Encoding;
-			try
-			{
-				// Пытаемся получить кодировку Windows-1251
-				win1251Encoding = EncodingHelper.GetEncoding(1251);
-			}
-			catch
-			{
-				// Если не поддерживается, используем альтернативу или ASCII
-				Console.WriteLine("   Windows-1251 не поддерживается, используем ASCII для демонстрации");
-				win1251Encoding = Encoding.ASCII;
-			}
-
-			byte[] win1251Bytes = win1251Encoding.GetBytes(russianText);
-
-			Console.WriteLine($"   Текст: '{russianText}'");
-			Console.WriteLine($"   UTF-8 байты: {BitConverter.ToString(utf8Bytes)}");
-			Console.WriteLine($"   Windows-1251 байты: {BitConverter.ToString(win1251Bytes)}");
-
-			// Декодирование неправильной кодировкой
-			string corrupted;
-			try
-			{
-				corrupted = Encoding.UTF8.GetString(win1251Bytes);
-				Console.WriteLine($"   Декодирование UTF-8 как Windows-1251: '{corrupted}'");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"   Ошибка декодирования: {ex.Message}");
-
-				// Альтернативная демонстрация с ASCII
-				Console.WriteLine($"\n   Альтернативная демонстрация с ASCII:");
-				string asciiText = "Hello";
-				byte[] asciiBytes = Encoding.ASCII.GetBytes(asciiText);
-				byte[] fakeUtf8Bytes = Encoding.UTF8.GetBytes(asciiText);
-				Console.WriteLine($"   ASCII текст: '{asciiText}'");
-				Console.WriteLine($"   ASCII байты: {BitConverter.ToString(asciiBytes)}");
-				Console.WriteLine($"   UTF-8 байты: {BitConverter.ToString(fakeUtf8Bytes)}");
-
-				// Декодируем ASCII байты как UTF-8 (должно работать для ASCII символов)
-				string decoded = Encoding.UTF8.GetString(asciiBytes);
-				Console.WriteLine($"   Декодирование ASCII байтов как UTF-8: '{decoded}'");
-			}
-
-			Console.WriteLine($"\n   ВЫВОД: Клиент и сервер должны использовать одну кодировку");
+			Console.WriteLine("\n   Выводы:");
+			Console.WriteLine("   + Эффективное использование сети");
+			Console.WriteLine("   + Легко расширять новыми командами");
+			Console.WriteLine("   + Строгая типизация");
+			Console.WriteLine("   - Сложность чтения данных без документации");
+			Console.WriteLine("   - Сложнее отладка");
 		}
 
-		private static async Task DemonstrateBlockingBehavior()
+		private static async Task DemonstrateStatefulProtocol()
 		{
-			Console.WriteLine("   Демонстрация блокирующего поведения:");
+			Console.WriteLine("   Stateful протокол с аутентификацией:");
+			Console.WriteLine("   Состояния: NotAuthenticated → Authenticated → Processing");
 
-			const int port = 11050;
-
-			// Тест 1: Блокировка при чтении
-			Console.WriteLine($"\n   ТЕСТ 1: Блокировка чтения");
-
-			var server = new BlockingServer(port);
+			const int port = 11043;
+			var server = new StatefulServer(port);
 			var serverTask = server.StartAsync();
-			await Task.Delay(500); // Даем серверу время запуститься
 
-			using (var client = new SimpleTCPClient(port))
+			await Task.Delay(500);
+
+			using (var client = new StatefulClient(port))
 			{
 				await client.ConnectAsync();
 
-				Console.WriteLine($"   Клиент подключён, но не отправляет данные");
-				Console.WriteLine($"   Сервер вызывает Receive() и блокируется...");
+				Console.WriteLine("\n   Тест 1: Попытка выполнить команду без аутентификации");
+				try
+				{
+					await client.SendCommandAsync("GET_DATA");
+					Console.WriteLine($"   Ошибка: команда должна быть отклонена");
+				}
+				catch (ProtocolException ex)
+				{
+					Console.WriteLine($"   Ожидаемая ошибка: {ex.Message}");
+				}
 
-				// Даем серверу время заблокироваться на чтении
-				await Task.Delay(1000);
+				Console.WriteLine("\n   Тест 2: Корректная аутентификация");
+				var authResult = await client.AuthenticateAsync("admin", "password123");
+				Console.WriteLine($"   Аутентификация: {authResult}");
 
-				// Запускаем задачу чтения с таймаутом
-				var readTask = server.WaitForBlockingRead();
+				Console.WriteLine("\n   Тест 3: Выполнение команд после аутентификации");
+				await client.SendCommandAsync("GET_DATA");
+				await client.SendCommandAsync("SET_VALUE 100");
+				await client.SendCommandAsync("GET_STATS");
 
-				// Ждем немного, чтобы убедиться, что сервер заблокирован
-				await Task.Delay(500);
+				var executedCommands = await server.GetExecutedCommandsAsync(3, 1000);
+				Console.WriteLine($"   Выполнено команд: {executedCommands.Count}");
 
-				Console.WriteLine($"   Клиент отправляет данные...");
-				await client.SendAsync("Data");
+				Console.WriteLine("\n   Тест 4: Смена состояния");
+				await client.LogoutAsync();
+				Console.WriteLine($"   Клиент вышел из системы");
 
 				try
 				{
-					string received = await readTask;
-					Console.WriteLine($"   Сервер получил данные: '{received}'");
-					Console.WriteLine($"   Блокировка снята успешно!");
+					await client.SendCommandAsync("GET_DATA");
+					Console.WriteLine($"   Ошибка: команда должна быть отклонена после выхода");
 				}
-				catch (TimeoutException)
+				catch (ProtocolException ex)
 				{
-					Console.WriteLine($"   ТАЙМ-АУТ: Сервер не получил данные за ожидаемое время");
-					Console.WriteLine($"   Возможные причины:");
-					Console.WriteLine($"     1. Сервер не успел заблокироваться на Receive()");
-					Console.WriteLine($"     2. Данные не дошли до сервера");
-					Console.WriteLine($"     3. Проблема с синхронизацией потоков");
+					Console.WriteLine($"   Ожидаемая ошибка: {ex.Message}");
 				}
 			}
 
 			server.Stop();
 			await serverTask;
 
-			// Тест 2: Блокировка при записи (переполнение буфера)
-			Console.WriteLine($"\n   ТЕСТ 2: Блокировка записи");
-
-			var server2 = new SlowConsumerServer(port + 1);
-			var serverTask2 = server2.StartAsync();
-			await Task.Delay(500);
-
-			using (var client2 = new SimpleTCPClient(port + 1))
-			{
-				await client2.ConnectAsync();
-
-				Console.WriteLine($"   Сервер читает медленно (100 мс на 1 байт)");
-				Console.WriteLine($"   Клиент отправляет 10000 байт быстро...");
-
-				string data = new string('X', 10000);
-
-				var sendTask = Task.Run(async () =>
-				{
-					try
-					{
-						// Добавим логирование процесса отправки
-						Console.WriteLine($"   Начало отправки...");
-						await client2.SendAsync(data);
-						Console.WriteLine($"   Отправка завершена");
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine($"   Ошибка отправки: {ex.Message}");
-					}
-				});
-
-				// Мониторинг прогресса
-				var monitorTask = Task.Run(async () =>
-				{
-					for (int i = 0; i < 10; i++)
-					{
-						await Task.Delay(500);
-						int received = server2.GetBytesReceived();
-						Console.WriteLine($"   Сервер получил: {received} байт ({received * 100 / 10000}%)");
-					}
-				});
-
-				await Task.WhenAny(sendTask, Task.Delay(3000));
-
-				// Проверяем, завершилась ли отправка
-				if (sendTask.IsCompleted)
-				{
-					Console.WriteLine($"   Отправка завершилась за 3 секунды");
-				}
-				else
-				{
-					Console.WriteLine($"   Отправка ВСЕ ЕЩЁ продолжается через 3 секунды!");
-					Console.WriteLine($"   Это демонстрирует блокировку записи - клиент ждет,");
-					Console.WriteLine($"   пока TCP освободит буферы для отправки данных");
-				}
-
-				await Task.Delay(1000); // Даем немного времени для завершения
-			}
-
-			server2.Stop();
-			await serverTask2;
-
-			Console.WriteLine($"\n   ВЫВОД: Чтение и запись могут блокировать выполнение");
-			Console.WriteLine($"   - Чтение блокируется, когда нет данных");
-			Console.WriteLine($"   - Запись блокируется, когда буферы TCP полны");
-			Console.WriteLine($"   - Всегда используйте асинхронные методы или тайм-ауты");
-		}
-
-		private static async Task DemonstrateMessageBoundaries()
-		{
-			Console.WriteLine("   Демонстрация определения границ сообщений:");
-
-			// Метод 1: Фиксированная длина
-			Console.WriteLine($"\n   МЕТОД 1: Фиксированная длина сообщений");
-
-			const int fixedPort = 11060;
-			var fixedServer = new FixedLengthServer(fixedPort, 10); // Сообщения по 10 байт
-			var fixedServerTask = fixedServer.StartAsync();
-			await Task.Delay(500);
-
-			using (var fixedClient = new FixedLengthClient(fixedPort, 10))
-			{
-				await fixedClient.ConnectAsync();
-
-				// Отправка сообщений фиксированной длины
-				string[] messages = { "Hello12345", "World67890", "Test123456" };
-
-				foreach (var message in messages)
-				{
-					Console.WriteLine($"   Отправка: '{message}' (10 байт)");
-					await fixedClient.SendFixedAsync(message);
-
-					string received = await fixedServer.GetNextMessageAsync(1000);
-					Console.WriteLine($"   Сервер получил: '{received}'");
-				}
-			}
-
-			fixedServer.Stop();
-			await fixedServerTask;
-
-			// Метод 2: Разделители
-			Console.WriteLine($"\n   МЕТОД 2: Разделители сообщений");
-
-			const int delimiterPort = 11061;
-			var delimiterServer = new DelimitedServer(delimiterPort, '\n');
-			var delimiterServerTask = delimiterServer.StartAsync();
-			await Task.Delay(500);
-
-			using (var delimiterClient = new DelimitedClient(delimiterPort, '\n'))
-			{
-				await delimiterClient.ConnectAsync();
-
-				string[] delimitedMessages = { "First line", "Second line", "Third line" };
-
-				foreach (var message in delimitedMessages)
-				{
-					Console.WriteLine($"   Отправка: '{message}\\n'");
-					await delimiterClient.SendDelimitedAsync(message);
-
-					string received = await delimiterServer.GetNextMessageAsync(1000);
-					Console.WriteLine($"   Сервер получил: '{received}'");
-				}
-			}
-
-			delimiterServer.Stop();
-			await delimiterServerTask;
-
-			// Метод 3: Заголовок с длиной
-			Console.WriteLine($"\n   МЕТОД 3: Заголовок с длиной сообщения");
-
-			const int lengthPrefixPort = 11062;
-			var lengthPrefixServer = new LengthPrefixServer(lengthPrefixPort);
-			var lengthPrefixServerTask = lengthPrefixServer.StartAsync();
-			await Task.Delay(500);
-
-			using (var lengthPrefixClient = new LengthPrefixClient(lengthPrefixPort))
-			{
-				await lengthPrefixClient.ConnectAsync();
-
-				string[] variableMessages =
-				{
-					"Short",
-					"Medium length message",
-					"Very long message with many characters to demonstrate variable length"
-				};
-
-				foreach (var message in variableMessages)
-				{
-					Console.WriteLine($"   Отправка: '{message}' ({message.Length} байт)");
-					await lengthPrefixClient.SendWithLengthAsync(message);
-
-					string received = await lengthPrefixServer.GetNextMessageAsync(1000);
-					Console.WriteLine($"   Сервер получил: '{received}' (длина: {received.Length})");
-				}
-			}
-
-			lengthPrefixServer.Stop();
-			await lengthPrefixServerTask;
-
-			// Метод 4: Самозавершающиеся форматы
-			Console.WriteLine($"\n   МЕТОД 4: Самозавершающиеся форматы (JSON)");
-
-			const int jsonPort = 11063;
-			var jsonServer = new JSONServer(jsonPort);
-			var jsonServerTask = jsonServer.StartAsync();
-			await Task.Delay(500);
-
-			using (var jsonClient = new JSONClient(jsonPort))
-			{
-				await jsonClient.ConnectAsync();
-
-				// Отправка JSON сообщений
-				var messages = new[]
-				{
-					"{\"type\":\"login\",\"user\":\"alice\"}",
-					"{\"type\":\"message\",\"text\":\"Hello\",\"timestamp\":1234567890}",
-					"{\"type\":\"logout\",\"reason\":\"timeout\"}"
-				};
-
-				foreach (var json in messages)
-				{
-					Console.WriteLine($"   Отправка JSON: {json}");
-					await jsonClient.SendJSONAsync(json);
-
-					string received = await jsonServer.GetNextJSONAsync(1000);
-					Console.WriteLine($"   Сервер получил: {received}");
-				}
-			}
-
-			jsonServer.Stop();
-			await jsonServerTask;
-
-			Console.WriteLine($"\n   ВЫВОД: Приложение должно само определять границы сообщений");
-			Console.WriteLine($"   Выбор метода зависит от требований приложения");
+			Console.WriteLine("\n   Выводы:");
+			Console.WriteLine("   + Безопасность (требуется аутентификация)");
+			Console.WriteLine("   + Контекстные команды");
+			Console.WriteLine("   + Управление сессиями");
+			Console.WriteLine("   - Сложнее реализация");
+			Console.WriteLine("   - Требует хранения состояния");
+			Console.WriteLine("   - Обработка таймаутов сессий");
 		}
 
 		private static async Task DemonstrateErrorHandling()
 		{
-			Console.WriteLine("   Демонстрация обработки ошибок:");
+			Console.WriteLine("   Обработка ошибок в протоколе:");
 
-			const int port = 11070;
-
-			// Тест 1: Разрыв соединения при чтении
-			Console.WriteLine($"\n   ТЕСТ 1: Разрыв соединения во время чтения");
-
-			var server = new ResilientServer(port);
+			const int port = 11044;
+			var server = new ErrorHandlingServer(port);
 			var serverTask = server.StartAsync();
+
 			await Task.Delay(500);
 
-			using (var client = new SimpleTCPClient(port))
+			using (var client = new ErrorHandlingClient(port))
 			{
 				await client.ConnectAsync();
 
-				Console.WriteLine($"   Клиент подключён");
-				Console.WriteLine($"   Клиент внезапно закрывает соединение...");
+				Console.WriteLine("\n   Тест 1: Неверный формат сообщения");
+				var errorResponse = await client.SendRawAsync("INVALID_FORMAT");
+				Console.WriteLine($"   Ответ сервера: {errorResponse}");
 
-				// Резкое закрытие без Shutdown
-				client.Dispose();
+				Console.WriteLine("\n   Тест 2: Слишком длинное сообщение");
+				var longMessage = new string('X', 10000);
+				errorResponse = await client.SendRawAsync(longMessage);
+				Console.WriteLine($"   Ответ сервера: {errorResponse}");
 
-				// Сервер пытается читать
-				try
-				{
-					string result = await server.TryReadWithTimeout(2000);
-					Console.WriteLine($"   Сервер получил: '{result}'");
-				}
-				catch (SocketException ex)
-				{
-					Console.WriteLine($"   Сервер получил ошибку: {ex.SocketErrorCode}");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"   Другая ошибка: {ex.Message}");
-				}
-			}
+				Console.WriteLine("\n   Тест 3: Неизвестная команда");
+				errorResponse = await client.SendRawAsync("UNKNOWN_COMMAND arg1 arg2");
+				Console.WriteLine($"   Ответ сервера: {errorResponse}");
 
-			server.Stop();
-			await serverTask;
+				Console.WriteLine("\n   Тест 4: Недостаточно параметров");
+				errorResponse = await client.SendRawAsync("GET_DATA"); // Нужны параметры
+				Console.WriteLine($"   Ответ сервера: {errorResponse}");
 
-			// Тест 2: Разрыв соединения при записи
-			Console.WriteLine($"\n   ТЕСТ 2: Разрыв соединения во время записи");
-
-			var server2 = new ResilientServer(port + 1);
-			var serverTask2 = server2.StartAsync();
-			await Task.Delay(500);
-
-			using (var client2 = new SimpleTCPClient(port + 1))
-			{
-				await client2.ConnectAsync();
-
-				Console.WriteLine($"   Клиент подключён");
-				Console.WriteLine($"   Сервер внезапно останавливается...");
-
-				// Останавливаем сервер
-				server2.Stop();
+				Console.WriteLine("\n   Тест 5: Частичное сообщение (сбой в середине)");
+				// Имитация отправки части сообщения
+				await client.SendPartialAsync("GET_DATA param1");
 				await Task.Delay(100);
+				// Сервер не должен зависнуть в ожидании
+				var status = await server.GetStatusAsync();
+				Console.WriteLine($"   Статус сервера: {status}");
 
-				Console.WriteLine($"   Клиент пытается отправить данные...");
-
-				try
-				{
-					await client2.SendAsync("Test message");
-					Console.WriteLine($"   ОШИБКА: Отправка должна была завершиться с ошибкой");
-				}
-				catch (SocketException ex)
-				{
-					Console.WriteLine($"   Ожидаемая ошибка: {ex.SocketErrorCode}");
-				}
-			}
-
-			await serverTask2;
-
-			// Тест 3: Неполные чтения и тайм-ауты
-			Console.WriteLine($"\n   ТЕСТ 3: Обработка неполных данных и тайм-аутов");
-
-			var robustClient = new RobustTCPClient(); // Убрали параметр (port + 2)
-
-			try
-			{
-				Console.WriteLine($"   Попытка подключения к несуществующему серверу...");
-				await robustClient.ConnectWithTimeoutAsync("127.0.0.1", port + 999, 2000);
-				Console.WriteLine($"   ОШИБКА: Подключение не должно было состояться");
-			}
-			catch (TimeoutException)
-			{
-				Console.WriteLine($"   Ожидаемый тайм-аут подключения");
-			}
-			catch (SocketException ex)
-			{
-				Console.WriteLine($"   Ошибка подключения: {ex.SocketErrorCode}");
-			}
-
-			Console.WriteLine($"\n   ВЫВОД: Ошибки - нормальная часть сетевого программирования");
-			Console.WriteLine($"   Код должен быть готов к разрывам и тайм-аутам");
-		}
-
-		private static async Task DemonstratePracticalPatterns()
-		{
-			Console.WriteLine("   Демонстрация практических паттернов:");
-
-			// Паттерн 1: Чтение до заполнения буфера
-			Console.WriteLine($"\n   ПАТТЕРН 1: Чтение до заполнения буфера");
-
-			const int port = 11080;
-
-			var server = new BufferFillingServer(port);
-			var serverTask = server.StartAsync();
-			await Task.Delay(500);
-
-			using (var client = new SimpleTCPClient(port))
-			{
-				await client.ConnectAsync();
-
-				string message = "Hello, this is a test message for buffer filling pattern.";
-				await client.SendAsync(message);
-
-				// Сервер читает до заполнения 20-байтного буфера
-				string result = await server.ReadBufferAsync(20, 1000);
-				Console.WriteLine($"   Сервер прочитал 20 байт: '{result}'");
-				Console.WriteLine($"   Осталось в потоке: {message.Length - 20} байт");
+				Console.WriteLine("\n   Тест 6: Восстановление после ошибки");
+				errorResponse = await client.SendRawAsync("VALID_COMMAND");
+				Console.WriteLine($"   Нормальный ответ после ошибки: {errorResponse}");
 			}
 
 			server.Stop();
 			await serverTask;
 
-			// Паттерн 2: Накопление данных до определённого условия
-			Console.WriteLine($"\n   ПАТТЕРН 2: Накопление данных до условия");
-
-			var accumulator = new DataAccumulator();
-
-			// Симуляция поступления данных частями
-			string[] chunks = { "Hel", "lo ", "Wor", "ld", "!" };
-
-			Console.WriteLine($"   Поступление данных частями:");
-			foreach (var chunk in chunks)
-			{
-				accumulator.Add(chunk);
-				Console.WriteLine($"     Чанк: '{chunk}', накоплено: '{accumulator.GetData()}'");
-
-				// Проверяем, есть ли полное сообщение
-				if (accumulator.GetData().Contains("World"))
-				{
-					Console.WriteLine($"   Найдено полное сообщение: 'World'");
-					accumulator.ClearProcessed(8); // Удаляем обработанные данные
-				}
-			}
-
-			// Паттерн 3: Асинхронное чтение с CancellationToken
-			Console.WriteLine($"\n   ПАТТЕРН 3: Асинхронное чтение с отменой");
-
-			var cts = new CancellationTokenSource();
-
-			var asyncServer = new AsyncServer(port + 1);
-			var asyncServerTask = asyncServer.StartAsync(); // Убрали передачу CancellationToken
-			await Task.Delay(500);
-
-			using (var asyncClient = new SimpleTCPClient(port + 1))
-			{
-				await asyncClient.ConnectAsync();
-
-				// Запускаем асинхронное чтение
-				var readTask = asyncServer.ReadAsync(cts.Token);
-
-				// Отправляем данные с задержкой
-				await Task.Delay(1000);
-				await asyncClient.SendAsync("Delayed message");
-
-				string received = await readTask;
-				Console.WriteLine($"   Сервер получил асинхронно: '{received}'");
-
-				// Тест отмены
-				cts.Cancel();
-				try
-				{
-					await asyncServer.ReadAsync(cts.Token);
-				}
-				catch (OperationCanceledException)
-				{
-					Console.WriteLine($"   Ожидаемая отмена операции");
-				}
-			}
-
-			cts.Cancel();
-			await asyncServerTask;
-
-			Console.WriteLine($"\n   ВЫВОД: Практические паттерны решают общие проблемы TCP");
+			Console.WriteLine("\n   Выводы:");
+			Console.WriteLine("   + Устойчивость к невалидным данным");
+			Console.WriteLine("   + Защита от DoS (ограничение размера)");
+			Console.WriteLine("   + Информативные сообщения об ошибках");
+			Console.WriteLine("   + Восстановление после ошибок");
+			Console.WriteLine("   - Усложнение протокола");
+			Console.WriteLine("   - Больше кода для обработки краевых случаев");
 		}
 
-		private static async Task DemonstrateLocalVsRemote()
+		private static async Task DemonstrateComplexProtocol()
 		{
-			Console.WriteLine("   Сравнение локальной и реальной передачи:");
+			Console.WriteLine("   Комплексный протокол с расширяемостью:");
+			Console.WriteLine("   Формат: [Version][Type][Length][Data]");
+			Console.WriteLine("   Поддерживает текстовые и бинарные сообщения");
 
-			// Локальный тест: всё идеально
-			Console.WriteLine($"\n   ЛОКАЛЬНЫЙ ТЕСТ (на одном компьютере):");
+			const int port = 11045;
+			var server = new ComplexProtocolServer(port);
+			var serverTask = server.StartAsync();
 
-			const int localPort = 11090;
-
-			var localServer = new SimpleTCPServer(localPort);
-			var localServerTask = localServer.StartAsync();
 			await Task.Delay(500);
 
-			using (var localClient = new SimpleTCPClient(localPort))
-			{
-				await localClient.ConnectAsync();
-
-				// Множественные отправки
-				for (int i = 0; i < 5; i++)
-				{
-					await localClient.SendAsync($"Message {i}");
-				}
-
-				// Чтение одним вызовом
-				string allData = await localServer.WaitForDataAsync(1000);
-				Console.WriteLine($"   Локальный сервер получил: '{allData}'");
-				Console.WriteLine($"   Длина: {allData.Length}, ожидалось: 38");
-
-				// В локальной сети часто всё приходит одним куском
-				Console.WriteLine($"   В локальном тесте часто получается идеально");
-			}
-
-			localServer.Stop();
-			await localServerTask;
-
-			// Симуляция реальных проблем
-			Console.WriteLine($"\n   СИМУЛЯЦИЯ РЕАЛЬНЫХ ПРОБЛЕМ:");
-
-			const int simulatedPort = 11091;
-
-			var problematicServer = new ProblemSimulatingServer(simulatedPort);
-			var problematicServerTask = problematicServer.StartAsync();
-			await Task.Delay(500);
-
-			using (var client = new SimpleTCPClient(simulatedPort))
+			using (var client = new ComplexProtocolClient(port))
 			{
 				await client.ConnectAsync();
 
-				Console.WriteLine($"   Реальные проблемы, которые скрывает локальная сеть:");
-				Console.WriteLine($"     1. Задержки (latency)");
-				Console.WriteLine($"     2. Потери пакетов");
-				Console.WriteLine($"     3. Фрагментация данных");
-				Console.WriteLine($"     4. Переполнение буферов");
-				Console.WriteLine($"     5. Неожиданные разрывы");
+				Console.WriteLine("\n   Тест 1: Текстовые сообщения разных версий");
+				await client.SendTextMessageAsync("Hello", 1);
+				await client.SendTextMessageAsync("Привет, мир!", 2);
 
-				// Сервер симулирует проблемы
-				await client.SendAsync("Test message");
+				var textMessages = await server.GetTextMessagesAsync(2, 1000);
+				Console.WriteLine($"   Получено текстовых сообщений: {textMessages.Count}");
 
-				var result = await problematicServer.GetReceivedWithProblems(2000);
-				Console.WriteLine($"\n   Результат с симулированными проблемами:");
-				Console.WriteLine($"     Получено чанков: {result.Chunks.Count}");
-				Console.WriteLine($"     Время получения: {result.ElapsedMs}мс");
-				Console.WriteLine($"     Данные целы: {result.DataIntegrity}");
+				Console.WriteLine("\n   Тест 2: Бинарные сообщения");
+				var binaryData = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05 };
+				await client.SendBinaryMessageAsync(binaryData, MessageType.Data);
+
+				var binaryMessages = await server.GetBinaryMessagesAsync(1, 1000);
+				Console.WriteLine($"   Получено бинарных сообщений: {binaryMessages.Count}");
+
+				Console.WriteLine("\n   Тест 3: Сжатые данные");
+				var uncompressed = new string('A', 1000);
+				await client.SendCompressedTextAsync(uncompressed);
+
+				var compressedInfo = await server.GetCompressionInfoAsync(1000);
+				Console.WriteLine($"   Сжатие: {compressedInfo.OriginalSize} → {compressedInfo.CompressedSize}");
+
+				Console.WriteLine("\n   Тест 4: Подтверждение получения");
+				var ackMessages = new List<string>();
+				for (int i = 1; i <= 3; i++)
+				{
+					var response = await client.SendWithAckAsync($"Message {i}");
+					ackMessages.Add(response);
+				}
+				Console.WriteLine($"   Получено подтверждений: {ackMessages.Count}");
+
+				Console.WriteLine("\n   Тест 5: Потоковая передача");
+				var streamData = new List<string> { "Chunk1", "Chunk2", "Chunk3", "END" };
+				foreach (var chunk in streamData)
+				{
+					await client.SendStreamChunkAsync(chunk);
+					await Task.Delay(50);
+				}
+
+				var streamResult = await server.GetStreamResultAsync(2000);
+				Console.WriteLine($"   Потоковая передача завершена: {streamResult}");
+
+				Console.WriteLine("\n   Тест 6: Расширяемость");
+				// Отправка сообщения нового типа (если бы протокол поддерживал)
+				Console.WriteLine($"   Протокол позволяет добавлять новые типы сообщений");
+				Console.WriteLine($"   без нарушения работы старых клиентов");
 			}
 
-			problematicServer.Stop();
-			await problematicServerTask;
+			server.Stop();
+			await serverTask;
 
-			Console.WriteLine($"\n   РЕКОМЕНДАЦИИ:");
-			Console.WriteLine($"     1. Всегда тестируйте с разными размерами данных");
-			Console.WriteLine($"     2. Симулируйте задержки и потери");
-			Console.WriteLine($"     3. Проверяйте обработку неполных данных");
-			Console.WriteLine($"     4. Тестируйте разрывы соединений");
-			Console.WriteLine($"     5. Используйте тайм-ауты во всех операциях");
-
-			Console.WriteLine($"\n   ВЫВОД: Локальные тесты ≠ реальная работа");
-			Console.WriteLine($"   Пишите код, который работает правильно в любых условиях");
+			Console.WriteLine("\n   Итоги комплексного протокола:");
+			Console.WriteLine("   1. Поддержка разных версий для обратной совместимости");
+			Console.WriteLine("   2. Разные типы сообщений (текст, бинарные, сжатые)");
+			Console.WriteLine("   3. Надёжность (подтверждения, повторные отправки)");
+			Console.WriteLine("   4. Эффективность (сжатие, потоковая передача)");
+			Console.WriteLine("   5. Расширяемость (новые типы, новые версии)");
 		}
 	}
 
-	// Вспомогательные классы для демонстрации
-	public class SimpleTCPServer : IDisposable
-	{
-		protected Socket _serverSocket;
-		protected Socket _clientSocket;
-		protected Thread _serverThread;
-		protected bool _isRunning;
-		protected readonly int _port;
-		protected readonly object _lock = new object();
-		protected string _lastReceived = string.Empty;
+	// Реализации протоколов
 
-		public SimpleTCPServer(int port)
+	#region Текстовый протокол с разделителем строк
+	public class TextLineServer : IDisposable
+	{
+		private TcpListener _listener;
+		private Thread _serverThread;
+		private bool _isRunning;
+		private readonly Queue<string> _receivedMessages = new();
+		private readonly object _lock = new();
+
+		public TextLineServer(int port)
 		{
-			_port = port;
+			_listener = new TcpListener(IPAddress.Loopback, port);
 		}
 
-		public virtual async Task StartAsync()
+		public async Task StartAsync()
 		{
-			_serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-			_serverSocket.Bind(new IPEndPoint(IPAddress.Loopback, _port));
-			_serverSocket.Listen(1);
-
+			_listener.Start();
 			_isRunning = true;
-			_serverThread = new Thread(RunServer);
+
+			_serverThread = new Thread(() =>
+			{
+				try
+				{
+					while (_isRunning)
+					{
+						var client = _listener.AcceptTcpClient();
+						Task.Run(() => HandleClient(client));
+					}
+				}
+				catch { }
+			});
+
 			_serverThread.Start();
 
 			await Task.Delay(100);
 		}
 
-		protected virtual void RunServer()
+		private void HandleClient(TcpClient client)
 		{
-			try
+			using (client)
+			using (var stream = client.GetStream())
+			using (var reader = new StreamReader(stream, Encoding.UTF8))
 			{
-				_clientSocket = _serverSocket.Accept();
-
-				var buffer = new byte[1024];
-				while (_isRunning && _clientSocket.Connected)
+				try
 				{
-					if (_clientSocket.Available > 0)
+					while (_isRunning && client.Connected)
 					{
-						int bytesRead = _clientSocket.Receive(buffer);
-						if (bytesRead > 0)
+						// Читаем до символа новой строки
+						string line = reader.ReadLine();
+						if (line == null) break;
+
+						lock (_lock)
+						{
+							_receivedMessages.Enqueue(line);
+						}
+
+						// Простой ответ
+						var response = $"OK: {line}";
+						var responseBytes = Encoding.UTF8.GetBytes(response + "\n");
+						stream.Write(responseBytes, 0, responseBytes.Length);
+					}
+				}
+				catch { }
+			}
+		}
+
+		public async Task<List<string>> GetResponsesAsync(int count, int timeoutMs)
+		{
+			var result = new List<string>();
+			var startTime = DateTime.Now;
+
+			while (result.Count < count && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+			{
+				lock (_lock)
+				{
+					while (_receivedMessages.Count > 0 && result.Count < count)
+					{
+						result.Add(_receivedMessages.Dequeue());
+					}
+				}
+
+				if (result.Count < count)
+					await Task.Delay(10);
+			}
+
+			return result;
+		}
+
+		public async Task<string> GetLastResponseAsync(int timeoutMs)
+		{
+			var responses = await GetResponsesAsync(1, timeoutMs);
+			return responses.Count > 0 ? responses[0] : string.Empty;
+		}
+
+		public void Stop()
+		{
+			_isRunning = false;
+			_listener.Stop();
+			_serverThread?.Join(1000);
+		}
+
+		public void Dispose() => Stop();
+	}
+
+	public class TextLineClient : IDisposable
+	{
+		private TcpClient _client;
+		private NetworkStream _stream;
+		private StreamReader _reader;
+		private StreamWriter _writer;
+		private readonly int _port;
+
+		// Конструктор с портом
+		public TextLineClient(int port)
+		{
+			_port = port;
+		}
+
+		// Конструктор без параметров (для демонстрации)
+		public TextLineClient() : this(11040) { }
+
+		public async Task ConnectAsync()
+		{
+			_client = new TcpClient();
+			await _client.ConnectAsync(IPAddress.Loopback, _port);
+			_stream = _client.GetStream();
+			_reader = new StreamReader(_stream, Encoding.UTF8);
+			_writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
+		}
+
+		public async Task SendAsync(string message)
+		{
+			await _writer.WriteLineAsync(message);
+		}
+
+		public async Task<string> ReceiveAsync()
+		{
+			return await _reader.ReadLineAsync() ?? string.Empty;
+		}
+
+		public void Dispose()
+		{
+			_writer?.Dispose();
+			_reader?.Dispose();
+			_stream?.Dispose();
+			_client?.Dispose();
+		}
+	}
+	#endregion
+
+	#region Протокол с указанием длины
+	public class LengthPrefixServer : IDisposable
+	{
+		private TcpListener _listener;
+		private Thread _serverThread;
+		private bool _isRunning;
+		private readonly Queue<byte[]> _receivedMessages = new();
+		private readonly object _lock = new();
+
+		public LengthPrefixServer(int port)
+		{
+			_listener = new TcpListener(IPAddress.Loopback, port);
+		}
+
+		public async Task StartAsync()
+		{
+			_listener.Start();
+			_isRunning = true;
+
+			_serverThread = new Thread(() =>
+			{
+				try
+				{
+					while (_isRunning)
+					{
+						var client = _listener.AcceptTcpClient();
+						Task.Run(() => HandleClient(client));
+					}
+				}
+				catch { }
+			});
+
+			_serverThread.Start();
+
+			await Task.Delay(100);
+		}
+
+		private void HandleClient(TcpClient client)
+		{
+			using (client)
+			using (var stream = client.GetStream())
+			{
+				try
+				{
+					while (_isRunning && client.Connected)
+					{
+						// Читаем длину сообщения (4 байта)
+						byte[] lengthBytes = new byte[4];
+						int lengthRead = stream.Read(lengthBytes, 0, 4);
+						if (lengthRead != 4) break;
+
+						int messageLength = BitConverter.ToInt32(lengthBytes, 0);
+
+						// Читаем само сообщение
+						byte[] messageBytes = new byte[messageLength];
+						int totalRead = 0;
+
+						while (totalRead < messageLength)
+						{
+							int read = stream.Read(messageBytes, totalRead, messageLength - totalRead);
+							if (read == 0) break;
+							totalRead += read;
+						}
+
+						if (totalRead == messageLength)
 						{
 							lock (_lock)
 							{
-								_lastReceived = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+								_receivedMessages.Enqueue(messageBytes);
 							}
 						}
 					}
-					Thread.Sleep(10);
 				}
+				catch { }
 			}
-			catch { }
 		}
 
-		public async Task<string> WaitForDataAsync(int timeoutMs)
+		public async Task<List<string>> GetMessagesAsync(int count, int timeoutMs)
+		{
+			var result = new List<string>();
+			var startTime = DateTime.Now;
+
+			while (result.Count < count && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+			{
+				lock (_lock)
+				{
+					while (_receivedMessages.Count > 0 && result.Count < count)
+					{
+						result.Add(Encoding.UTF8.GetString(_receivedMessages.Dequeue()));
+					}
+				}
+
+				if (result.Count < count)
+					await Task.Delay(10);
+			}
+
+			return result;
+		}
+
+		public async Task<byte[]> GetLastBinaryMessageAsync(int timeoutMs)
 		{
 			var startTime = DateTime.Now;
 
@@ -873,828 +663,974 @@ namespace TCPDataTransfer
 			{
 				lock (_lock)
 				{
-					if (!string.IsNullOrEmpty(_lastReceived))
-					{
-						string result = _lastReceived;
-						_lastReceived = string.Empty;
-						return result;
-					}
+					if (_receivedMessages.Count > 0)
+						return _receivedMessages.Dequeue();
 				}
+
 				await Task.Delay(10);
 			}
 
-			return string.Empty;
-		}
-
-		public async Task<List<string>> ReceiveWithSmallBuffer(int chunkSize, int timeoutMs)
-		{
-			var chunks = new List<string>();
-			var buffer = new byte[chunkSize];
-			var startTime = DateTime.Now;
-
-			while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMs && _clientSocket != null && _clientSocket.Connected)
-			{
-				if (_clientSocket.Available > 0)
-				{
-					try
-					{
-						int bytesRead = _clientSocket.Receive(buffer, Math.Min(chunkSize, _clientSocket.Available), SocketFlags.None);
-						if (bytesRead > 0)
-						{
-							chunks.Add(Encoding.UTF8.GetString(buffer, 0, bytesRead));
-						}
-					}
-					catch { break; }
-				}
-				await Task.Delay(10);
-			}
-
-			return chunks;
-		}
-
-		public async Task<string> ReceiveExactAsync(int exactBytes, int timeoutMs)
-		{
-			var buffer = new byte[exactBytes];
-			int totalRead = 0;
-			var startTime = DateTime.Now;
-
-			while (totalRead < exactBytes && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
-			{
-				if (_clientSocket.Available > 0)
-				{
-					int bytesRead = _clientSocket.Receive(buffer, totalRead, exactBytes - totalRead, SocketFlags.None);
-					totalRead += bytesRead;
-				}
-				await Task.Delay(10);
-			}
-
-			return Encoding.UTF8.GetString(buffer, 0, totalRead);
-		}
-
-		public async Task<string> ReceiveAnyAsync(int timeoutMs)
-		{
-			var buffer = new byte[1024];
-			var startTime = DateTime.Now;
-
-			while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
-			{
-				if (_clientSocket.Available > 0)
-				{
-					int bytesRead = _clientSocket.Receive(buffer);
-					return Encoding.UTF8.GetString(buffer, 0, bytesRead);
-				}
-				await Task.Delay(10);
-			}
-
-			return string.Empty;
+			return Array.Empty<byte>();
 		}
 
 		public void Stop()
 		{
 			_isRunning = false;
-			_clientSocket?.Close();
-			_serverSocket?.Close();
+			_listener.Stop();
 			_serverThread?.Join(1000);
 		}
 
 		public void Dispose() => Stop();
 	}
 
-	public class SimpleTCPClient : IDisposable
+	public class LengthPrefixClient : IDisposable
 	{
-		protected Socket _socket;
-		protected readonly int _port;
+		private TcpClient _client;
+		private NetworkStream _stream;
+		private readonly int _port;
 
-		public SimpleTCPClient(int port)
+		public LengthPrefixClient(int port)
 		{
 			_port = port;
 		}
 
-		public virtual async Task ConnectAsync()
+		public LengthPrefixClient() : this(11041) { }
+
+		public async Task ConnectAsync()
 		{
-			_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-			await Task.Run(() => _socket.Connect(new IPEndPoint(IPAddress.Loopback, _port)));
+			_client = new TcpClient();
+			await _client.ConnectAsync(IPAddress.Loopback, _port);
+			_stream = _client.GetStream();
 		}
 
-		public virtual async Task SendAsync(string message)
+		public async Task SendAsync(string message)
 		{
 			byte[] data = Encoding.UTF8.GetBytes(message);
-			await Task.Run(() => _socket.Send(data));
+			await SendAsync(data);
+		}
+
+		public async Task SendAsync(byte[] data)
+		{
+			// Записываем длину сообщения
+			byte[] lengthBytes = BitConverter.GetBytes(data.Length);
+			await _stream.WriteAsync(lengthBytes, 0, lengthBytes.Length);
+
+			// Записываем данные
+			await _stream.WriteAsync(data, 0, data.Length);
 		}
 
 		public void Dispose()
 		{
-			_socket?.Close();
-			_socket?.Dispose();
+			_stream?.Dispose();
+			_client?.Dispose();
 		}
 	}
+	#endregion
 
-	// Классы для демонстрации кодировок
-	public class EncodingAwareServer : SimpleTCPServer
+	#region Бинарный протокол
+	public class BinaryProtocolServer : IDisposable
 	{
-		private Encoding _encoding;
+		private TcpListener _listener;
+		private Thread _serverThread;
+		private bool _isRunning;
+		private readonly List<CommandInfo> _receivedCommands = new();
+		private readonly object _lock = new();
 
-		public EncodingAwareServer(int port, Encoding encoding = null) : base(port)
+		public record CommandInfo(byte CommandId, byte[] Data);
+
+		public BinaryProtocolServer(int port)
 		{
-			_encoding = encoding ?? Encoding.UTF8;
+			_listener = new TcpListener(IPAddress.Loopback, port);
 		}
 
-		public async Task<string> WaitForMessageAsync(int timeoutMs)
+		public async Task StartAsync()
 		{
-			return await WaitForDataAsync(timeoutMs);
-		}
-	}
+			_listener.Start();
+			_isRunning = true;
 
-	// Классы для демонстрации блокировок
-	public class BlockingServer : SimpleTCPServer
-	{
-		private ManualResetEventSlim _dataReceived = new ManualResetEventSlim();
-		private ManualResetEventSlim _serverReady = new ManualResetEventSlim();
-		private string _blockingResult;
-		private Exception _readException;
-
-		public BlockingServer(int port) : base(port) { }
-
-		protected override void RunServer()
-		{
-			try
-			{
-				_clientSocket = _serverSocket.Accept();
-				Console.WriteLine($"   [Сервер] Клиент подключен, сервер готов к блокировке");
-				_serverReady.Set(); // Сервер готов
-
-				// Блокирующее чтение
-				var buffer = new byte[1024];
-
-				Console.WriteLine($"   [Сервер] Вызываю Receive() (блокировка)...");
-				int bytesRead = _clientSocket.Receive(buffer); // Блокируется здесь
-				Console.WriteLine($"   [Сервер] Receive() вернул управление, получено {bytesRead} байт");
-
-				_blockingResult = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-				_dataReceived.Set();
-			}
-			catch (SocketException ex)
-			{
-				Console.WriteLine($"   [Сервер] Ошибка сокета: {ex.SocketErrorCode}");
-				_readException = ex;
-				_dataReceived.Set();
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"   [Сервер] Другая ошибка: {ex.Message}");
-				_readException = ex;
-				_dataReceived.Set();
-			}
-		}
-
-		public async Task<string> WaitForBlockingRead()
-		{
-			// Ждем, пока сервер будет готов (примет подключение)
-			if (!_serverReady.Wait(2000))
-			{
-				throw new TimeoutException("Сервер не готов к блокировке");
-			}
-
-			Console.WriteLine($"   [Тест] Сервер готов, ждем блокировку и данные...");
-
-			// Ждем завершения блокирующего чтения
-			if (_dataReceived.Wait(5000))
-			{
-				if (_readException != null)
-				{
-					throw _readException;
-				}
-				return _blockingResult;
-			}
-
-			throw new TimeoutException("Блокирующее чтение не завершилось за 5 секунд");
-		}
-	}
-
-	public class SlowConsumerServer : SimpleTCPServer
-	{
-		private int _bytesReceived;
-
-		public SlowConsumerServer(int port) : base(port) { }
-
-		protected override void RunServer()
-		{
-			try
-			{
-				_clientSocket = _serverSocket.Accept();
-
-				var buffer = new byte[1]; // Читаем по 1 байту
-				while (_isRunning && _clientSocket.Connected)
-				{
-					if (_clientSocket.Available > 0)
-					{
-						int bytesRead = _clientSocket.Receive(buffer);
-						_bytesReceived += bytesRead;
-
-						// Медленная обработка
-						Thread.Sleep(100);
-					}
-					Thread.Sleep(10);
-				}
-			}
-			catch { }
-		}
-
-		public int GetBytesReceived() => _bytesReceived;
-	}
-
-	// Классы для демонстрации границ сообщений
-	public class FixedLengthServer : SimpleTCPServer
-	{
-		private readonly int _messageLength;
-		private readonly Queue<string> _messages = new Queue<string>();
-
-		public FixedLengthServer(int port, int messageLength) : base(port)
-		{
-			_messageLength = messageLength;
-		}
-
-		protected override void RunServer()
-		{
-			try
-			{
-				_clientSocket = _serverSocket.Accept();
-
-				var buffer = new byte[_messageLength];
-				while (_isRunning && _clientSocket.Connected)
-				{
-					int totalRead = 0;
-					while (totalRead < _messageLength && _isRunning)
-					{
-						int bytesRead = _clientSocket.Receive(buffer, totalRead, _messageLength - totalRead, SocketFlags.None);
-						if (bytesRead == 0) break;
-						totalRead += bytesRead;
-					}
-
-					if (totalRead == _messageLength)
-					{
-						string message = Encoding.UTF8.GetString(buffer, 0, totalRead);
-						lock (_messages)
-						{
-							_messages.Enqueue(message);
-						}
-					}
-					Thread.Sleep(10);
-				}
-			}
-			catch { }
-		}
-
-		public async Task<string> GetNextMessageAsync(int timeoutMs)
-		{
-			var startTime = DateTime.Now;
-
-			while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
-			{
-				lock (_messages)
-				{
-					if (_messages.Count > 0)
-					{
-						return _messages.Dequeue();
-					}
-				}
-				await Task.Delay(10);
-			}
-
-			return string.Empty;
-		}
-	}
-
-	public class FixedLengthClient : SimpleTCPClient
-	{
-		private readonly int _messageLength;
-
-		public FixedLengthClient(int port, int messageLength) : base(port)
-		{
-			_messageLength = messageLength;
-		}
-
-		public async Task SendFixedAsync(string message)
-		{
-			if (message.Length != _messageLength)
-			{
-				message = message.PadRight(_messageLength).Substring(0, _messageLength);
-			}
-
-			await SendAsync(message);
-		}
-	}
-
-	public class DelimitedServer : SimpleTCPServer
-	{
-		private readonly char _delimiter;
-		private readonly Queue<string> _messages = new Queue<string>();
-		private readonly StringBuilder _buffer = new StringBuilder();
-
-		public DelimitedServer(int port, char delimiter) : base(port)
-		{
-			_delimiter = delimiter;
-		}
-
-		protected override void RunServer()
-		{
-			try
-			{
-				_clientSocket = _serverSocket.Accept();
-
-				var byteBuffer = new byte[1024];
-				while (_isRunning && _clientSocket.Connected)
-				{
-					if (_clientSocket.Available > 0)
-					{
-						int bytesRead = _clientSocket.Receive(byteBuffer);
-						string chunk = Encoding.UTF8.GetString(byteBuffer, 0, bytesRead);
-						_buffer.Append(chunk);
-
-						// Проверяем наличие разделителя
-						int delimiterIndex;
-						while ((delimiterIndex = _buffer.ToString().IndexOf(_delimiter)) >= 0)
-						{
-							string message = _buffer.ToString(0, delimiterIndex);
-							lock (_messages)
-							{
-								_messages.Enqueue(message);
-							}
-							_buffer.Remove(0, delimiterIndex + 1);
-						}
-					}
-					Thread.Sleep(10);
-				}
-			}
-			catch { }
-		}
-
-		public async Task<string> GetNextMessageAsync(int timeoutMs)
-		{
-			var startTime = DateTime.Now;
-
-			while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
-			{
-				lock (_messages)
-				{
-					if (_messages.Count > 0)
-					{
-						return _messages.Dequeue();
-					}
-				}
-				await Task.Delay(10);
-			}
-
-			return string.Empty;
-		}
-	}
-
-	public class DelimitedClient : SimpleTCPClient
-	{
-		private readonly char _delimiter;
-
-		public DelimitedClient(int port, char delimiter) : base(port)
-		{
-			_delimiter = delimiter;
-		}
-
-		public async Task SendDelimitedAsync(string message)
-		{
-			await SendAsync(message + _delimiter);
-		}
-	}
-
-	public class LengthPrefixServer : SimpleTCPServer
-	{
-		private readonly Queue<string> _messages = new Queue<string>();
-
-		public LengthPrefixServer(int port) : base(port) { }
-
-		protected override void RunServer()
-		{
-			try
-			{
-				_clientSocket = _serverSocket.Accept();
-
-				while (_isRunning && _clientSocket.Connected)
-				{
-					// Читаем длину (4 байта)
-					byte[] lengthBytes = new byte[4];
-					int lengthBytesRead = 0;
-					while (lengthBytesRead < 4 && _isRunning)
-					{
-						int bytesRead = _clientSocket.Receive(lengthBytes, lengthBytesRead, 4 - lengthBytesRead, SocketFlags.None);
-						if (bytesRead == 0) break;
-						lengthBytesRead += bytesRead;
-					}
-
-					if (lengthBytesRead == 4)
-					{
-						int messageLength = BitConverter.ToInt32(lengthBytes, 0);
-
-						// Читаем сообщение
-						byte[] messageBytes = new byte[messageLength];
-						int messageBytesRead = 0;
-						while (messageBytesRead < messageLength && _isRunning)
-						{
-							int bytesRead = _clientSocket.Receive(messageBytes, messageBytesRead, messageLength - messageBytesRead, SocketFlags.None);
-							if (bytesRead == 0) break;
-							messageBytesRead += bytesRead;
-						}
-
-						if (messageBytesRead == messageLength)
-						{
-							string message = Encoding.UTF8.GetString(messageBytes, 0, messageLength);
-							lock (_messages)
-							{
-								_messages.Enqueue(message);
-							}
-						}
-					}
-					Thread.Sleep(10);
-				}
-			}
-			catch { }
-		}
-
-		public async Task<string> GetNextMessageAsync(int timeoutMs)
-		{
-			var startTime = DateTime.Now;
-
-			while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
-			{
-				lock (_messages)
-				{
-					if (_messages.Count > 0)
-					{
-						return _messages.Dequeue();
-					}
-				}
-				await Task.Delay(10);
-			}
-
-			return string.Empty;
-		}
-	}
-
-	public static class EncodingHelper
-	{
-		private static bool _encodingsRegistered = false;
-
-		public static void RegisterWindowsEncodings()
-		{
-			if (_encodingsRegistered) return;
-
-			// Регистрируем провайдер кодировок для Windows
-			Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-			_encodingsRegistered = true;
-		}
-
-		public static Encoding GetEncoding(int codePage)
-		{
-			RegisterWindowsEncodings();
-			return Encoding.GetEncoding(codePage);
-		}
-	}
-
-	public class LengthPrefixClient : SimpleTCPClient
-	{
-		public LengthPrefixClient(int port) : base(port) { }
-
-		public async Task SendWithLengthAsync(string message)
-		{
-			byte[] messageBytes = Encoding.UTF8.GetBytes(message);
-			byte[] lengthBytes = BitConverter.GetBytes(messageBytes.Length);
-
-			// Отправляем длину, затем данные
-			await Task.Run(() =>
-			{
-				_socket.Send(lengthBytes);
-				_socket.Send(messageBytes);
-			});
-		}
-	}
-
-	public class JSONServer : SimpleTCPServer
-	{
-		private readonly Queue<string> _messages = new Queue<string>();
-		private readonly StringBuilder _buffer = new StringBuilder();
-
-		public JSONServer(int port) : base(port) { }
-
-		protected override void RunServer()
-		{
-			try
-			{
-				_clientSocket = _serverSocket.Accept();
-
-				var byteBuffer = new byte[1024];
-				while (_isRunning && _clientSocket.Connected)
-				{
-					if (_clientSocket.Available > 0)
-					{
-						int bytesRead = _clientSocket.Receive(byteBuffer);
-						string chunk = Encoding.UTF8.GetString(byteBuffer, 0, bytesRead);
-						_buffer.Append(chunk);
-
-						// Пытаемся найти валидный JSON
-						string bufferStr = _buffer.ToString();
-						int braceCount = 0;
-						int startIndex = -1;
-
-						for (int i = 0; i < bufferStr.Length; i++)
-						{
-							if (bufferStr[i] == '{')
-							{
-								if (braceCount == 0) startIndex = i;
-								braceCount++;
-							}
-							else if (bufferStr[i] == '}')
-							{
-								braceCount--;
-								if (braceCount == 0 && startIndex != -1)
-								{
-									string json = bufferStr.Substring(startIndex, i - startIndex + 1);
-									lock (_messages)
-									{
-										_messages.Enqueue(json);
-									}
-									_buffer.Remove(0, i + 1);
-									break;
-								}
-							}
-						}
-					}
-					Thread.Sleep(10);
-				}
-			}
-			catch { }
-		}
-
-		public async Task<string> GetNextJSONAsync(int timeoutMs)
-		{
-			var startTime = DateTime.Now;
-
-			while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
-			{
-				lock (_messages)
-				{
-					if (_messages.Count > 0)
-					{
-						return _messages.Dequeue();
-					}
-				}
-				await Task.Delay(10);
-			}
-
-			return string.Empty;
-		}
-	}
-
-	public class JSONClient : SimpleTCPClient
-	{
-		public JSONClient(int port) : base(port) { }
-
-		public async Task SendJSONAsync(string json)
-		{
-			await SendAsync(json);
-		}
-	}
-
-	// Классы для обработки ошибок
-	public class ResilientServer : SimpleTCPServer
-	{
-		public ResilientServer(int port) : base(port) { }
-
-		public async Task<string> TryReadWithTimeout(int timeoutMs)
-		{
-			try
-			{
-				if (_clientSocket != null && _clientSocket.Connected)
-				{
-					var buffer = new byte[1024];
-					_clientSocket.ReceiveTimeout = timeoutMs;
-					int bytesRead = _clientSocket.Receive(buffer);
-					return Encoding.UTF8.GetString(buffer, 0, bytesRead);
-				}
-			}
-			catch (SocketException ex)
-			{
-				throw;
-			}
-
-			return string.Empty;
-		}
-	}
-
-	public class RobustTCPClient : IDisposable
-	{
-		private Socket _socket;
-
-		// Если нужен конструктор с портом, добавьте его:
-		public RobustTCPClient() { } // Конструктор по умолчанию
-
-		// ИЛИ если нужен конструктор с портом:
-		// public RobustTCPClient(int port) { } // Но тогда нужно хранить порт
-
-		public async Task ConnectWithTimeoutAsync(string host, int port, int timeoutMs)
-		{
-			_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-			var connectTask = Task.Run(() => _socket.Connect(host, port));
-			var timeoutTask = Task.Delay(timeoutMs);
-
-			var completedTask = await Task.WhenAny(connectTask, timeoutTask);
-
-			if (completedTask == timeoutTask)
-			{
-				_socket.Close();
-				throw new TimeoutException($"Подключение к {host}:{port} превысило тайм-аут {timeoutMs}мс");
-			}
-
-			// Проверяем, была ли ошибка подключения
-			await connectTask;
-		}
-
-		public void Dispose()
-		{
-			_socket?.Close();
-			_socket?.Dispose();
-		}
-	}
-
-	// Классы для практических паттернов
-	public class BufferFillingServer : SimpleTCPServer
-	{
-		public BufferFillingServer(int port) : base(port) { }
-
-		public async Task<string> ReadBufferAsync(int bufferSize, int timeoutMs)
-		{
-			var buffer = new byte[bufferSize];
-			int totalRead = 0;
-			var startTime = DateTime.Now;
-
-			while (totalRead < bufferSize && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
-			{
-				if (_clientSocket != null && _clientSocket.Connected && _clientSocket.Available > 0)
-				{
-					int bytesRead = _clientSocket.Receive(buffer, totalRead, bufferSize - totalRead, SocketFlags.None);
-					totalRead += bytesRead;
-				}
-				await Task.Delay(10);
-			}
-
-			return Encoding.UTF8.GetString(buffer, 0, totalRead);
-		}
-	}
-
-	public class AsyncServer : SimpleTCPServer
-	{
-		private readonly CancellationTokenSource _cts = new CancellationTokenSource();
-
-		public AsyncServer(int port) : base(port) { }
-
-		public async Task<string> ReadAsync(CancellationToken cancellationToken)
-		{
-			if (_clientSocket == null || !_clientSocket.Connected)
-				return string.Empty;
-
-			var buffer = new byte[1024];
-
-			using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token))
+			_serverThread = new Thread(() =>
 			{
 				try
 				{
-					// Асинхронное чтение
-					int bytesRead = await Task.Run(() =>
+					while (_isRunning)
 					{
-						try
-						{
-							return _clientSocket.Receive(buffer);
-						}
-						catch (SocketException) when (linkedCts.Token.IsCancellationRequested)
-						{
-							return 0;
-						}
-					}, linkedCts.Token);
-
-					return Encoding.UTF8.GetString(buffer, 0, bytesRead);
-				}
-				catch (OperationCanceledException)
-				{
-					return string.Empty;
-				}
-			}
-		}
-
-		public new void Stop()
-		{
-			_cts.Cancel();
-			base.Stop();
-		}
-	}
-
-	public class ProblemSimulatingServer : SimpleTCPServer
-	{
-		public class ProblemSimulationResult
-		{
-			public List<string> Chunks { get; set; } = new List<string>();
-			public long ElapsedMs { get; set; }
-			public bool DataIntegrity { get; set; }
-		}
-
-		public ProblemSimulatingServer(int port) : base(port) { }
-
-		public async Task<ProblemSimulationResult> GetReceivedWithProblems(int timeoutMs)
-		{
-			var result = new ProblemSimulationResult();
-			var stopwatch = Stopwatch.StartNew();
-
-			// Симулируем проблемы: читаем с задержками и разными размерами
-			var random = new Random();
-			var allData = new StringBuilder();
-
-			while (stopwatch.ElapsedMilliseconds < timeoutMs)
-			{
-				if (_clientSocket != null && _clientSocket.Connected && _clientSocket.Available > 0)
-				{
-					// Случайный размер буфера (1-100 байт)
-					int bufferSize = random.Next(1, 101);
-					var buffer = new byte[bufferSize];
-
-					int bytesRead = _clientSocket.Receive(buffer, 0, Math.Min(bufferSize, _clientSocket.Available), SocketFlags.None);
-					if (bytesRead > 0)
-					{
-						string chunk = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-						result.Chunks.Add(chunk);
-						allData.Append(chunk);
-
-						// Случайная задержка (0-200 мс)
-						await Task.Delay(random.Next(0, 201));
+						var client = _listener.AcceptTcpClient();
+						Task.Run(() => HandleClient(client));
 					}
 				}
-				else
+				catch { }
+			});
+
+			_serverThread.Start();
+
+			await Task.Delay(100);
+		}
+
+		private void HandleClient(TcpClient client)
+		{
+			using (client)
+			using (var stream = client.GetStream())
+			{
+				try
 				{
-					await Task.Delay(50);
+					while (_isRunning && client.Connected)
+					{
+						// Читаем заголовок: [CommandID: 1 байт][DataLength: 2 байта]
+						byte[] header = new byte[3];
+						int headerRead = stream.Read(header, 0, 3);
+						if (headerRead != 3) break;
+
+						byte commandId = header[0];
+						ushort dataLength = BitConverter.ToUInt16(header, 1);
+
+						// Валидация команды
+						if (commandId > 0x0F) // Допустимы только команды 0x00-0x0F
+						{
+							SendErrorResponse(stream, "Invalid command ID");
+							continue;
+						}
+
+						if (dataLength > 1024) // Ограничение размера данных
+						{
+							SendErrorResponse(stream, "Data too large");
+							continue;
+						}
+
+						// Читаем данные
+						byte[] data = new byte[dataLength];
+						int totalRead = 0;
+
+						while (totalRead < dataLength)
+						{
+							int read = stream.Read(data, totalRead, dataLength - totalRead);
+							if (read == 0) break;
+							totalRead += read;
+						}
+
+						if (totalRead == dataLength)
+						{
+							lock (_lock)
+							{
+								_receivedCommands.Add(new CommandInfo(commandId, data));
+							}
+
+							SendSuccessResponse(stream);
+						}
+					}
 				}
+				catch { }
 			}
+		}
 
-			stopwatch.Stop();
-			result.ElapsedMs = stopwatch.ElapsedMilliseconds;
+		private void SendSuccessResponse(NetworkStream stream)
+		{
+			byte[] response = new byte[] { 0x01 }; // 0x01 = успех
+			stream.Write(response, 0, response.Length);
+		}
 
-			// Проверяем целостность данных (все чанки состоят из 'X')
-			string allReceived = allData.ToString();
-			result.DataIntegrity = allReceived.Length > 0 && allReceived.All(c => c == 'X');
+		private void SendErrorResponse(NetworkStream stream, string message)
+		{
+			byte[] messageBytes = Encoding.UTF8.GetBytes(message);
+			byte[] response = new byte[1 + messageBytes.Length];
+			response[0] = 0x00; // 0x00 = ошибка
+			Array.Copy(messageBytes, 0, response, 1, messageBytes.Length);
+			stream.Write(response, 0, response.Length);
+		}
+
+		public async Task<List<CommandInfo>> GetCommandsAsync(int count, int timeoutMs)
+		{
+			var result = new List<CommandInfo>();
+			var startTime = DateTime.Now;
+
+			while (result.Count < count && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+			{
+				lock (_lock)
+				{
+					while (_receivedCommands.Count > 0 && result.Count < count)
+					{
+						result.Add(_receivedCommands[0]);
+						_receivedCommands.RemoveAt(0);
+					}
+				}
+
+				if (result.Count < count)
+					await Task.Delay(10);
+			}
 
 			return result;
 		}
+
+		public void Stop()
+		{
+			_isRunning = false;
+			_listener.Stop();
+			_serverThread?.Join(1000);
+		}
+
+		public void Dispose() => Stop();
 	}
 
-	public class DataAccumulator
+	public class BinaryProtocolClient : IDisposable
 	{
-		private readonly StringBuilder _buffer = new StringBuilder();
+		private TcpClient _client;
+		private NetworkStream _stream;
+		private readonly int _port;
 
-		public void Add(string data)
+		public BinaryProtocolClient(int port)
 		{
-			_buffer.Append(data);
+			_port = port;
 		}
 
-		public string GetData()
+		public BinaryProtocolClient() : this(11042) { }
+
+		public async Task ConnectAsync()
 		{
-			return _buffer.ToString();
+			_client = new TcpClient();
+			await _client.ConnectAsync(IPAddress.Loopback, _port);
+			_stream = _client.GetStream();
 		}
 
-		public void ClearProcessed(int length)
+		public async Task SendCommandAsync(byte commandId, string data)
 		{
-			if (length >= _buffer.Length)
+			byte[] dataBytes = Encoding.UTF8.GetBytes(data);
+			await SendCommandAsync(commandId, dataBytes);
+		}
+
+		public async Task SendCommandAsync(byte commandId, byte[] data)
+		{
+			if (data.Length > 65535)
+				throw new ProtocolException("Data too large");
+
+			// Формируем заголовок
+			byte[] header = new byte[3];
+			header[0] = commandId;
+			byte[] lengthBytes = BitConverter.GetBytes((ushort)data.Length);
+			Array.Copy(lengthBytes, 0, header, 1, 2);
+
+			// Отправляем заголовок
+			await _stream.WriteAsync(header, 0, header.Length);
+
+			// Отправляем данные
+			await _stream.WriteAsync(data, 0, data.Length);
+
+			// Читаем ответ
+			byte[] response = new byte[1];
+			int read = await _stream.ReadAsync(response, 0, 1);
+
+			if (read == 1 && response[0] == 0x00)
 			{
-				_buffer.Clear();
+				// Читаем сообщение об ошибке
+				byte[] errorBytes = new byte[1024];
+				int errorRead = await _stream.ReadAsync(errorBytes, 0, errorBytes.Length);
+				string errorMessage = Encoding.UTF8.GetString(errorBytes, 0, errorRead);
+				throw new ProtocolException($"Server error: {errorMessage}");
 			}
-			else
-			{
-				_buffer.Remove(0, length);
-			}
+		}
+
+		public void Dispose()
+		{
+			_stream?.Dispose();
+			_client?.Dispose();
 		}
 	}
+
+	public class ProtocolException : Exception
+	{
+		public ProtocolException(string message) : base(message) { }
+	}
+	#endregion
+
+	#region Stateful протокол
+	public class StatefulServer : IDisposable
+	{
+		private TcpListener _listener;
+		private Thread _serverThread;
+		private bool _isRunning;
+		private readonly List<string> _executedCommands = new();
+		private readonly object _lock = new();
+
+		// Хранилище сессий (в реальности было бы сложнее)
+		private readonly Dictionary<string, Session> _sessions = new();
+
+		private class Session
+		{
+			public string Username { get; set; }
+			public DateTime Created { get; } = DateTime.Now;
+			public bool IsAuthenticated { get; set; }
+		}
+
+		public StatefulServer(int port)
+		{
+			_listener = new TcpListener(IPAddress.Loopback, port);
+		}
+
+		public async Task StartAsync()
+		{
+			_listener.Start();
+			_isRunning = true;
+
+			_serverThread = new Thread(() =>
+			{
+				try
+				{
+					while (_isRunning)
+					{
+						var client = _listener.AcceptTcpClient();
+						Task.Run(() => HandleClient(client));
+					}
+				}
+				catch { }
+			});
+
+			_serverThread.Start();
+
+			await Task.Delay(100);
+		}
+
+		private void HandleClient(TcpClient client)
+		{
+			using (client)
+			using (var stream = client.GetStream())
+			using (var reader = new StreamReader(stream, Encoding.UTF8))
+			using (var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true })
+			{
+				try
+				{
+					string sessionId = Guid.NewGuid().ToString();
+					var session = new Session();
+					_sessions[sessionId] = session;
+
+					writer.WriteLine($"SESSION {sessionId}");
+
+					while (_isRunning && client.Connected)
+					{
+						string line = reader.ReadLine();
+						if (line == null) break;
+
+						string[] parts = line.Split(' ', 2);
+						string command = parts[0].ToUpper();
+						string argument = parts.Length > 1 ? parts[1] : string.Empty;
+
+						if (command == "AUTH")
+						{
+							// Формат: AUTH username password
+							string[] authParts = argument.Split(' ');
+							if (authParts.Length == 2)
+							{
+								if (authParts[0] == "admin" && authParts[1] == "password123")
+								{
+									session.IsAuthenticated = true;
+									session.Username = authParts[0];
+									writer.WriteLine("AUTH_SUCCESS");
+								}
+								else
+								{
+									writer.WriteLine("AUTH_FAILED");
+								}
+							}
+						}
+						else if (command == "LOGOUT")
+						{
+							session.IsAuthenticated = false;
+							writer.WriteLine("LOGOUT_SUCCESS");
+						}
+						else if (!session.IsAuthenticated)
+						{
+							writer.WriteLine("ERROR Not authenticated");
+						}
+						else
+						{
+							lock (_lock)
+							{
+								_executedCommands.Add($"{command} {argument}");
+							}
+							writer.WriteLine($"OK {command} executed");
+						}
+					}
+				}
+				catch { }
+				finally
+				{
+					// Очистка сессии
+					_sessions.Clear();
+				}
+			}
+		}
+
+		public async Task<List<string>> GetExecutedCommandsAsync(int count, int timeoutMs)
+		{
+			var result = new List<string>();
+			var startTime = DateTime.Now;
+
+			while (result.Count < count && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+			{
+				lock (_lock)
+				{
+					while (_executedCommands.Count > 0 && result.Count < count)
+					{
+						result.Add(_executedCommands[0]);
+						_executedCommands.RemoveAt(0);
+					}
+				}
+
+				if (result.Count < count)
+					await Task.Delay(10);
+			}
+
+			return result;
+		}
+
+		public void Stop()
+		{
+			_isRunning = false;
+			_listener.Stop();
+			_serverThread?.Join(1000);
+		}
+
+		public void Dispose() => Stop();
+	}
+
+	public class StatefulClient : IDisposable
+	{
+		private TcpClient _client;
+		private NetworkStream _stream;
+		private StreamReader _reader;
+		private StreamWriter _writer;
+		private readonly int _port;
+
+		public StatefulClient(int port)
+		{
+			_port = port;
+		}
+
+		public StatefulClient() : this(11043) { }
+
+		public async Task ConnectAsync()
+		{
+			_client = new TcpClient();
+			await _client.ConnectAsync(IPAddress.Loopback, _port);
+			_stream = _client.GetStream();
+			_reader = new StreamReader(_stream, Encoding.UTF8);
+			_writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
+
+			// Читаем приветственное сообщение с session ID
+			string welcome = await _reader.ReadLineAsync();
+			if (welcome == null || !welcome.StartsWith("SESSION"))
+				throw new ProtocolException("Invalid server response");
+		}
+
+		public async Task<bool> AuthenticateAsync(string username, string password)
+		{
+			await _writer.WriteLineAsync($"AUTH {username} {password}");
+			string response = await _reader.ReadLineAsync();
+			return response == "AUTH_SUCCESS";
+		}
+
+		public async Task<string> SendCommandAsync(string command)
+		{
+			await _writer.WriteLineAsync(command);
+			return await _reader.ReadLineAsync();
+		}
+
+		public async Task<bool> LogoutAsync()
+		{
+			await _writer.WriteLineAsync("LOGOUT");
+			string response = await _reader.ReadLineAsync();
+			return response == "LOGOUT_SUCCESS";
+		}
+
+		public void Dispose()
+		{
+			_writer?.Dispose();
+			_reader?.Dispose();
+			_stream?.Dispose();
+			_client?.Dispose();
+		}
+	}
+	#endregion
+
+	#region Обработка ошибок
+	public class ErrorHandlingServer : IDisposable
+	{
+		private TcpListener _listener;
+		private Thread _serverThread;
+		private bool _isRunning;
+		private string _status = "Stopped";
+
+		public ErrorHandlingServer(int port)
+		{
+			_listener = new TcpListener(IPAddress.Loopback, port);
+		}
+
+		public async Task StartAsync()
+		{
+			_listener.Start();
+			_isRunning = true;
+			_status = "Running";
+
+			_serverThread = new Thread(() =>
+			{
+				try
+				{
+					while (_isRunning)
+					{
+						var client = _listener.AcceptTcpClient();
+						Task.Run(() => HandleClient(client));
+					}
+				}
+				catch { }
+			});
+
+			_serverThread.Start();
+
+			await Task.Delay(100);
+		}
+
+		private void HandleClient(TcpClient client)
+		{
+			using (client)
+			using (var stream = client.GetStream())
+			using (var reader = new StreamReader(stream, Encoding.UTF8))
+			using (var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true })
+			{
+				try
+				{
+					// Устанавливаем таймаут для чтения
+					client.ReceiveTimeout = 5000;
+
+					char[] buffer = new char[4096];
+					int totalRead = 0;
+
+					while (_isRunning && client.Connected)
+					{
+						// Читаем порциями с проверкой максимального размера
+						int read = reader.Read(buffer, totalRead, buffer.Length - totalRead);
+						if (read == 0) break;
+
+						totalRead += read;
+
+						// Проверяем на наличие разделителя
+						string received = new string(buffer, 0, totalRead);
+						int delimiterIndex = received.IndexOf('\n');
+
+						if (delimiterIndex >= 0)
+						{
+							// Нашли полное сообщение
+							string message = received.Substring(0, delimiterIndex);
+							ProcessMessage(message, writer);
+
+							// Сдвигаем буфер
+							int remaining = totalRead - delimiterIndex - 1;
+							if (remaining > 0)
+							{
+								Array.Copy(buffer, delimiterIndex + 1, buffer, 0, remaining);
+								totalRead = remaining;
+							}
+							else
+							{
+								totalRead = 0;
+							}
+						}
+						else if (totalRead >= buffer.Length)
+						{
+							// Переполнение буфера
+							writer.WriteLine("ERROR Message too long");
+							totalRead = 0; // Сбрасываем буфер
+						}
+					}
+				}
+				catch (IOException) when (!_isRunning)
+				{
+					// Ожидаемое прерывание
+				}
+				catch
+				{
+					// Игнорируем ошибки клиента
+				}
+			}
+		}
+
+		private void ProcessMessage(string message, StreamWriter writer)
+		{
+			try
+			{
+				if (string.IsNullOrWhiteSpace(message))
+				{
+					writer.WriteLine("ERROR Empty message");
+					return;
+				}
+
+				if (message.Length > 1024)
+				{
+					writer.WriteLine("ERROR Message too large");
+					return;
+				}
+
+				string[] parts = message.Split(' ', 2);
+				string command = parts[0].ToUpper();
+				string arguments = parts.Length > 1 ? parts[1] : string.Empty;
+
+				switch (command)
+				{
+					case "HELLO":
+						writer.WriteLine("OK Hello from server");
+						break;
+
+					case "GET_DATA":
+						if (string.IsNullOrEmpty(arguments))
+							writer.WriteLine("ERROR Missing parameters for GET_DATA");
+						else
+							writer.WriteLine($"OK Data: {arguments}");
+						break;
+
+					case "VALID_COMMAND":
+						writer.WriteLine("OK Command executed successfully");
+						break;
+
+					default:
+						writer.WriteLine($"ERROR Unknown command: {command}");
+						break;
+				}
+			}
+			catch (Exception ex)
+			{
+				writer.WriteLine($"ERROR Internal error: {ex.Message}");
+			}
+		}
+
+		public async Task<string> GetStatusAsync()
+		{
+			await Task.Delay(100);
+			return _status;
+		}
+
+		public void Stop()
+		{
+			_isRunning = false;
+			_status = "Stopped";
+			_listener.Stop();
+			_serverThread?.Join(1000);
+		}
+
+		public void Dispose() => Stop();
+	}
+
+	public class ErrorHandlingClient : IDisposable
+	{
+		private TcpClient _client;
+		private NetworkStream _stream;
+		private StreamReader _reader;
+		private StreamWriter _writer;
+		private readonly int _port;
+
+		public ErrorHandlingClient(int port)
+		{
+			_port = port;
+		}
+
+		public ErrorHandlingClient() : this(11044) { }
+
+		public async Task ConnectAsync()
+		{
+			_client = new TcpClient();
+			await _client.ConnectAsync(IPAddress.Loopback, _port);
+			_stream = _client.GetStream();
+			_reader = new StreamReader(_stream, Encoding.UTF8);
+			_writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
+		}
+
+		public async Task<string> SendRawAsync(string message)
+		{
+			await _writer.WriteLineAsync(message);
+			return await _reader.ReadLineAsync() ?? "NO_RESPONSE";
+		}
+
+		public async Task SendPartialAsync(string message)
+		{
+			// Отправка без завершающего \n
+			await _writer.WriteAsync(message);
+			await _writer.FlushAsync();
+		}
+
+		public void Dispose()
+		{
+			_writer?.Dispose();
+			_reader?.Dispose();
+			_stream?.Dispose();
+			_client?.Dispose();
+		}
+	}
+	#endregion
+
+	#region Комплексный протокол (упрощенная реализация для демонстрации)
+	public class ComplexProtocolServer : IDisposable
+	{
+		private TcpListener _listener;
+		private Thread _serverThread;
+		private bool _isRunning;
+		private readonly List<string> _textMessages = new();
+		private readonly List<byte[]> _binaryMessages = new();
+		private (int OriginalSize, int CompressedSize) _compressionInfo;
+		private string _streamResult = string.Empty;
+
+		public enum MessageType : byte
+		{
+			Text = 1,
+			Binary = 2,
+			Compressed = 3,
+			Stream = 4,
+			Data = 5
+		}
+
+		public ComplexProtocolServer(int port)
+		{
+			_listener = new TcpListener(IPAddress.Loopback, port);
+		}
+
+		public async Task StartAsync()
+		{
+			_listener.Start();
+			_isRunning = true;
+
+			_serverThread = new Thread(() =>
+			{
+				try
+				{
+					while (_isRunning)
+					{
+						var client = _listener.AcceptTcpClient();
+						Task.Run(() => HandleClient(client));
+					}
+				}
+				catch { }
+			});
+
+			_serverThread.Start();
+
+			await Task.Delay(100);
+		}
+
+		private void HandleClient(TcpClient client)
+		{
+			using (client)
+			using (var stream = client.GetStream())
+			{
+				try
+				{
+					while (_isRunning && client.Connected)
+					{
+						// Читаем заголовок: [Version][Type][Length]
+						byte[] header = new byte[7]; // 1 + 1 + 4 + 1 (версия, тип, длина, флаг подтверждения)
+						int headerRead = stream.Read(header, 0, header.Length);
+						if (headerRead != header.Length) break;
+
+						byte version = header[0];
+						MessageType type = (MessageType)header[1];
+						int length = BitConverter.ToInt32(header, 2);
+						bool requiresAck = header[6] == 1;
+
+						// Читаем данные
+						byte[] data = new byte[length];
+						int totalRead = 0;
+
+						while (totalRead < length)
+						{
+							int read = stream.Read(data, totalRead, length - totalRead);
+							if (read == 0) break;
+							totalRead += read;
+						}
+
+						if (totalRead == length)
+						{
+							ProcessMessage(version, type, data);
+
+							if (requiresAck)
+							{
+								// Отправляем подтверждение
+								byte[] ack = new byte[] { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 };
+								stream.Write(ack, 0, ack.Length);
+							}
+						}
+					}
+				}
+				catch { }
+			}
+		}
+
+		private void ProcessMessage(byte version, MessageType type, byte[] data)
+		{
+			switch (type)
+			{
+				case MessageType.Text:
+					string text = Encoding.UTF8.GetString(data);
+					_textMessages.Add($"[v{version}] {text}");
+					break;
+
+				case MessageType.Binary:
+					_binaryMessages.Add(data);
+					break;
+
+				case MessageType.Compressed:
+					// В реальности было бы распаковка
+					_compressionInfo = (data.Length, data.Length / 2); // Симуляция сжатия
+					break;
+
+				case MessageType.Stream:
+					string chunk = Encoding.UTF8.GetString(data);
+					if (chunk == "END")
+						_streamResult = "Stream completed";
+					break;
+			}
+		}
+
+		public async Task<List<string>> GetTextMessagesAsync(int count, int timeoutMs)
+		{
+			var startTime = DateTime.Now;
+
+			while (_textMessages.Count < count && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+				await Task.Delay(10);
+
+			return _textMessages.GetRange(0, Math.Min(count, _textMessages.Count));
+		}
+
+		public async Task<List<byte[]>> GetBinaryMessagesAsync(int count, int timeoutMs)
+		{
+			var startTime = DateTime.Now;
+
+			while (_binaryMessages.Count < count && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+				await Task.Delay(10);
+
+			return _binaryMessages.GetRange(0, Math.Min(count, _binaryMessages.Count));
+		}
+
+		public async Task<(int OriginalSize, int CompressedSize)> GetCompressionInfoAsync(int timeoutMs)
+		{
+			await Task.Delay(100);
+			return _compressionInfo;
+		}
+
+		public async Task<string> GetStreamResultAsync(int timeoutMs)
+		{
+			var startTime = DateTime.Now;
+
+			while (string.IsNullOrEmpty(_streamResult) && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+				await Task.Delay(10);
+
+			return _streamResult;
+		}
+
+		public void Stop()
+		{
+			_isRunning = false;
+			_listener.Stop();
+			_serverThread?.Join(1000);
+		}
+
+		public void Dispose() => Stop();
+	}
+
+	public class ComplexProtocolClient : IDisposable
+	{
+		private TcpClient _client;
+		private NetworkStream _stream;
+		private readonly int _port;
+
+		public ComplexProtocolClient(int port)
+		{
+			_port = port;
+		}
+
+		public ComplexProtocolClient() : this(11045) { }
+
+		public async Task ConnectAsync()
+		{
+			_client = new TcpClient();
+			await _client.ConnectAsync(IPAddress.Loopback, _port);
+			_stream = _client.GetStream();
+		}
+
+		private async Task SendMessageAsync(byte version, byte type, byte[] data, bool requireAck = false)
+		{
+			// Формируем заголовок
+			byte[] header = new byte[7];
+			header[0] = version;
+			header[1] = type;
+			byte[] lengthBytes = BitConverter.GetBytes(data.Length);
+			Array.Copy(lengthBytes, 0, header, 2, 4);
+			header[6] = requireAck ? (byte)1 : (byte)0;
+
+			// Отправляем
+			await _stream.WriteAsync(header, 0, header.Length);
+			await _stream.WriteAsync(data, 0, data.Length);
+
+			if (requireAck)
+			{
+				// Ждем подтверждения
+				byte[] ack = new byte[7];
+				await _stream.ReadAsync(ack, 0, ack.Length);
+			}
+		}
+
+		public async Task SendTextMessageAsync(string text, byte version = 1)
+		{
+			byte[] data = Encoding.UTF8.GetBytes(text);
+			await SendMessageAsync(version, (byte)MessageType.Text, data);
+		}
+
+		public async Task SendBinaryMessageAsync(byte[] data, MessageType type)
+		{
+			await SendMessageAsync(1, (byte)type, data);
+		}
+
+		public async Task SendCompressedTextAsync(string text)
+		{
+			// Симуляция сжатия
+			byte[] data = Encoding.UTF8.GetBytes(text);
+			await SendMessageAsync(1, (byte)MessageType.Compressed, data);
+		}
+
+		public async Task<string> SendWithAckAsync(string message)
+		{
+			byte[] data = Encoding.UTF8.GetBytes(message);
+			await SendMessageAsync(1, (byte)MessageType.Text, data, true);
+			return "ACK_RECEIVED";
+		}
+
+		public async Task SendStreamChunkAsync(string chunk)
+		{
+			byte[] data = Encoding.UTF8.GetBytes(chunk);
+			await SendMessageAsync(1, (byte)MessageType.Stream, data);
+		}
+
+		public void Dispose()
+		{
+			_stream?.Dispose();
+			_client?.Dispose();
+		}
+	}
+	#endregion
 
 	// Главная программа
 	class Program
 	{
 		static async Task Main(string[] args)
 		{
-			Console.WriteLine("ПЕРЕДАЧА ДАННЫХ ПО TCP: ОТ ТЕОРИИ К ПРАКТИКЕ");
-			Console.WriteLine("============================================\n");
+			Console.WriteLine("ПРОТОКОЛЫ ОБЩЕНИЯ ПОВЕРХ TCP В C#");
+			Console.WriteLine("==================================\n");
 
-			await TCPDataTransferDemo.DemonstrateDataTransfer();
+			await ProtocolDemonstration.DemonstrateProtocols();
 
-			Console.WriteLine("\n\nОСНОВНЫЕ ВЫВОДЫ:");
-			Console.WriteLine("1. TCP передаёт ПОТОК БАЙТОВ, не сообщения");
-			Console.WriteLine("2. Одна отправка ≠ одно чтение (данные могут фрагментироваться)");
-			Console.WriteLine("3. Кодировка должна быть согласована между клиентом и сервером");
-			Console.WriteLine("4. Чтение и запись могут БЛОКИРОВАТЬ выполнение программы");
-			Console.WriteLine("5. Границы сообщений определяет ПРИЛОЖЕНИЕ (не TCP)");
-			Console.WriteLine("6. Ошибки и разрывы - НОРМАЛЬНАЯ часть сетевого программирования");
-			Console.WriteLine("7. Локальные тесты часто скрывают реальные проблемы");
+			Console.WriteLine("\n\nКлючевые выводы:");
+			Console.WriteLine("1. TCP передаёт байты, протокол определяет их смысл");
+			Console.WriteLine("2. Простейший протокол лучше, чем отсутствие протокола");
+			Console.WriteLine("3. Текстовый протокол с разделителями прост, но ненадёжен");
+			Console.WriteLine("4. Протокол с указанием длины надёжнее, но сложнее");
+			Console.WriteLine("5. Бинарные протоколы эффективны, но требуют строгой типизации");
+			Console.WriteLine("6. Stateful протоколы позволяют реализовать сессии и состояния");
+			Console.WriteLine("7. Обработка ошибок должна быть частью протокола");
+			Console.WriteLine("8. Хороший протокол предусматривает расширяемость");
+			Console.WriteLine("9. Симметричность реализации клиента и сервера критически важна");
+			Console.WriteLine("10. Протокол должен быть устойчив к невалидным данным");
 		}
 	}
 }
