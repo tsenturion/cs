@@ -4,559 +4,977 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Linq;
 
-namespace NetworkingFundamentals
+namespace TCPConnectionArchitecture
 {
-	// Демонстрация основ компьютерных сетей
-	public class NetworkBasicsDemo
+	// Демонстрация архитектуры TCP-соединения
+	public class TCPArchitectureDemo
 	{
-		public static void DemonstrateNetworkConcepts()
+		public static async Task DemonstrateTCPArchitecture()
 		{
-			Console.WriteLine("=== ОСНОВЫ КОМПЬЮТЕРНЫХ СЕТЕЙ ===\n");
+			Console.WriteLine("=== АРХИТЕКТУРА TCP-СОЕДИНЕНИЯ ===\n");
 
-			// 1. Клиент и сервер как роли программы
-			Console.WriteLine("1. КЛИЕНТ И СЕРВЕР - РОЛИ ПРОГРАММ:");
-			DemonstrateClientServerRoles();
+			// 1. Установка соединения (трехстороннее рукопожатие)
+			Console.WriteLine("1. УСТАНОВКА СОЕДИНЕНИЯ (трехстороннее рукопожатие):");
+			await DemonstrateConnectionEstablishment();
 
-			// 2. IP-адреса и порты
-			Console.WriteLine("\n2. IP-АДРЕСА И ПОРТЫ:");
-			DemonstrateAddressing();
+			// 2. Поток байтов и буферизация
+			Console.WriteLine("\n2. ПОТОК БАЙТОВ И БУФЕРИЗАЦИЯ:");
+			await DemonstrateStreamBuffering();
 
-			// 3. Локальные и удалённые соединения
-			Console.WriteLine("\n3. ЛОКАЛЬНЫЕ И УДАЛЁННЫЕ СОЕДИНЕНИЯ:");
-			DemonstrateConnectionTypes();
+			// 3. Управление потоком данных
+			Console.WriteLine("\n3. УПРАВЛЕНИЕ ПОТОКОМ ДАННЫХ:");
+			await DemonstrateFlowControl();
 
-			// 4. TCP как надёжный протокол
-			Console.WriteLine("\n4. TCP - НАДЁЖНЫЙ ПРОТОКОЛ:");
-			DemonstrateTCPFeatures();
+			// 4. Корректное закрытие соединения
+			Console.WriteLine("\n4. ЗАКРЫТИЕ СОЕДИНЕНИЯ:");
+			await DemonstrateConnectionClosure();
 
-			// 5. Поток байтов в TCP
-			Console.WriteLine("\n5. TCP КАК ПОТОК БАЙТОВ:");
-			DemonstrateTCPStream();
+			// 5. Разрыв соединения и обработка ошибок
+			Console.WriteLine("\n5. РАЗРЫВЫ СОЕДИНЕНИЯ:");
+			await DemonstrateConnectionBreak();
 
-			// 6. Управление состояниями соединения
-			Console.WriteLine("\n6. СОСТОЯНИЯ TCP-СОЕДИНЕНИЯ:");
-			DemonstrateConnectionStates();
+			// 6. Тайм-ауты и устойчивость
+			Console.WriteLine("\n6. ТАЙМ-АУТЫ И УСТОЙЧИВОСТЬ:");
+			await DemonstrateTimeoutsAndResilience();
 
-			// 7. Практическая демонстрация
-			Console.WriteLine("\n7. ПРАКТИЧЕСКАЯ ДЕМОНСТРАЦИЯ:");
-			DemonstratePracticalExample();
+			// 7. Полная архитектура TCP в действии
+			Console.WriteLine("\n7. ПОЛНАЯ АРХИТЕКТУРА В ДЕЙСТВИИ:");
+			await DemonstrateFullArchitecture();
 		}
 
-		private static void DemonstrateClientServerRoles()
+		private static async Task DemonstrateConnectionEstablishment()
 		{
-			Console.WriteLine("   Демонстрация ролей клиента и сервера:");
+			Console.WriteLine("   Демонстрация установки соединения:");
 
-			// Симуляция: один компьютер запускает обе роли
-			Console.WriteLine($"\n   Ситуация 1: Отдельные программы");
-			Console.WriteLine($"     Компьютер 1: Запускает СерверПрограмма.exe");
-			Console.WriteLine($"     Компьютер 2: Запускает КлиентПрограмма.exe");
-			Console.WriteLine($"     Результат: Клиент подключается к Серверу");
+			const int port = 11030;
 
-			Console.WriteLine($"\n   Ситуация 2: Одна программа, две роли");
-			Console.WriteLine($"     Компьютер: Запускает Программа.exe");
-			Console.WriteLine($"     Программа создаёт:");
-			Console.WriteLine($"       - Серверную часть (слушает порт 8080)");
-			Console.WriteLine($"       - Клиентскую часть (подключается к localhost:8080)");
-			Console.WriteLine($"     Результат: Внутреннее взаимодействие");
+			// Сервер: подготовка к приёму соединений
+			var serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			serverSocket.Bind(new IPEndPoint(IPAddress.Loopback, port));
+			serverSocket.Listen(1);
 
-			Console.WriteLine($"\n   Ситуация 3: Многосервисная архитектура");
-			Console.WriteLine($"     Сервис A: Сервер для клиентов, Клиент для Сервиса B");
-			Console.WriteLine($"     Сервис B: Сервер для Сервиса A");
-			Console.WriteLine($"     Результат: Сложное взаимодействие");
+			Console.WriteLine($"\n   Сервер готов слушать порт {port}");
+			Console.WriteLine($"   Состояние сервера: IsBound={serverSocket.IsBound}, Connected={serverSocket.Connected}");
 
-			// Практический пример в коде
-			Console.WriteLine($"\n   Кодовая демонстрация:");
+			// Асинхронное принятие соединения
+			var acceptTask = Task.Run(() =>
+			{
+				Console.WriteLine($"   Сервер: вызываем Accept() - ожидание подключения...");
+				return serverSocket.Accept();
+			});
 
-			var server = new TcpListener(IPAddress.Loopback, 11020);
-			server.Start();
-			Console.WriteLine($"     Сервер запущен и слушает порт 11020");
+			// Даём время серверу начать ожидание
+			await Task.Delay(500);
 
-			var client = new TcpClient();
-			client.Connect(IPAddress.Loopback, 11020);
-			Console.WriteLine($"     Клиент подключился к серверу");
+			// Клиент: установка соединения
+			var clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+			Console.WriteLine($"\n   Клиент: вызов Connect() - начало трехстороннего рукопожатия...");
+
+			var stopwatch = Stopwatch.StartNew();
+			clientSocket.Connect(new IPEndPoint(IPAddress.Loopback, port));
+			stopwatch.Stop();
+
+			Console.WriteLine($"   Клиент: соединение установлено за {stopwatch.ElapsedMilliseconds}мс");
+			Console.WriteLine($"   Состояние клиента: Connected={clientSocket.Connected}");
+
+			// Сервер получает клиентский сокет
+			var acceptedSocket = await acceptTask;
+			Console.WriteLine($"   Сервер: получил клиентское соединение");
+			Console.WriteLine($"   Состояние серверного клиента: Connected={acceptedSocket.Connected}");
+
+			// Проверка адресов
+			Console.WriteLine($"\n   Адреса соединения:");
+			Console.WriteLine($"     Клиент Local: {clientSocket.LocalEndPoint}");
+			Console.WriteLine($"     Клиент Remote: {clientSocket.RemoteEndPoint}");
+			Console.WriteLine($"     Серверный клиент Local: {acceptedSocket.LocalEndPoint}");
+			Console.WriteLine($"     Серверный клиент Remote: {acceptedSocket.RemoteEndPoint}");
+
+			// Освобождение ресурсов
+			clientSocket.Close();
+			acceptedSocket.Close();
+			serverSocket.Close();
+
+			Console.WriteLine($"\n   Вывод: Соединение установлено через трехстороннее рукопожатие");
+			Console.WriteLine($"   Клиент отправляет SYN → Сервер отвечает SYN-ACK → Клиент отправляет ACK");
+		}
+
+		private static async Task DemonstrateStreamBuffering()
+		{
+			Console.WriteLine("   Демонстрация потока байтов и буферизации:");
+
+			const int port = 11031;
+
+			// Запускаем тестовый сервер
+			var server = new TCPServer(port);
+			var serverTask = server.StartAsync();
+
+			await Task.Delay(500);
+
+			using (var client = new TCPClient(port))
+			{
+				await client.ConnectAsync();
+
+				// Тест 1: Множественные отправки - одно чтение
+				Console.WriteLine($"\n   Тест 1: Разные отправки - одно чтение");
+
+				Console.WriteLine($"   Клиент отправляет: 'Hello', ' ', 'World', '!'");
+				await client.SendAsync("Hello");
+				await Task.Delay(100);
+				await client.SendAsync(" ");
+				await Task.Delay(100);
+				await client.SendAsync("World");
+				await Task.Delay(100);
+				await client.SendAsync("!");
+
+				// Сервер читает всё одним вызовом
+				string received1 = await server.GetLastReceivedAsync(1000);
+				Console.WriteLine($"   Сервер получил одним чтением: '{received1}'");
+				Console.WriteLine($"   Вывод: TCP объединил отправки в один поток байтов");
+
+				// Тест 2: Одна отправка - множество чтений
+				Console.WriteLine($"\n   Тест 2: Одна отправка - множество чтений");
+
+				string longMessage = new string('X', 1000); // 1000 символов
+				Console.WriteLine($"   Клиент отправляет 1000 символов одной операцией");
+				await client.SendAsync(longMessage);
+
+				// Сервер читает по частям
+				var chunks = await server.ReceiveInChunksAsync(100, 2000);
+				Console.WriteLine($"   Сервер получил {chunks.Count} чанками:");
+				Console.WriteLine($"     Первый чанк: {chunks.FirstOrDefault()?.Length ?? 0} байт");
+				Console.WriteLine($"     Последний чанк: {chunks.LastOrDefault()?.Length ?? 0} байт");
+				Console.WriteLine($"   Вывод: TCP может разбить данные на фрагменты");
+
+				// Тест 3: Размеры буферов
+				Console.WriteLine($"\n   Тест 3: Размеры буферов TCP");
+
+				Console.WriteLine($"   Клиент SendBufferSize: {client.GetSendBufferSize()}");
+				Console.WriteLine($"   Клиент ReceiveBufferSize: {client.GetReceiveBufferSize()}");
+				Console.WriteLine($"   Сервер SendBufferSize: {server.GetSendBufferSize()}");
+				Console.WriteLine($"   Сервер ReceiveBufferSize: {server.GetReceiveBufferSize()}");
+
+				Console.WriteLine($"   Вывод: У каждого сокета есть свои буферы отправки и приёма");
+			}
 
 			server.Stop();
-			client.Close();
-			Console.WriteLine($"     Демонстрация завершена");
+			await serverTask;
 		}
 
-		private static void DemonstrateAddressing()
+		private static async Task DemonstrateFlowControl()
 		{
-			Console.WriteLine("   Адресация в сети:");
+			Console.WriteLine("   Демонстрация управления потоком данных:");
 
-			// IP-адреса как адреса домов
-			Console.WriteLine($"\n   IP-адрес - 'адрес дома':");
+			const int port = 11032;
 
-			IPAddress localhost = IPAddress.Loopback;           // 127.0.0.1
-			IPAddress localNetwork = IPAddress.Parse("192.168.1.100");
-			IPAddress external = IPAddress.Parse("8.8.8.8");    // Google DNS
+			// Создаём сервер с маленьким буфером
+			var server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			server.ReceiveBufferSize = 256; // Маленький буфер специально
+			server.Bind(new IPEndPoint(IPAddress.Loopback, port));
+			server.Listen(1);
 
-			Console.WriteLine($"     localhost (этот компьютер): {localhost}");
-			Console.WriteLine($"     Локальная сеть: {localNetwork}");
-			Console.WriteLine($"     Внешний сервер: {external}");
+			var acceptTask = Task.Run(() => server.Accept());
 
-			// Порт как номер квартиры
-			Console.WriteLine($"\n   Порт - 'номер квартиры':");
+			// Клиент с большим сообщением
+			var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			client.SendBufferSize = 1024;
+			client.Connect(new IPEndPoint(IPAddress.Loopback, port));
 
-			var wellKnownPorts = new Dictionary<int, string>
+			var acceptedSocket = await acceptTask;
+
+			// Тест отправки большего объёма данных
+			Console.WriteLine($"\n   Тест управления потоком:");
+			Console.WriteLine($"   Клиент буфер отправки: {client.SendBufferSize} байт");
+			Console.WriteLine($"   Сервер буфер приёма: {acceptedSocket.ReceiveBufferSize} байт");
+
+			// Отправляем данные быстрее, чем сервер их обрабатывает
+			Console.WriteLine($"\n   Клиент отправляет 10 сообщений по 100 байт...");
+
+			var sendTasks = new Task[10];
+			for (int i = 0; i < 10; i++)
 			{
-				[80] = "HTTP (веб-серверы)",
-				[443] = "HTTPS (безопасный веб)",
-				[25] = "SMTP (почта)",
-				[53] = "DNS",
-				[22] = "SSH (удалённое управление)"
-			};
+				string message = $"Сообщение {i}: {new string('A', 90)}";
+				byte[] data = Encoding.UTF8.GetBytes(message);
 
-			Console.WriteLine($"     Зарезервированные порты:");
-			foreach (var port in wellKnownPorts)
-			{
-				Console.WriteLine($"       {port.Key} - {port.Value}");
+				sendTasks[i] = Task.Run(() =>
+				{
+					try
+					{
+						client.Send(data);
+					}
+					catch (SocketException ex)
+					{
+						Console.WriteLine($"   Ошибка отправки: {ex.SocketErrorCode}");
+					}
+				});
 			}
 
-			Console.WriteLine($"\n   Случайные порты (для приложений):");
-			Random rand = new Random();
-			for (int i = 0; i < 3; i++)
+			// Сервер медленно читает
+			Console.WriteLine($"   Сервер начинает медленное чтение...");
+
+			int totalReceived = 0;
+			var buffer = new byte[128]; // Читаем маленькими порциями
+
+			Task readingTask = Task.Run(() =>
 			{
-				int port = rand.Next(1024, 65535);
-				Console.WriteLine($"       Пример: {port}");
+				for (int i = 0; i < 20 && totalReceived < 1000; i++)
+				{
+					try
+					{
+						if (acceptedSocket.Available > 0)
+						{
+							int bytesRead = acceptedSocket.Receive(buffer);
+							totalReceived += bytesRead;
+							Console.WriteLine($"   Сервер прочитал {bytesRead} байт, всего {totalReceived}");
+
+							// Имитация медленной обработки
+							Thread.Sleep(200);
+						}
+					}
+					catch { break; }
+				}
+			});
+
+			// Ждём завершения
+			Task.WaitAll(sendTasks);
+			await readingTask;
+
+			Console.WriteLine($"\n   Итоги:");
+			Console.WriteLine($"   Отправлено: ~1000 байт");
+			Console.WriteLine($"   Получено: {totalReceived} байт");
+			Console.WriteLine($"   Вывод: TCP замедлил отправку из-за заполнения буфера");
+
+			client.Close();
+			acceptedSocket.Close();
+			server.Close();
+		}
+
+		private static async Task DemonstrateConnectionClosure()
+		{
+			Console.WriteLine("   Демонстрация корректного закрытия соединения:");
+
+			const int port = 11033;
+
+			var server = new TCPServer(port);
+			var serverTask = server.StartAsync();
+
+			await Task.Delay(500);
+
+			using (var client = new TCPClient(port))
+			{
+				await client.ConnectAsync();
+
+				Console.WriteLine($"\n   Этапы корректного закрытия:");
+				Console.WriteLine($"   1. Клиент хочет закрыть соединение");
+
+				// Отправляем последние данные
+				await client.SendAsync("Последнее сообщение");
+
+				Console.WriteLine($"   2. Клиент вызывает Shutdown(Send) - больше не будет отправлять");
+				client.ShutdownSend();
+
+				// Даём время серверу получить все данные
+				await Task.Delay(500);
+
+				Console.WriteLine($"   3. Сервер получает признак конца потока");
+				string lastMessage = await server.GetLastReceivedAsync(1000);
+				Console.WriteLine($"      Сервер получил: '{lastMessage}'");
+
+				Console.WriteLine($"   4. Сервер вызывает Shutdown(Send) в ответ");
+				server.ShutdownSend();
+
+				Console.WriteLine($"   5. Клиент получает признак конца потока");
+				bool clientEOF = await client.CheckForEOFAsync();
+				Console.WriteLine($"      Клиент получил EOF: {clientEOF}");
+
+				Console.WriteLine($"   6. Обе стороны вызывают Close()");
+
+				// Освобождение
+				server.Stop();
+				await serverTask;
 			}
 
-			// Полная адресация: IP + порт
-			Console.WriteLine($"\n   Конечная точка (IP + порт):");
+			Console.WriteLine($"\n   Вывод: Корректное закрытие - это процесс, а не одно действие");
+		}
 
-			var endpoint1 = new IPEndPoint(localhost, 8080);
-			var endpoint2 = new IPEndPoint(external, 443);
+		private static async Task DemonstrateConnectionBreak()
+		{
+			Console.WriteLine("   Демонстрация разрывов соединения:");
 
-			Console.WriteLine($"     Веб-сервер на локальной машине: {endpoint1}");
-			Console.WriteLine($"     Google HTTPS сервер: {endpoint2}");
+			const int port = 11034;
 
-			// Создание сокета с конкретным портом
-			Console.WriteLine($"\n   Практика: привязка сокета к порту:");
+			// Тест 1: Резкое закрытие клиента
+			Console.WriteLine($"\n   Тест 1: Клиент неожиданно закрывается");
+
+			var server = new TCPServer(port);
+			var serverTask = server.StartAsync();
+
+			await Task.Delay(500);
+
+			var client = new TCPClient(port);
+			await client.ConnectAsync();
+
+			// Клиент резко закрывается (без Shutdown)
+			Console.WriteLine($"   Клиент резко закрывает соединение...");
+			client.Dispose();
+
+			// Проверяем, как сервер узнаёт о разрыве
 			try
 			{
-				var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-				socket.Bind(new IPEndPoint(IPAddress.Loopback, 11021));
-				Console.WriteLine($"     Успешно привязан к порту 11021");
-				socket.Close();
+				await server.WaitForConnectionBreakAsync(2000);
+				Console.WriteLine($"   Сервер обнаружил разрыв соединения");
+			}
+			catch (TimeoutException)
+			{
+				Console.WriteLine($"   Сервер не обнаружил разрыв вовремя");
+			}
+
+			server.Stop();
+			await serverTask;
+
+			// Тест 2: Сетевая ошибка при отправке
+			Console.WriteLine($"\n   Тест 2: Ошибка сети при отправке");
+
+			server = new TCPServer(port);
+			serverTask = server.StartAsync();
+
+			await Task.Delay(500);
+
+			using (var client2 = new TCPClient(port))
+			{
+				await client2.ConnectAsync();
+
+				// Закрываем серверную сторону, чтобы симулировать сбой
+				server.StopImmediately();
+
+				Console.WriteLine($"   Серверная сторона закрыта, клиент пытается отправить...");
+
+				try
+				{
+					await client2.SendAsync("Тестовое сообщение");
+					Console.WriteLine($"   ОШИБКА: Отправка должна была завершиться с ошибкой");
+				}
+				catch (SocketException ex)
+				{
+					Console.WriteLine($"   Ожидаемая ошибка: {ex.SocketErrorCode}");
+				}
+			}
+
+			await serverTask;
+
+			Console.WriteLine($"\n   Вывод: Разрыв соединения - нормальная ситуация в сетевом коде");
+		}
+
+		private static async Task DemonstrateTimeoutsAndResilience()
+		{
+			Console.WriteLine("   Демонстрация тайм-аутов и устойчивости:");
+
+			// Тест 1: Тайм-аут подключения
+			Console.WriteLine($"\n   Тест 1: Тайм-аут при подключении");
+
+			var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+			try
+			{
+				// Пытаемся подключиться к несуществующему порту
+				client.Connect(new IPEndPoint(IPAddress.Loopback, 99999));
+				Console.WriteLine($"   ОШИБКА: Подключение не должно было состояться");
+			}
+			catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionRefused)
+			{
+				Console.WriteLine($"   Ожидаемая ошибка: ConnectionRefused");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"   Ошибка: {ex.Message}");
+			}
+
+			client.Close();
+
+			// Тест 2: Настройка тайм-аутов
+			Console.WriteLine($"\n   Тест 2: Настройка тайм-аутов сокета");
+
+			var socketWithTimeout = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+			// Устанавливаем короткие тайм-ауты
+			socketWithTimeout.ReceiveTimeout = 1000; // 1 секунда
+			socketWithTimeout.SendTimeout = 1000;
+
+			Console.WriteLine($"   ReceiveTimeout: {socketWithTimeout.ReceiveTimeout}мс");
+			Console.WriteLine($"   SendTimeout: {socketWithTimeout.SendTimeout}мс");
+
+			// Тест чтения с тайм-аутом
+			try
+			{
+				socketWithTimeout.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+				socketWithTimeout.Listen(1);
+
+				Console.WriteLine($"\n   Тест операции с тайм-аутом:");
+				Console.WriteLine($"   Вызов Receive() на слушающем сокете...");
+
+				// Этот вызов завершится по тайм-ауту
+				socketWithTimeout.Receive(new byte[1]);
+
+				Console.WriteLine($"   ОШИБКА: Receive должен был завершиться по тайм-ауту");
 			}
 			catch (SocketException ex)
 			{
-				Console.WriteLine($"     Ошибка: {ex.Message}");
-				Console.WriteLine($"     Возможно, порт уже используется");
-			}
-		}
-
-		private static void DemonstrateConnectionTypes()
-		{
-			Console.WriteLine("   Типы соединений:");
-
-			// Локальные соединения
-			Console.WriteLine($"\n   ЛОКАЛЬНЫЕ СОЕДИНЕНИЯ:");
-			Console.WriteLine($"     Клиент и сервер на одном компьютере");
-			Console.WriteLine($"     Используется IP-адрес: {IPAddress.Loopback}");
-			Console.WriteLine($"     Преимущества:");
-			Console.WriteLine($"       - Минимальные задержки");
-			Console.WriteLine($"       - Нет потерь данных");
-			Console.WriteLine($"       - Простая отладка");
-			Console.WriteLine($"     Использование: тестирование, IPC");
-
-			// Удалённые соединения
-			Console.WriteLine($"\n   УДАЛЁННЫЕ СОЕДИНЕНИЯ:");
-			Console.WriteLine($"     Клиент и сервер на разных компьютерах");
-			Console.WriteLine($"     Используются реальные IP-адреса");
-			Console.WriteLine($"     Особенности:");
-			Console.WriteLine($"       - Задержки (латентность)");
-			Console.WriteLine($"       - Возможны потери пакетов");
-			Console.WriteLine($"       - Может быть фильтрация трафика");
-			Console.WriteLine($"       - Разная пропускная способность");
-			Console.WriteLine($"     Использование: веб, облачные сервисы, распределённые системы");
-
-			// Практическая демонстрация
-			Console.WriteLine($"\n   ДЕМОНСТРАЦИЯ В КОДЕ:");
-
-			// Локальное соединение
-			Console.WriteLine($"\n   Локальное соединение:");
-			var localServer = new TcpListener(IPAddress.Loopback, 11022);
-			localServer.Start();
-
-			var localClient = new TcpClient();
-			localClient.Connect(IPAddress.Loopback, 11022);
-
-			Console.WriteLine($"     Сервер запущен на: {localServer.LocalEndpoint}");
-			Console.WriteLine($"     Клиент подключён к: {localClient.Client.LocalEndPoint} -> {localClient.Client.RemoteEndPoint}");
-			Console.WriteLine($"     Это одно и то же устройство: {((IPEndPoint)localServer.LocalEndpoint).Address.Equals(IPAddress.Loopback)}");
-
-			localClient.Close();
-			localServer.Stop();
-
-			// Симуляция проблем удалённого соединения
-			Console.WriteLine($"\n   Симуляция проблем удалённого соединения:");
-			Console.WriteLine($"     В реальном коде всегда нужно учитывать:");
-			Console.WriteLine($"       - Таймауты операций");
-			Console.WriteLine($"       - Повторные попытки подключения");
-			Console.WriteLine($"       - Обработку разрывов соединения");
-			Console.WriteLine($"       - Размер передаваемых данных");
-
-			// Пример с таймаутами
-			var remoteClient = new TcpClient();
-			remoteClient.ReceiveTimeout = 5000; // 5 секунд
-			remoteClient.SendTimeout = 5000;
-			Console.WriteLine($"     Установлены таймауты: Receive={remoteClient.ReceiveTimeout}ms, Send={remoteClient.SendTimeout}ms");
-
-			remoteClient.Close();
-		}
-
-		private static void DemonstrateTCPFeatures()
-		{
-			Console.WriteLine("   Особенности TCP протокола:");
-
-			// Надёжность TCP
-			Console.WriteLine($"\n   НАДЁЖНОСТЬ TCP:");
-			Console.WriteLine($"     Что гарантирует TCP:");
-			Console.WriteLine($"       1. Доставка данных (или уведомление об ошибке)");
-			Console.WriteLine($"       2. Сохранение порядка данных");
-			Console.WriteLine($"       3. Отсутствие дубликатов");
-			Console.WriteLine($"       4. Контроль перегрузки сети");
-			Console.WriteLine($"       5. Управление потоком данных");
-
-			// Установка соединения (Three-way handshake)
-			Console.WriteLine($"\n   УСТАНОВКА СОЕДИНЕНИЯ:");
-			Console.WriteLine($"     1. Клиент → Сервер: SYN (запрос на соединение)");
-			Console.WriteLine($"     2. Сервер → Клиент: SYN-ACK (подтверждение)");
-			Console.WriteLine($"     3. Клиент → Сервер: ACK (окончательное подтверждение)");
-			Console.WriteLine($"     Только после этого начинается передача данных");
-
-			// Процесс передачи данных
-			Console.WriteLine($"\n   ПЕРЕДАЧА ДАННЫХ:");
-			Console.WriteLine($"     - Данные разбиваются на сегменты");
-			Console.WriteLine($"     - Каждый сегмент нумеруется");
-			Console.WriteLine($"     - Получатель подтверждает получение (ACK)");
-			Console.WriteLine($"     - Если подтверждения нет, отправитель повторяет отправку");
-
-			// Закрытие соединения
-			Console.WriteLine($"\n   ЗАКРЫТИЕ СОЕДИНЕНИЯ:");
-			Console.WriteLine($"     1. Сторона A → Сторона B: FIN (завершение)");
-			Console.WriteLine($"     2. Сторона B → Сторона A: ACK (подтверждение)");
-			Console.WriteLine($"     3. Сторона B → Сторона A: FIN (со своей стороны)");
-			Console.WriteLine($"     4. Сторона A → Сторона B: ACK (окончательное)");
-			Console.WriteLine($"     Соединение полностью закрыто");
-
-			// Практическая демонстрация
-			Console.WriteLine($"\n   ДЕМОНСТРАЦИЯ В КОДЕ:");
-
-			// Создание TCP сокета (автоматически использует TCP протокол)
-			var tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-			Console.WriteLine($"     Создан TCP сокет:");
-			Console.WriteLine($"       SocketType.Stream = {SocketType.Stream}");
-			Console.WriteLine($"       ProtocolType.Tcp = {ProtocolType.Tcp}");
-
-			// Настройка параметров TCP через сокет
-			tcpSocket.NoDelay = false; // Включение алгоритма Нагля (оптимизация для небольших пакетов)
-			tcpSocket.LingerState = new LingerOption(true, 5); // Задержка при закрытии
-
-			Console.WriteLine($"     Параметры TCP:");
-			Console.WriteLine($"       NoDelay: {tcpSocket.NoDelay} (false = оптимизация включена)");
-			Console.WriteLine($"       Linger: Enabled={tcpSocket.LingerState.Enabled}, Time={tcpSocket.LingerState.LingerTime}s");
-
-			tcpSocket.Close();
-		}
-
-		private static void DemonstrateTCPStream()
-		{
-			Console.WriteLine("   TCP как поток байтов:");
-
-			// Ключевая концепция
-			Console.WriteLine($"\n   КЛЮЧЕВАЯ КОНЦЕПЦИЯ:");
-			Console.WriteLine($"     TCP не знает о 'сообщениях', он знает только о байтах");
-			Console.WriteLine($"     Пример:");
-			Console.WriteLine($"       Клиент отправляет: 'Hello' 'World'");
-			Console.WriteLine($"       Сервер может получить: 'HelloWorld' (всё вместе)");
-			Console.WriteLine($"       Или: 'He' 'llo' 'Wor' 'ld' (по частям)");
-			Console.WriteLine($"       Или: 'HelloW' 'orld' (любая комбинация)");
-			Console.WriteLine($"     Это нормально и ожидаемо!");
-
-			// Проблема фрагментации
-			Console.WriteLine($"\n   ПРОБЛЕМА ФРАГМЕНТАЦИИ:");
-			Console.WriteLine($"     Данные могут быть разбиты по пути:");
-			Console.WriteLine($"       - Размером буфера операционной системы");
-			Console.WriteLine($"       - Сетевыми устройствами (маршрутизаторами)");
-			Console.WriteLine($"       - Настройками протокола");
-			Console.WriteLine($"     Решение: приложение само должно определять границы сообщений");
-
-			// Методы определения границ
-			Console.WriteLine($"\n   МЕТОДЫ ОПРЕДЕЛЕНИЯ ГРАНИЦ:");
-			Console.WriteLine($"     1. Фиксированная длина: все сообщения одинакового размера");
-			Console.WriteLine($"     2. Разделители: специальные символы между сообщениями");
-			Console.WriteLine($"     3. Заголовок с длиной: сначала отправляется размер данных");
-			Console.WriteLine($"     4. Самозавершающиеся форматы (JSON, XML)");
-
-			// Практическая демонстрация
-			Console.WriteLine($"\n   ДЕМОНСТРАЦИЯ В КОДЕ:");
-
-			// Тестовые данные
-			string[] messages = { "Hello", "World", "TCP", "Stream" };
-
-			Console.WriteLine($"\n   Отправка данных:");
-			foreach (var message in messages)
-			{
-				Console.WriteLine($"     Отправлено: '{message}' ({message.Length} байт)");
+				Console.WriteLine($"   Ожидаемый тайм-аут: {ex.SocketErrorCode}");
 			}
 
-			Console.WriteLine($"\n   Что может получить сервер:");
-			Console.WriteLine($"     Вариант 1: 'HelloWorldTCPStream' (всё вместе)");
-			Console.WriteLine($"     Вариант 2: 'He' 'lloWor' 'ldTCP' 'Stream' (случайные фрагменты)");
-			Console.WriteLine($"     Вариант 3: 'H' 'e' 'l' 'l' 'o' 'W' 'o' 'r' 'l' 'd'... (по одному байту)");
+			socketWithTimeout.Close();
 
-			// Демонстрация с разделителями
-			Console.WriteLine($"\n   РЕШЕНИЕ: Использование разделителей");
-			var delimiter = Encoding.UTF8.GetBytes("\n"); // Перевод строки как разделитель
+			// Тест 3: Устойчивость к временным сбоям
+			Console.WriteLine($"\n   Тест 3: Устойчивое приложение");
 
-			foreach (var message in messages)
+			const int port = 11035;
+			var resilientServer = new ResilientTCPServer(port);
+			var serverTask = resilientServer.StartAsync();
+
+			await Task.Delay(500);
+
+			// Имитация различных проблем
+			Console.WriteLine($"   Тест устойчивого клиента:");
+
+			using (var resilientClient = new ResilientTCPClient(port))
 			{
-				byte[] data = Encoding.UTF8.GetBytes(message + "\n");
-				Console.WriteLine($"     Формирование: '{message}\\n' = {data.Length} байт");
-			}
+				int attempts = 0;
+				bool connected = false;
 
-			// Демонстрация с заголовком длины
-			Console.WriteLine($"\n   РЕШЕНИЕ: Заголовок с длиной");
-			foreach (var message in messages)
-			{
-				byte[] messageBytes = Encoding.UTF8.GetBytes(message);
-				byte[] lengthBytes = BitConverter.GetBytes(messageBytes.Length);
-				Console.WriteLine($"     Формирование: [{lengthBytes.Length} байт длины] + [{messageBytes.Length} байт данных]");
-			}
-
-			Console.WriteLine($"\n   ВЫВОД: TCP доставляет байты, границы определяет приложение");
-		}
-
-		private static void DemonstrateConnectionStates()
-		{
-			Console.WriteLine("   Состояния TCP-соединения:");
-
-			// Диаграмма состояний
-			Console.WriteLine($"\n   ОСНОВНЫЕ СОСТОЯНИЯ:");
-			Console.WriteLine($"     1. LISTEN: Сервер слушает порт");
-			Console.WriteLine($"     2. SYN_SENT: Клиент отправил запрос на подключение");
-			Console.WriteLine($"     3. SYN_RECEIVED: Сервер получил запрос");
-			Console.WriteLine($"     4. ESTABLISHED: Соединение установлено, можно передавать данные");
-			Console.WriteLine($"     5. FIN_WAIT: Начало закрытия соединения");
-			Console.WriteLine($"     6. CLOSE_WAIT: Ожидание закрытия");
-			Console.WriteLine($"     7. CLOSED: Соединение закрыто");
-
-			// Жизненный цикл соединения
-			Console.WriteLine($"\n   ЖИЗНЕННЫЙ ЦИКЛ СОЕДИНЕНИЯ:");
-			Console.WriteLine($"     Сервер: Создать сокет → Bind → Listen → Accept");
-			Console.WriteLine($"     Клиент: Создать сокет → Connect");
-			Console.WriteLine($"     Оба: Send/Receive → Shutdown → Close");
-
-			// Разрывы соединения
-			Console.WriteLine($"\n   РАЗРЫВЫ СОЕДИНЕНИЯ:");
-			Console.WriteLine($"     Причины разрыва:");
-			Console.WriteLine($"       - Явное закрытие (Close)");
-			Console.WriteLine($"       - Таймаут неактивности");
-			Console.WriteLine($"       - Сетевая ошибка");
-			Console.WriteLine($"       - Перезагрузка устройства");
-			Console.WriteLine($"       - Программа завершила работу");
-
-			Console.WriteLine($"\n     Важно: программа должна быть готова к разрыву в любой момент");
-
-			// Практическая демонстрация
-			Console.WriteLine($"\n   ДЕМОНСТРАЦИЯ В КОДЕ:");
-
-			try
-			{
-				// Серверная часть
-				var server = new TcpListener(IPAddress.Loopback, 11023);
-				server.Start();
-				Console.WriteLine($"     Сервер: состояние LISTEN на порту 11023");
-
-				// Клиентская часть
-				var client = new TcpClient();
-				Console.WriteLine($"     Клиент: создан сокет");
-
-				client.Connect(IPAddress.Loopback, 11023);
-				Console.WriteLine($"     Клиент: состояние ESTABLISHED");
-
-				// Получение сервером подключения
-				var serverClient = server.AcceptTcpClient();
-				Console.WriteLine($"     Сервер: принял подключение, состояние ESTABLISHED");
-
-				// Передача данных
-				string message = "Test";
-				byte[] data = Encoding.UTF8.GetBytes(message);
-				client.GetStream().Write(data, 0, data.Length);
-				Console.WriteLine($"     Клиент: отправил данные");
-
-				// Получение данных
-				byte[] buffer = new byte[1024];
-				int bytesRead = serverClient.GetStream().Read(buffer, 0, buffer.Length);
-				Console.WriteLine($"     Сервер: получил {bytesRead} байт");
-
-				// Закрытие соединения
-				Console.WriteLine($"\n     Закрытие соединения:");
-				client.Close();
-				Console.WriteLine($"     Клиент: инициировал закрытие");
-
-				serverClient.Close();
-				Console.WriteLine($"     Сервер: закрыл клиентское соединение");
-
-				server.Stop();
-				Console.WriteLine($"     Сервер: остановлен");
-
-				Console.WriteLine($"     Состояние: CLOSED");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"     Ошибка: {ex.Message}");
-			}
-		}
-
-		private static void DemonstratePracticalExample()
-		{
-			Console.WriteLine("   Практический пример: простой эхо-сервер");
-
-			const int port = 11024;
-			var cts = new CancellationTokenSource();
-
-			// Запуск сервера в фоновом потоке
-			var serverTask = Task.Run(() => RunEchoServer(port, cts.Token));
-
-			// Даём время серверу запуститься
-			Thread.Sleep(1000);
-
-			// Запуск нескольких клиентов
-			var clientTasks = new List<Task>();
-
-			for (int i = 1; i <= 3; i++)
-			{
-				int clientId = i;
-				clientTasks.Add(Task.Run(() => RunEchoClient(clientId, port)));
-			}
-
-			// Ожидание завершения клиентов
-			Task.WaitAll(clientTasks.ToArray(), 5000);
-
-			// Остановка сервера
-			cts.Cancel();
-			serverTask.Wait(1000);
-
-			Console.WriteLine($"\n   Демонстрация завершена");
-		}
-
-		private static async Task RunEchoServer(int port, CancellationToken cancellationToken)
-		{
-			var server = new TcpListener(IPAddress.Loopback, port);
-			server.Start();
-
-			Console.WriteLine($"\n   [Сервер] Запущен на порту {port}");
-			Console.WriteLine($"   [Сервер] Ожидает подключений...");
-
-			try
-			{
-				while (!cancellationToken.IsCancellationRequested)
+				while (attempts < 3 && !connected)
 				{
-					var client = await server.AcceptTcpClientAsync();
-					_ = Task.Run(() => HandleClient(client));
+					attempts++;
+					Console.WriteLine($"   Попытка подключения #{attempts}...");
+
+					try
+					{
+						await resilientClient.ConnectWithRetryAsync(3, 1000);
+						connected = true;
+						Console.WriteLine($"   Подключено с попытки #{attempts}");
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"   Попытка {attempts} не удалась: {ex.Message}");
+						await Task.Delay(500);
+					}
+				}
+
+				if (connected)
+				{
+					Console.WriteLine($"   Отправка тестового сообщения...");
+					await resilientClient.SendWithRetryAsync("Тестовое сообщение", 3);
+					Console.WriteLine($"   Сообщение отправлено");
 				}
 			}
-			catch (Exception) when (cancellationToken.IsCancellationRequested)
-			{
-				// Ожидаемое прерывание
-			}
-			finally
-			{
-				server.Stop();
-				Console.WriteLine($"   [Сервер] Остановлен");
-			}
+
+			resilientServer.Stop();
+			await serverTask;
+
+			Console.WriteLine($"\n   Вывод: Тайм-ауты и повторные попытки - основа устойчивых сетевых приложений");
 		}
 
-		private static async Task HandleClient(TcpClient client)
+		private static async Task DemonstrateFullArchitecture()
 		{
-			var endpoint = client.Client.RemoteEndPoint;
-			Console.WriteLine($"   [Сервер] Принял подключение от {endpoint}");
+			Console.WriteLine("   Полная архитектура TCP в действии:");
+
+			const int port = 11036;
+
+			// Создаем эхо-сервер, который демонстрирует все аспекты TCP
+			var echoServer = new EchoServer(port);
+			var serverTask = echoServer.StartAsync();
+
+			await Task.Delay(1000);
+
+			Console.WriteLine($"\n   Тестирование полного цикла TCP:");
+
+			// Тест 1: Нормальная работа
+			Console.WriteLine($"\n   1. Нормальное взаимодействие:");
+
+			using (var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+			{
+				Console.WriteLine($"   Этап 1: Установка соединения");
+				client.Connect(new IPEndPoint(IPAddress.Loopback, port));
+				Console.WriteLine($"     Соединение установлено, состояние: Connected={client.Connected}");
+
+				Console.WriteLine($"\n   Этап 2: Передача данных");
+				string message = "Hello, TCP Architecture!";
+				byte[] sendData = Encoding.UTF8.GetBytes(message);
+
+				Console.WriteLine($"     Отправка: '{message}' ({sendData.Length} байт)");
+				int sent = client.Send(sendData);
+				Console.WriteLine($"     Отправлено байт: {sent}");
+
+				Console.WriteLine($"\n   Этап 3: Приём ответа");
+				byte[] receiveBuffer = new byte[1024];
+				int received = client.Receive(receiveBuffer);
+				string response = Encoding.UTF8.GetString(receiveBuffer, 0, received);
+				Console.WriteLine($"     Получен ответ: '{response}' ({received} байт)");
+
+				Console.WriteLine($"\n   Этап 4: Корректное закрытие");
+				client.Shutdown(SocketShutdown.Both);
+				Console.WriteLine($"     Shutdown выполнен");
+				client.Close();
+				Console.WriteLine($"     Сокет закрыт, состояние: Connected={client.Connected}");
+			}
+
+			// Тест 2: Проверка буферизации
+			Console.WriteLine($"\n   2. Тест буферизации:");
+
+			using (var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+			{
+				client.Connect(new IPEndPoint(IPAddress.Loopback, port));
+
+				// Отправляем данные частями
+				string[] parts = { "Часть1", "Часть2", "Часть3", "Часть4" };
+
+				foreach (var part in parts)
+				{
+					byte[] data = Encoding.UTF8.GetBytes(part);
+					client.Send(data);
+					Console.WriteLine($"     Отправлена часть: '{part}'");
+					await Task.Delay(50);
+				}
+
+				// Читаем ответ (скорее всего, одним куском)
+				byte[] buffer = new byte[1024];
+				int totalReceived = client.Receive(buffer);
+				string fullResponse = Encoding.UTF8.GetString(buffer, 0, totalReceived);
+				Console.WriteLine($"     Получен ответ: '{fullResponse}' ({totalReceived} байт)");
+
+				client.Close();
+			}
+
+			// Тест 3: Обработка разрыва
+			Console.WriteLine($"\n   3. Тест обработки разрыва:");
+
+			var client3 = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			client3.Connect(new IPEndPoint(IPAddress.Loopback, port));
+
+			Console.WriteLine($"   Соединение установлено");
+
+			// Резко останавливаем сервер
+			echoServer.Stop();
+			await serverTask;
+
+			Console.WriteLine($"   Сервер остановлен, проверяем состояние клиента...");
 
 			try
 			{
-				var stream = client.GetStream();
-				var buffer = new byte[1024];
+				// Попытка отправить данные на закрытый сервер
+				client3.Send(Encoding.UTF8.GetBytes("Test"));
+				Console.WriteLine($"   ОШИБКА: Отправка должна была завершиться с ошибкой");
+			}
+			catch (SocketException ex)
+			{
+				Console.WriteLine($"   Ожидаемая ошибка: {ex.SocketErrorCode}");
+				Console.WriteLine($"   TCP обнаружил разрыв соединения");
+			}
 
+			client3.Close();
+
+			Console.WriteLine($"\n   ИТОГИ ДЕМОНСТРАЦИИ:");
+			Console.WriteLine($"   1. TCP-соединение - это состояние, а не физический канал");
+			Console.WriteLine($"   2. Установка требует трехстороннего рукопожатия");
+			Console.WriteLine($"   3. Данные передаются как поток байтов через буферы");
+			Console.WriteLine($"   4. TCP управляет порядком и надёжностью данных");
+			Console.WriteLine($"   5. Закрытие - это процесс с обоюдным подтверждением");
+			Console.WriteLine($"   6. Разрывы - нормальная часть сетевой работы");
+			Console.WriteLine($"   7. Приложение отвечает за семантику данных поверх TCP");
+		}
+	}
+
+	// Вспомогательные классы для демонстрации
+	public class TCPServer : IDisposable
+	{
+		private Socket _serverSocket;
+		private Socket _clientSocket;
+		private Thread _serverThread;
+		private bool _isRunning;
+		private readonly int _port;
+		private readonly ConcurrentQueue<string> _receivedMessages = new();
+
+		public TCPServer(int port)
+		{
+			_port = port;
+		}
+
+		public async Task StartAsync()
+		{
+			_serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			_serverSocket.Bind(new IPEndPoint(IPAddress.Loopback, _port));
+			_serverSocket.Listen(1);
+
+			_isRunning = true;
+			_serverThread = new Thread(RunServer);
+			_serverThread.Start();
+
+			await Task.Delay(100);
+		}
+
+		private void RunServer()
+		{
+			try
+			{
+				_clientSocket = _serverSocket.Accept();
+
+				var buffer = new byte[1024];
+				while (_isRunning && _clientSocket.Connected)
+				{
+					if (_clientSocket.Available > 0)
+					{
+						int bytesRead = _clientSocket.Receive(buffer);
+						if (bytesRead > 0)
+						{
+							string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+							_receivedMessages.Enqueue(message);
+
+							// Эхо-ответ
+							_clientSocket.Send(Encoding.UTF8.GetBytes($"Echo: {message}"));
+						}
+					}
+					Thread.Sleep(10);
+				}
+			}
+			catch { }
+		}
+
+		public async Task<string> GetLastReceivedAsync(int timeoutMs)
+		{
+			var startTime = DateTime.Now;
+
+			while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+			{
+				if (_receivedMessages.TryDequeue(out string message))
+					return message;
+
+				await Task.Delay(10);
+			}
+
+			return string.Empty;
+		}
+
+		public async Task<List<string>> ReceiveInChunksAsync(int chunkSize, int timeoutMs)
+		{
+			var chunks = new List<string>();
+			var buffer = new byte[chunkSize];
+			var startTime = DateTime.Now;
+
+			while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMs && _clientSocket != null && _clientSocket.Connected)
+			{
+				if (_clientSocket.Available > 0)
+				{
+					try
+					{
+						int bytesRead = _clientSocket.Receive(buffer, Math.Min(chunkSize, _clientSocket.Available), SocketFlags.None);
+						if (bytesRead > 0)
+						{
+							chunks.Add(Encoding.UTF8.GetString(buffer, 0, bytesRead));
+						}
+					}
+					catch { break; }
+				}
+				await Task.Delay(10);
+			}
+
+			return chunks;
+		}
+
+		public void ShutdownSend()
+		{
+			_clientSocket?.Shutdown(SocketShutdown.Send);
+		}
+
+		public async Task WaitForConnectionBreakAsync(int timeoutMs)
+		{
+			var startTime = DateTime.Now;
+
+			while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+			{
+				if (_clientSocket == null || !_clientSocket.Connected || _clientSocket.Available < 0)
+					return;
+
+				await Task.Delay(10);
+			}
+
+			throw new TimeoutException("Разрыв соединения не обнаружен");
+		}
+
+		public void Stop()
+		{
+			_isRunning = false;
+			_clientSocket?.Close();
+			_serverSocket?.Close();
+			_serverThread?.Join(1000);
+		}
+
+		public void StopImmediately()
+		{
+			_clientSocket?.Close();
+			_serverSocket?.Close();
+		}
+
+		public int GetSendBufferSize() => _serverSocket?.SendBufferSize ?? 0;
+		public int GetReceiveBufferSize() => _serverSocket?.ReceiveBufferSize ?? 0;
+
+		public void Dispose() => Stop();
+	}
+
+	public class TCPClient : IDisposable
+	{
+		private Socket _socket;
+		private readonly int _port;
+
+		public TCPClient(int port)
+		{
+			_port = port;
+		}
+
+		public async Task ConnectAsync()
+		{
+			_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			await Task.Run(() => _socket.Connect(new IPEndPoint(IPAddress.Loopback, _port)));
+		}
+
+		public async Task SendAsync(string message)
+		{
+			byte[] data = Encoding.UTF8.GetBytes(message);
+			await Task.Run(() => _socket.Send(data));
+		}
+
+		public void ShutdownSend()
+		{
+			_socket.Shutdown(SocketShutdown.Send);
+		}
+
+		public async Task<bool> CheckForEOFAsync()
+		{
+			var buffer = new byte[1];
+			try
+			{
+				int received = await Task.Run(() => _socket.Receive(buffer, SocketFlags.Peek));
+				return received == 0;
+			}
+			catch
+			{
+				return true;
+			}
+		}
+
+		public int GetSendBufferSize() => _socket?.SendBufferSize ?? 0;
+		public int GetReceiveBufferSize() => _socket?.ReceiveBufferSize ?? 0;
+
+		public void Dispose()
+		{
+			_socket?.Close();
+			_socket?.Dispose();
+		}
+	}
+
+	public class ResilientTCPServer : IDisposable
+	{
+		private Socket _serverSocket;
+		private bool _isRunning;
+		private readonly int _port;
+
+		public ResilientTCPServer(int port)
+		{
+			_port = port;
+		}
+
+		public async Task StartAsync()
+		{
+			_serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			_serverSocket.Bind(new IPEndPoint(IPAddress.Loopback, _port));
+			_serverSocket.Listen(1);
+
+			_isRunning = true;
+
+			_ = Task.Run(async () =>
+			{
+				while (_isRunning)
+				{
+					try
+					{
+						var client = await Task.Factory.FromAsync(
+							_serverSocket.BeginAccept(null, null),
+							_serverSocket.EndAccept);
+
+						// Обработка клиента
+						_ = Task.Run(() => HandleClient(client));
+					}
+					catch { }
+				}
+			});
+
+			await Task.Delay(100);
+		}
+
+		private void HandleClient(Socket client)
+		{
+			try
+			{
+				var buffer = new byte[1024];
 				while (client.Connected)
 				{
-					int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-					if (bytesRead == 0)
-						break;
+					int bytesRead = client.Receive(buffer);
+					if (bytesRead == 0) break;
 
-					string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-					Console.WriteLine($"   [Сервер] Получено от {endpoint}: '{message}' ({bytesRead} байт)");
-
-					// Эхо-ответ
-					await stream.WriteAsync(buffer, 0, bytesRead);
-					Console.WriteLine($"   [Сервер] Отправлен эхо-ответ {endpoint}");
+					// Простая эхо-логика
+					client.Send(buffer, 0, bytesRead, SocketFlags.None);
 				}
 			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"   [Сервер] Ошибка с клиентом {endpoint}: {ex.Message}");
-			}
+			catch { }
 			finally
 			{
 				client.Close();
-				Console.WriteLine($"   [Сервер] Закрыл соединение с {endpoint}");
 			}
 		}
 
-		private static async Task RunEchoClient(int clientId, int port)
+		public void Stop()
+		{
+			_isRunning = false;
+			_serverSocket?.Close();
+		}
+
+		public void Dispose() => Stop();
+	}
+
+	public class ResilientTCPClient : IDisposable
+	{
+		private Socket _socket;
+		private readonly int _port;
+
+		public ResilientTCPClient(int port)
+		{
+			_port = port;
+		}
+
+		public async Task ConnectWithRetryAsync(int maxAttempts, int delayMs)
+		{
+			for (int attempt = 1; attempt <= maxAttempts; attempt++)
+			{
+				try
+				{
+					_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+					await Task.Run(() => _socket.Connect(new IPEndPoint(IPAddress.Loopback, _port)));
+					return;
+				}
+				catch (SocketException)
+				{
+					if (attempt == maxAttempts) throw;
+					await Task.Delay(delayMs);
+				}
+			}
+		}
+
+		public async Task SendWithRetryAsync(string message, int maxAttempts)
+		{
+			byte[] data = Encoding.UTF8.GetBytes(message);
+
+			for (int attempt = 1; attempt <= maxAttempts; attempt++)
+			{
+				try
+				{
+					await Task.Run(() => _socket.Send(data));
+					return;
+				}
+				catch (SocketException)
+				{
+					if (attempt == maxAttempts) throw;
+					await Task.Delay(100);
+				}
+			}
+		}
+
+		public void Dispose()
+		{
+			_socket?.Close();
+			_socket?.Dispose();
+		}
+	}
+
+	public class EchoServer : IDisposable
+	{
+		private Socket _serverSocket;
+		private bool _isRunning;
+		private readonly int _port;
+		private Thread _serverThread;
+
+		public EchoServer(int port)
+		{
+			_port = port;
+		}
+
+		public async Task StartAsync()
+		{
+			_serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			_serverSocket.Bind(new IPEndPoint(IPAddress.Loopback, _port));
+			_serverSocket.Listen(10);
+
+			_isRunning = true;
+			_serverThread = new Thread(RunServer);
+			_serverThread.Start();
+
+			await Task.Delay(100);
+		}
+
+		private void RunServer()
 		{
 			try
 			{
-				using (var client = new TcpClient())
+				while (_isRunning)
 				{
-					Console.WriteLine($"   [Клиент {clientId}] Подключение к localhost:{port}");
-					await client.ConnectAsync(IPAddress.Loopback, port);
-
-					var stream = client.GetStream();
-					string message = $"Привет от клиента {clientId}";
-					byte[] data = Encoding.UTF8.GetBytes(message);
-
-					Console.WriteLine($"   [Клиент {clientId}] Отправка: '{message}'");
-					await stream.WriteAsync(data, 0, data.Length);
-
-					var buffer = new byte[1024];
-					int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-					string response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-
-					Console.WriteLine($"   [Клиент {clientId}] Получен ответ: '{response}'");
-
-					client.Close();
-					Console.WriteLine($"   [Клиент {clientId}] Отключён");
+					var client = _serverSocket.Accept();
+					_ = Task.Run(() => HandleEchoClient(client));
 				}
 			}
-			catch (Exception ex)
+			catch { }
+		}
+
+		private void HandleEchoClient(Socket client)
+		{
+			try
 			{
-				Console.WriteLine($"   [Клиент {clientId}] Ошибка: {ex.Message}");
+				var buffer = new byte[1024];
+				while (client.Connected)
+				{
+					int bytesRead = client.Receive(buffer);
+					if (bytesRead == 0) break;
+
+					// Эхо-ответ
+					client.Send(buffer, 0, bytesRead, SocketFlags.None);
+				}
+			}
+			catch { }
+			finally
+			{
+				client.Close();
 			}
 		}
+
+		public void Stop()
+		{
+			_isRunning = false;
+			_serverSocket?.Close();
+			_serverThread?.Join(1000);
+		}
+
+		public void Dispose() => Stop();
 	}
 
 	// Главная программа
 	class Program
 	{
-		static void Main(string[] args)
+		static async Task Main(string[] args)
 		{
-			Console.WriteLine("ОСНОВЫ КОМПЬЮТЕРНЫХ СЕТЕЙ И TCP В C#");
-			Console.WriteLine("=====================================\n");
+			Console.WriteLine("АРХИТЕКТУРА TCP-СОЕДИНЕНИЯ В C#");
+			Console.WriteLine("===============================\n");
 
-			NetworkBasicsDemo.DemonstrateNetworkConcepts();
-
-			Console.WriteLine("\n\nВыводы из модуля:");
-			Console.WriteLine("1. Сеть связывает устройства через IP-адреса и порты");
-			Console.WriteLine("2. Клиент и сервер - это роли программ, а не компьютеров");
-			Console.WriteLine("3. TCP обеспечивает надёжное соединение с гарантией доставки");
-			Console.WriteLine("4. TCP работает с потоком байтов, не с готовыми сообщениями");
-			Console.WriteLine("5. Соединение - это состояние, которое может оборваться в любой момент");
-			Console.WriteLine("6. Сетевой код должен быть готов к ошибкам и нестабильности");
+			await TCPArchitectureDemo.DemonstrateTCPArchitecture();
 		}
 	}
 }
