@@ -4,606 +4,745 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace UdpImplementationDemo
+namespace UdpOsInteraction
 {
-	// Демонстрация UDP сокетов через низкоуровневый API
-	public class UdpRawSocketDemo : IDisposable
+	// Демонстрация взаимодействия UDP с операционной системой
+	public class UdpOsInteractionDemo : IDisposable
 	{
-		private Socket _udpSocket;
-		private Thread _receiveThread;
+		private UdpClient _receiver;
+		private UdpClient _sender;
+		private Thread _receiverThread;
 		private bool _isRunning;
-		private readonly int _port;
+		private int _port;
+		private readonly ConcurrentQueue<(byte[] data, IPEndPoint endpoint)> _packetQueue = new();
+		private long _droppedPackets = 0;
+		private long _receivedPackets = 0;
+		private object _statisticsLock = new object();
 
-		public UdpRawSocketDemo(int port = 9000)
+		// Статистика для анализа
+		public class UdpStatistics
+		{
+			public long TotalReceived { get; set; }
+			public long TotalDropped { get; set; }
+			public int BufferSize { get; set; }
+			public int AvailableInBuffer { get; set; }
+			public TimeSpan AverageProcessingTime { get; set; }
+		}
+
+		public UdpStatistics CurrentStatistics { get; private set; } = new UdpStatistics();
+
+		public UdpOsInteractionDemo(int port = 11050)
 		{
 			_port = port;
 		}
 
-		public void DemonstrateUdpSocket()
+		public void DemonstrateUdpBasics()
 		{
-			Console.WriteLine("=== UDP RAW SOCKET ДЕМОНСТРАЦИЯ ===\n");
+			Console.WriteLine("=== UDP И ВЗАИМОДЕЙСТВИЕ С ОПЕРАЦИОННОЙ СИСТЕМОЙ ===\n");
 
-			// 1. Создание UDP сокета
-			Console.WriteLine("1. СОЗДАНИЕ UDP СОКЕТА:");
+			Console.WriteLine("1. РЕГИСТРАЦИЯ В ОС КАК ПОЛУЧАТЕЛЬ:");
+			DemonstrateOsRegistration();
 
-			// SocketType.Dgram для UDP, ProtocolType.Udp
-			_udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+			Console.WriteLine("\n2. БУФЕРЫ ПРИЁМА И ОТПРАВКИ В ОС:");
+			DemonstrateOsBuffers();
 
-			Console.WriteLine($"   Создан UDP сокет:");
-			Console.WriteLine($"     SocketType: {_udpSocket.SocketType}");
-			Console.WriteLine($"     ProtocolType: {_udpSocket.ProtocolType}");
-			Console.WriteLine($"     AddressFamily: {_udpSocket.AddressFamily}");
-			Console.WriteLine($"     Handle: {_udpSocket.Handle}");
+			Console.WriteLine("\n3. БЛОКИРУЮЩИЕ ВЫЗОВЫ И ОЖИДАНИЕ ОС:");
+			DemonstrateBlockingCalls();
 
-			// 2. Привязка сокета к порту (для получения данных)
-			Console.WriteLine("\n2. ПРИВЯЗКА К ПОРТУ:");
+			Console.WriteLine("\n4. ПЕРЕПОЛНЕНИЕ БУФЕРА И ПОТЕРИ В ОС:");
+			DemonstrateBufferOverflow();
 
-			_udpSocket.Bind(new IPEndPoint(IPAddress.Any, _port));
-			Console.WriteLine($"   Сокет привязан к порту {_port}");
-			Console.WriteLine($"     IsBound: {_udpSocket.IsBound}");
-			Console.WriteLine($"     LocalEndPoint: {_udpSocket.LocalEndPoint}");
+			Console.WriteLine("\n5. ФРАГМЕНТАЦИЯ НА УРОВНЕ ОС:");
+			DemonstrateFragmentation();
 
-			// 3. Демонстрация отправки датаграмм
-			Console.WriteLine("\n3. ОТПРАВКА ДАТАГРАММ:");
+			Console.WriteLine("\n6. АСИНХРОННОСТЬ И УВЕДОМЛЕНИЯ ОТ ОС:");
+			DemonstrateAsyncNotifications();
 
-			// Создаем отдельный сокет для отправки
-			using (var senderSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+			Console.WriteLine("\n7. NAT И FIREWALL - ПРЕПЯТСТВИЯ В ОС:");
+			DemonstrateNetworkObstacles();
+		}
+
+		private void DemonstrateOsRegistration()
+		{
+			Console.WriteLine("   Приложение регистрируется в ОС как получатель UDP:");
+
+			try
 			{
-				var targetEndpoint = new IPEndPoint(IPAddress.Loopback, _port);
-				string[] messages =
+				// Создание UDP-сокета и привязка к порту
+				_receiver = new UdpClient(_port);
+
+				Console.WriteLine($"   UdpClient создан на порту {_port}");
+				Console.WriteLine($"   ОС зарегистрировала порт {_port} для этого процесса");
+				Console.WriteLine($"   PID процесса: {Process.GetCurrentProcess().Id}");
+
+				// Получение информации о сокете из ОС
+				Socket socket = _receiver.Client;
+				Console.WriteLine($"\n   Информация из ОС о сокете:");
+				Console.WriteLine($"     Handle (дескриптор ОС): {socket.Handle}");
+				Console.WriteLine($"     Локальная конечная точка: {socket.LocalEndPoint}");
+				Console.WriteLine($"     Протокол: {socket.ProtocolType}");
+				Console.WriteLine($"     AddressFamily: {socket.AddressFamily}");
+
+				// Проверка, что порт действительно занят в ОС
+				Console.WriteLine($"\n   Проверка состояния порта в ОС:");
+				Console.WriteLine($"     IsBound: {socket.IsBound}");
+				Console.WriteLine($"     Connected: {socket.Connected}");
+				Console.WriteLine($"     Available (в буфере ОС): {socket.Available}");
+
+				// Что происходит, когда порт уже занят другим процессом
+				Console.WriteLine($"\n   Попытка повторной регистрации порта:");
+				try
 				{
-					"Первая датаграмма",
-					"Вторая датаграмма",
-					"Третья датаграмма"
-				};
-
-				foreach (var message in messages)
+					var duplicate = new UdpClient(_port);
+					Console.WriteLine($"     ОШИБКА: ОС разрешила дублирование порта!");
+					duplicate.Close();
+				}
+				catch (SocketException ex)
 				{
-					byte[] data = Encoding.UTF8.GetBytes(message);
+					Console.WriteLine($"     ОС отказала: {ex.SocketErrorCode} - {ex.Message}");
+					Console.WriteLine($"     ОС защищает порт от повторного использования");
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"   Ошибка: {ex.Message}");
+			}
+		}
 
-					// Отправка без установки соединения
-					int bytesSent = senderSocket.SendTo(data, targetEndpoint);
+		private void DemonstrateOsBuffers()
+		{
+			Console.WriteLine("   Управление буферами в операционной системе:");
 
-					Console.WriteLine($"   Отправлено: '{message}'");
-					Console.WriteLine($"     Байт: {bytesSent}");
-					Console.WriteLine($"     Получатель: {targetEndpoint}");
+			if (_receiver == null)
+			{
+				_receiver = new UdpClient(new IPEndPoint(IPAddress.Any, _port));
+			}
 
-					Thread.Sleep(100); // Небольшая задержка для демонстрации
+			Socket socket = _receiver.Client;
+
+			// Размеры буферов по умолчанию
+			int defaultReceiveBuffer = socket.ReceiveBufferSize;
+			int defaultSendBuffer = socket.SendBufferSize;
+
+			Console.WriteLine($"\n   Размеры буферов по умолчанию:");
+			Console.WriteLine($"     ReceiveBufferSize: {defaultReceiveBuffer} байт ({defaultReceiveBuffer / 1024} KB)");
+			Console.WriteLine($"     SendBufferSize: {defaultSendBuffer} байт ({defaultSendBuffer / 1024} KB)");
+
+			// Настройка буферов (интерфейс с ОС)
+			Console.WriteLine($"\n   Настройка буферов через ОС:");
+
+			// Увеличение буферов для уменьшения потерь
+			socket.ReceiveBufferSize = 1024 * 1024; // 1 MB
+			socket.SendBufferSize = 1024 * 1024;    // 1 MB
+
+			Console.WriteLine($"     Новый ReceiveBufferSize: {socket.ReceiveBufferSize} байт");
+			Console.WriteLine($"     Новый SendBufferSize: {socket.SendBufferSize} байт");
+
+			// Проверка лимитов ОС
+			Console.WriteLine($"\n   Проверка лимитов ОС:");
+
+			try
+			{
+				// Попытка установить слишком большой буфер
+				socket.ReceiveBufferSize = int.MaxValue;
+				Console.WriteLine($"     Максимальный буфер: {socket.ReceiveBufferSize}");
+			}
+			catch (SocketException ex)
+			{
+				Console.WriteLine($"     ОС ограничила буфер: {ex.Message}");
+			}
+
+			// Дополнительные параметры сокета для взаимодействия с ОС
+			Console.WriteLine($"\n   Дополнительные параметры сокета:");
+			socket.ReceiveTimeout = 5000; // Таймаут приёма
+			socket.SendTimeout = 5000;    // Таймаут отправки
+			socket.DontFragment = true;   // Запрет фрагментации на уровне ОС
+
+			Console.WriteLine($"     ReceiveTimeout: {socket.ReceiveTimeout} мс");
+			Console.WriteLine($"     SendTimeout: {socket.SendTimeout} мс");
+			Console.WriteLine($"     DontFragment: {socket.DontFragment}");
+		}
+
+		private void DemonstrateBlockingCalls()
+		{
+			Console.WriteLine("   Блокирующие вызовы и ожидание в ОС:");
+
+			if (_receiver == null) return;
+
+			// Запуск фонового потока для приёма
+			_isRunning = true;
+			_receiverThread = new Thread(ReceiverWorker);
+			_receiverThread.IsBackground = true;
+			_receiverThread.Start();
+
+			// Создание отправителя
+			_sender = new UdpClient();
+			_sender.Connect(new IPEndPoint(IPAddress.Loopback, _port));
+
+			Console.WriteLine($"\n   Демонстрация блокирующего Receive:");
+
+			// Отправка тестового пакета
+			byte[] testData = Encoding.UTF8.GetBytes("Тестовый пакет");
+			_sender.Send(testData, testData.Length);
+			Console.WriteLine($"     Пакет отправлен в ОС");
+
+			// Даём время ОС обработать пакет
+			Thread.Sleep(100);
+
+			// Проверка состояния буфера в ОС
+			Socket socket = _receiver.Client;
+			Console.WriteLine($"\n   Состояние буфера в ОС:");
+			Console.WriteLine($"     Available (готовых пакетов): {socket.Available}");
+
+			if (socket.Available > 0)
+			{
+				Console.WriteLine($"     ОС поместила пакет в буфер сокета");
+
+				// Блокирующий вызов Receive
+				Console.WriteLine($"\n   Вызов блокирующего Receive:");
+				Console.WriteLine($"     Поток будет заблокирован в ОС до получения данных");
+
+				// В реальном приложении этот вызов был бы блокирующим
+				// Для демонстрации используем асинхронный вариант
+				var receiveTask = _receiver.ReceiveAsync();
+				if (receiveTask.Wait(1000))
+				{
+					var result = receiveTask.Result;
+					Console.WriteLine($"     ОС разблокировала поток, получено {result.Buffer.Length} байт");
 				}
 			}
 
-			// 4. Демонстрация приема датаграмм
-			Console.WriteLine("\n4. ПРИЁМ ДАТАГРАММ:");
+			// Демонстрация таймаута
+			Console.WriteLine($"\n   Демонстрация таймаута Receive:");
 
-			Console.WriteLine("   Ожидание входящих датаграмм...");
+			// Временное увеличение таймаута
+			socket.ReceiveTimeout = 2000;
+			Console.WriteLine($"     Таймаут установлен: {socket.ReceiveTimeout} мс");
 
-			// Принимаем несколько датаграмм
-			for (int i = 0; i < 3; i++)
+			try
 			{
-				var buffer = new byte[1024];
-				var senderEndpoint = new IPEndPoint(IPAddress.Any, 0);
-				EndPoint remoteEP = senderEndpoint;
+				// Попытка принять данные, которых нет
+				Console.WriteLine($"     Вызов Receive (ждём данные, которых нет)...");
+				var receiveTask = _receiver.ReceiveAsync();
 
-				// ReceiveFrom - блокирующий вызов
-				int bytesReceived = _udpSocket.ReceiveFrom(buffer, ref remoteEP);
-
-				string message = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
-				var sender = (IPEndPoint)remoteEP;
-
-				Console.WriteLine($"   Принято #{i + 1}:");
-				Console.WriteLine($"     Сообщение: '{message}'");
-				Console.WriteLine($"     Байт: {bytesReceived}");
-				Console.WriteLine($"     Отправитель: {sender.Address}:{sender.Port}");
-				Console.WriteLine($"     Время получения: {DateTime.Now:HH:mm:ss.fff}");
+				if (!receiveTask.Wait(2500))
+				{
+					Console.WriteLine($"     ОС не разблокировала поток (таймаут)");
+				}
 			}
-
-			// 5. Демонстрация многопоточного приема
-			Console.WriteLine("\n5. МНОГОПОТОЧНЫЙ ПРИЁМ:");
-			DemonstrateMultithreadedReceive();
-
-			// 6. Демонстрация без гарантий UDP
-			Console.WriteLine("\n6. ДЕМОНСТРАЦИЯ БЕЗ ГАРАНТИЙ UDP:");
-			DemonstrateUdpLimitations();
+			catch (Exception ex)
+			{
+				Console.WriteLine($"     Исключение: {ex.GetType().Name}");
+			}
 		}
 
-		private void DemonstrateMultithreadedReceive()
+		private void ReceiverWorker()
 		{
-			_isRunning = true;
+			Console.WriteLine($"\n   [Рабочий поток] Запущен, ожидает данные от ОС...");
 
-			// Запускаем поток для приема в фоне
-			_receiveThread = new Thread(() =>
+			while (_isRunning)
 			{
-				Console.WriteLine($"   Поток приема запущен (ID: {Thread.CurrentThread.ManagedThreadId})");
+				try
+				{
+					// Блокирующий вызов - поток "спит" в ОС
+					IPEndPoint remoteEndpoint = new IPEndPoint(IPAddress.Any, 0);
+					byte[] data = _receiver.Receive(ref remoteEndpoint);
 
-				while (_isRunning)
+					// Убираем readonly и используем обычное поле
+					_receivedPackets++;
+
+					// Используем _packetQueue
+					_packetQueue.Enqueue((data, remoteEndpoint));
+
+					// Имитация обработки
+					Thread.Sleep(50); // Искусственная задержка
+				}
+				catch (SocketException ex) when (ex.SocketErrorCode == SocketError.Interrupted)
+				{
+					break;
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"   [Рабочий поток] Ошибка: {ex.Message}");
+				}
+			}
+
+			Console.WriteLine($"   [Рабочий поток] Завершён");
+		}
+
+		private void DemonstrateBufferOverflow()
+		{
+			Console.WriteLine("   Переполнение буфера и потери внутри ОС:");
+
+			if (_receiver == null || _sender == null) return;
+
+			// Уменьшаем буфер для демонстрации переполнения
+			Socket socket = _receiver.Client;
+			int originalBufferSize = socket.ReceiveBufferSize;
+			socket.ReceiveBufferSize = 1024; // Маленький буфер
+
+			Console.WriteLine($"\n   Настройка маленького буфера:");
+			Console.WriteLine($"     ReceiveBufferSize: {socket.ReceiveBufferSize} байт");
+			Console.WriteLine($"     Примерный лимит пакетов: ~{socket.ReceiveBufferSize / 100} средних пакетов");
+
+			_droppedPackets = 0;
+			_receivedPackets = 0;
+
+			// Запуск быстрой отправки пакетов
+			Console.WriteLine($"\n   Быстрая отправка пакетов для переполнения буфера:");
+
+			var sendTask = Task.Run(() =>
+			{
+				byte[] smallPacket = Encoding.UTF8.GetBytes("X");
+				Stopwatch sw = Stopwatch.StartNew();
+				int sentCount = 0;
+
+				while (sw.ElapsedMilliseconds < 1000 && sentCount < 1000)
 				{
 					try
 					{
-						var buffer = new byte[1024];
-						var senderEndpoint = new IPEndPoint(IPAddress.Any, 0);
-						EndPoint remoteEP = senderEndpoint;
+						_sender.Send(smallPacket, smallPacket.Length);
+						sentCount++;
 
-						// Неблокирующий прием
-						if (_udpSocket.Poll(1000, SelectMode.SelectRead))
-						{
-							int bytesReceived = _udpSocket.ReceiveFrom(buffer, ref remoteEP);
-
-							if (bytesReceived > 0)
-							{
-								string message = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
-								var sender = (IPEndPoint)remoteEP;
-
-								Console.WriteLine($"     [Поток] Принято: '{message}' от {sender.Address}:{sender.Port}");
-							}
-						}
+						// Минимальная задержка для имитации быстрой отправки
+						Thread.Sleep(1);
 					}
-					catch (SocketException ex) when (ex.SocketErrorCode == SocketError.Interrupted)
+					catch { }
+				}
+
+				return sentCount;
+			});
+
+			// Мониторинг потерь
+			var monitorTask = Task.Run(async () =>
+			{
+				long lastReceived = 0;
+
+				while (!sendTask.IsCompleted)
+				{
+					long currentReceived = Interlocked.Read(ref _receivedPackets);
+					long dropped = sendTask.Result - currentReceived;
+
+					Interlocked.Exchange(ref _droppedPackets, dropped);
+
+					lock (_statisticsLock)
 					{
-						break;
+						CurrentStatistics = new UdpStatistics
+						{
+							TotalReceived = currentReceived,
+							TotalDropped = dropped,
+							BufferSize = socket.ReceiveBufferSize,
+							AvailableInBuffer = socket.Available
+						};
+					}
+
+					Console.WriteLine($"     Отправлено: {sendTask.Result}, " +
+									$"Получено: {currentReceived}, " +
+									$"Потеряно в ОС: {dropped}");
+
+					await Task.Delay(200);
+				}
+			});
+
+			Task.WaitAll(sendTask, monitorTask);
+
+			// Восстановление размера буфера
+			socket.ReceiveBufferSize = originalBufferSize;
+
+			Console.WriteLine($"\n   Итоги переполнения буфера:");
+			Console.WriteLine($"     Всего отправлено: {sendTask.Result}");
+			Console.WriteLine($"     Принято приложением: {_receivedPackets}");
+			Console.WriteLine($"     Потеряно в буфере ОС: {_droppedPackets}");
+			Console.WriteLine($"     Процент потерь: {(_droppedPackets * 100.0 / sendTask.Result):F1}%");
+
+			// Очистка буфера
+			while (_receiver.Client.Available > 0)
+			{
+				try
+				{
+					IPEndPoint dummy = new IPEndPoint(IPAddress.Any, 0);
+					_receiver.Receive(ref dummy);
+				}
+				catch { }
+			}
+		}
+
+		private void DemonstrateFragmentation()
+		{
+			Console.WriteLine("   Фрагментация на уровне ОС:");
+
+			if (_sender == null) return;
+
+			// Размер MTU для локальной петли
+			int mtu = 1500; // Стандартный Ethernet MTU
+			int udpHeaderSize = 8;
+			int ipHeaderSize = 20;
+			int maxUdpPayload = mtu - udpHeaderSize - ipHeaderSize;
+
+			Console.WriteLine($"\n   Рассчёт максимального размера UDP-пакета:");
+			Console.WriteLine($"     Ethernet MTU: {mtu} байт");
+			Console.WriteLine($"     IP заголовок: {ipHeaderSize} байт");
+			Console.WriteLine($"     UDP заголовок: {udpHeaderSize} байт");
+			Console.WriteLine($"     Максимальный payload: {maxUdpPayload} байт");
+
+			// Тест отправки пакетов разного размера
+			Console.WriteLine($"\n   Тест отправки пакетов разного размера:");
+
+			var testSizes = new[] { 100, 500, 1000, 1500, 2000, 5000, 10000 };
+
+			foreach (int size in testSizes)
+			{
+				try
+				{
+					byte[] data = new byte[size];
+					new Random().NextBytes(data);
+
+					Stopwatch sw = Stopwatch.StartNew();
+					int bytesSent = _sender.Send(data, data.Length);
+					sw.Stop();
+
+					bool requiresFragmentation = size > maxUdpPayload;
+
+					Console.WriteLine($"     Размер: {size} байт -> " +
+									$"Отправлено: {bytesSent} байт, " +
+									$"Время: {sw.ElapsedMilliseconds} мс, " +
+									$"Фрагментация: {(requiresFragmentation ? "ДА" : "нет")}");
+
+					if (requiresFragmentation)
+					{
+						Console.WriteLine($"       ⚠️  ОС разбила пакет на {(size + maxUdpPayload - 1) / maxUdpPayload} фрагментов");
+					}
+
+					Thread.Sleep(50);
+				}
+				catch (SocketException ex)
+				{
+					Console.WriteLine($"     Размер: {size} байт -> Ошибка: {ex.SocketErrorCode}");
+
+					if (ex.SocketErrorCode == SocketError.MessageSize)
+					{
+						Console.WriteLine($"       ❌ ОС отказалась отправлять (превышен максимальный размер)");
+					}
+				}
+			}
+
+			// Запрет фрагментации
+			Console.WriteLine($"\n   Запрет фрагментации через ОС:");
+
+			if (_receiver != null)
+			{
+				_receiver.Client.DontFragment = true;
+				Console.WriteLine($"     DontFragment = true");
+
+				try
+				{
+					byte[] largeData = new byte[maxUdpPayload + 100]; // Больше MTU
+					int sent = _sender.Send(largeData, largeData.Length);
+					Console.WriteLine($"     Отправка {largeData.Length} байт: {sent} байт отправлено");
+				}
+				catch (SocketException ex) when (ex.SocketErrorCode == SocketError.MessageSize)
+				{
+					Console.WriteLine($"     ОС отказалась отправлять: {ex.Message}");
+					Console.WriteLine($"     Пакет был бы фрагментирован, но DontFragment запрещает это");
+				}
+			}
+		}
+
+		private void DemonstrateAsyncNotifications()
+		{
+			Console.WriteLine("   Асинхронность и уведомления от ОС:");
+
+			if (_receiver == null) return;
+
+			Console.WriteLine($"\n   Асинхронный приём через BeginReceive/EndReceive:");
+
+			// Традиционный асинхронный подход
+			var asyncResult = _receiver.BeginReceive(null, null);
+
+			// Отправка тестового пакета
+			if (_sender != null)
+			{
+				byte[] testData = Encoding.UTF8.GetBytes("Асинхронный тест");
+				_sender.Send(testData, testData.Length);
+			}
+
+			// Ожидание завершения операции (реально ждём уведомления от ОС)
+			if (asyncResult.AsyncWaitHandle.WaitOne(2000))
+			{
+				IPEndPoint remoteEndpoint = new IPEndPoint(IPAddress.Any, 0);
+				byte[] data = _receiver.EndReceive(asyncResult, ref remoteEndpoint);
+
+				Console.WriteLine($"     ОС уведомила о данных, получено: {data.Length} байт");
+			}
+			else
+			{
+				Console.WriteLine($"     ОС не отправила уведомление (таймаут)");
+			}
+
+			Console.WriteLine($"\n   Современный асинхронный подход (async/await):");
+
+			// Запуск асинхронного приёма
+			var receiveTask = _receiver.ReceiveAsync();
+
+			if (_sender != null)
+			{
+				byte[] testData = Encoding.UTF8.GetBytes("Async/await тест");
+				_sender.Send(testData, testData.Length);
+			}
+
+			if (receiveTask.Wait(2000))
+			{
+				Console.WriteLine($"     ОС уведомила, получен пакет от {receiveTask.Result.RemoteEndPoint}");
+			}
+			else
+			{
+				Console.WriteLine($"     ОС не уведомила о данных");
+			}
+
+			// Демонстрация множественных асинхронных операций
+			Console.WriteLine($"\n   Множественные асинхронные операции:");
+
+			var tasks = new List<Task>();
+			for (int i = 0; i < 3; i++)
+			{
+				tasks.Add(Task.Run(async () =>
+				{
+					try
+					{
+						var result = await _receiver.ReceiveAsync();
+						Console.WriteLine($"     Задача {Task.CurrentId} получила {result.Buffer.Length} байт");
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine($"     [Поток] Ошибка: {ex.Message}");
+						Console.WriteLine($"     Задача {Task.CurrentId} ошибка: {ex.Message}");
 					}
-				}
+				}));
+			}
 
-				Console.WriteLine($"   Поток приема завершен");
-			});
-
-			_receiveThread.IsBackground = true;
-			_receiveThread.Start();
-
-			// Отправляем тестовые данные
-			Thread.Sleep(500);
-
-			using (var sender = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+			// Отправка нескольких пакетов
+			if (_sender != null)
 			{
-				var target = new IPEndPoint(IPAddress.Loopback, _port);
-
-				for (int i = 1; i <= 3; i++)
+				for (int i = 0; i < 3; i++)
 				{
-					string message = $"Асинхронное сообщение #{i}";
-					byte[] data = Encoding.UTF8.GetBytes(message);
-					sender.SendTo(data, target);
-
-					Console.WriteLine($"   Отправлено в фон: '{message}'");
-					Thread.Sleep(200);
+					byte[] data = Encoding.UTF8.GetBytes($"Пакет {i + 1}");
+					_sender.Send(data, data.Length);
+					Thread.Sleep(100);
 				}
 			}
 
-			Thread.Sleep(1000);
-			_isRunning = false;
-			_receiveThread.Join(1000);
+			Task.WaitAll(tasks.ToArray(), 3000);
 		}
 
-		private void DemonstrateUdpLimitations()
+		private void DemonstrateNetworkObstacles()
 		{
-			Console.WriteLine("   Демонстрация ограничений UDP:");
+			Console.WriteLine("   NAT и Firewall - препятствия на уровне ОС/сети:");
 
-			// Создаем два сокета для демонстрации
-			var socket1 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-			var socket2 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+			Console.WriteLine($"\n   Firewall операционной системы:");
+			Console.WriteLine($"     • Может блокировать входящие UDP-пакеты");
+			Console.WriteLine($"     • Может требовать разрешения для приложения");
+			Console.WriteLine($"     • Пакеты отбрасываются до попадания в сетевой стек ОС");
 
-			socket1.Bind(new IPEndPoint(IPAddress.Loopback, 9001));
-			socket2.Bind(new IPEndPoint(IPAddress.Loopback, 9002));
-
-			// Демонстрация 1: Потеря пакетов (симуляция)
-			Console.WriteLine($"\n   a) Потеря пакетов (симуляция):");
-
-			var messages = new[] { "Пакет 1", "Пакет 2", "Пакет 3" };
-			int lostPacketIndex = 1; // Симулируем потерю второго пакета
-
-			for (int i = 0; i < messages.Length; i++)
+			// Попытка определить локальные IP-адреса
+			Console.WriteLine($"\n   Определение сетевых интерфейсов:");
+			try
 			{
-				if (i == lostPacketIndex)
+				string hostName = Dns.GetHostName();
+				IPAddress[] addresses = Dns.GetHostAddresses(hostName);
+
+				Console.WriteLine($"     Имя хоста: {hostName}");
+				Console.WriteLine($"     IP-адреса:");
+				foreach (var addr in addresses)
 				{
-					Console.WriteLine($"     [СИМУЛЯЦИЯ] Пакет #{i + 1} потерян в сети");
-					continue;
+					Console.WriteLine($"       - {addr} ({addr.AddressFamily})");
 				}
-
-				byte[] data = Encoding.UTF8.GetBytes(messages[i]);
-				var target = new IPEndPoint(IPAddress.Loopback, 9001);
-				socket2.SendTo(data, target);
-				Console.WriteLine($"     Отправлен пакет #{i + 1}: '{messages[i]}'");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"     Ошибка получения адресов: {ex.Message}");
 			}
 
-			// Демонстрация 2: Изменение порядка
-			Console.WriteLine($"\n   b) Изменение порядка доставки:");
+			Console.WriteLine($"\n   Проблемы с NAT (Network Address Translation):");
+			Console.WriteLine($"     • Внешние пакеты не доходят без активного сопоставления");
+			Console.WriteLine($"     • NAT 'забывает' сопоставление через 30-300 секунд");
+			Console.WriteLine($"     • Решение: регулярные keep-alive пакеты");
 
-			var outOfOrderMessages = new[]
+			// Демонстрация keep-alive для NAT
+			Console.WriteLine($"\n   Keep-alive для поддержания NAT:");
+			if (_sender != null)
 			{
-				"Первое (отправлено первым)",
-				"Второе (отправлено вторым)",
-				"Третье (отправлено третьим)"
-			};
+				Console.WriteLine($"     Отправка keep-alive каждые 30 секунд имитирует активность");
 
-			// Отправляем в обратном порядке для демонстрации
-			for (int i = outOfOrderMessages.Length - 1; i >= 0; i--)
-			{
-				byte[] data = Encoding.UTF8.GetBytes(outOfOrderMessages[i]);
-				var target = new IPEndPoint(IPAddress.Loopback, 9002);
-				socket1.SendTo(data, target);
-				Console.WriteLine($"     Отправлен: '{outOfOrderMessages[i]}'");
+				// В реальном приложении здесь был бы таймер
+				byte[] keepAlive = Encoding.UTF8.GetBytes("KEEPALIVE");
+				_sender.Send(keepAlive, keepAlive.Length);
+				Console.WriteLine($"     Keep-alive отправлен");
 			}
 
-			// Демонстрация 3: Дублирование пакетов
-			Console.WriteLine($"\n   c) Дублирование пакетов:");
-
-			string duplicateMessage = "Оригинальное сообщение";
-			byte[] duplicateData = Encoding.UTF8.GetBytes(duplicateMessage);
-			var duplicateTarget = new IPEndPoint(IPAddress.Loopback, 9001);
-
-			// Отправляем один пакет несколько раз (симуляция дублирования)
-			for (int i = 0; i < 3; i++)
-			{
-				socket2.SendTo(duplicateData, duplicateTarget);
-				Console.WriteLine($"     Отправлена копия #{i + 1}: '{duplicateMessage}'");
-				Thread.Sleep(50);
-			}
-
-			socket1.Dispose();
-			socket2.Dispose();
+			Console.WriteLine($"\n   Рекомендации для работы через NAT/Firewall:");
+			Console.WriteLine($"     1. Использовать STUN/TURN серверы для определения внешнего адреса");
+			Console.WriteLine($"     2. Регулярные keep-alive пакеты (каждые 20-30 секунд)");
+			Console.WriteLine($"     3. Обработка симметричного NAT (самый строгий тип)");
+			Console.WriteLine($"     4. Fallback на TCP/TLS если UDP недоступен");
 		}
 
 		public void Dispose()
 		{
 			_isRunning = false;
-			_udpSocket?.Dispose();
-			_receiveThread?.Join(1000);
+
+			_receiver?.Close();
+			_sender?.Close();
+
+			_receiverThread?.Join(1000);
+
+			Console.WriteLine($"\n   Ресурсы освобождены, порт {_port} освобождён в ОС");
 		}
 	}
 
-	// Демонстрация через UdpClient (высокоуровневый API)
-	public class UdpClientDemo
+	// Пример реального приложения с учетом взаимодействия с ОС
+	public class UdpServerWithOsOptimization : IDisposable
 	{
-		public static void DemonstrateUdpClient()
+		private UdpClient _udpClient;
+		private Thread _receiverThread;
+		private bool _isRunning;
+		private int _port;
+		private long _totalReceived = 0;
+		private long _totalDropped = 0;
+
+		public UdpServerWithOsOptimization(int port)
 		{
-			Console.WriteLine("\n\n=== UDPCLIENT ДЕМОНСТРАЦИЯ ===\n");
+			_port = port;
 
-			// 1. Базовое использование
-			Console.WriteLine("1. БАЗОВОЕ ИСПОЛЬЗОВАНИЕ:");
-
-			var serverPort = 9010;
-			var clientPort = 9011;
-
-			// Сервер (получатель)
-			using (var server = new UdpClient(serverPort))
-			{
-				// Клиент (отправитель)
-				using (var client = new UdpClient())
-				{
-					client.Client.Bind(new IPEndPoint(IPAddress.Loopback, clientPort));
-
-					string message = "Привет через UdpClient!";
-					byte[] data = Encoding.UTF8.GetBytes(message);
-
-					// Отправка датаграммы
-					Console.WriteLine($"   Отправка: '{message}'");
-					int bytesSent = client.Send(data, data.Length, "127.0.0.1", serverPort);
-					Console.WriteLine($"     Отправлено байт: {bytesSent}");
-
-					// Прием датаграммы
-					Console.WriteLine($"\n   Ожидание получения...");
-					IPEndPoint remoteEndpoint = new IPEndPoint(IPAddress.Any, 0);
-					byte[] receivedData = server.Receive(ref remoteEndpoint);
-
-					string receivedMessage = Encoding.UTF8.GetString(receivedData);
-					Console.WriteLine($"   Получено: '{receivedMessage}'");
-					Console.WriteLine($"     Отправитель: {remoteEndpoint.Address}:{remoteEndpoint.Port}");
-				}
-			}
-
-			// 2. Асинхронные операции
-			Console.WriteLine("\n2. АСИНХРОННЫЕ ОПЕРАЦИИ:");
-			DemonstrateAsyncOperations().Wait();
-
-			// 3. Множественные отправители
-			Console.WriteLine("\n3. МНОЖЕСТВЕННЫЕ ОТПРАВИТЕЛИ:");
-			DemonstrateMultipleSenders();
-
-			// 4. Широковещательная рассылка
-			Console.WriteLine("\n4. ШИРОКОВЕЩАТЕЛЬНАЯ РАССЫЛКА:");
-			DemonstrateBroadcast();
+			// Оптимизация взаимодействия с ОС
+			InitializeWithOsOptimizations();
 		}
 
-		private static async Task DemonstrateAsyncOperations()
+		private void InitializeWithOsOptimizations()
 		{
-			var port = 9020;
+			Console.WriteLine($"\n[Инициализация сервера с оптимизацией для ОС]");
 
-			using (var server = new UdpClient(port))
-			using (var client = new UdpClient())
-			{
-				// Асинхронная отправка
-				string message = "Асинхронное сообщение";
-				byte[] data = Encoding.UTF8.GetBytes(message);
+			// 1. Создание сокета с привязкой к порту
+			_udpClient = new UdpClient(_port);
+			Socket socket = _udpClient.Client;
 
-				Console.WriteLine($"   Начало асинхронной отправки...");
-				var sendTask = client.SendAsync(data, data.Length, "127.0.0.1", port);
+			// 2. Увеличение буферов ОС для уменьшения потерь
+			socket.ReceiveBufferSize = 4 * 1024 * 1024; // 4 MB
+			socket.SendBufferSize = 4 * 1024 * 1024;    // 4 MB
 
-				// Асинхронный прием
-				Console.WriteLine($"   Ожидание асинхронного приема...");
-				var receiveTask = server.ReceiveAsync();
+			Console.WriteLine($"   Буферы ОС увеличены до {socket.ReceiveBufferSize / 1024 / 1024} MB");
 
-				// Ожидаем обе операции
-				await Task.WhenAll(sendTask, receiveTask);
+			// 3. Разрешение повторного использования порта
+			socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
-				UdpReceiveResult result = receiveTask.Result;
-				string receivedMessage = Encoding.UTF8.GetString(result.Buffer);
+			// 4. Настройка TTL (Time To Live)
+			socket.Ttl = 64;
 
-				Console.WriteLine($"   Получено асинхронно: '{receivedMessage}'");
-				Console.WriteLine($"     Отправитель: {result.RemoteEndPoint.Address}:{result.RemoteEndPoint.Port}");
-			}
+			Console.WriteLine($"   Порт {_port} зарегистрирован в ОС");
+			Console.WriteLine($"   PID: {Process.GetCurrentProcess().Id}");
 		}
 
-		private static void DemonstrateMultipleSenders()
+		public void Start()
 		{
-			var port = 9030;
+			_isRunning = true;
+			_receiverThread = new Thread(ReceiveLoop);
+			_receiverThread.IsBackground = true;
+			_receiverThread.Start();
 
-			using (var server = new UdpClient(port))
+			Console.WriteLine($"\n[Сервер запущен]");
+			Console.WriteLine($"   Поток приёма: {_receiverThread.ManagedThreadId}");
+			Console.WriteLine($"   Порт: {_port}");
+		}
+
+		private void ReceiveLoop()
+		{
+			Console.WriteLine($"[Поток приёма] Начало работы, ожидание данных от ОС...");
+
+			byte[] buffer = new byte[65507]; // Максимальный размер UDP-пакета
+
+			while (_isRunning)
 			{
-				Console.WriteLine($"   Сервер слушает порт {port}");
-				Console.WriteLine($"   Ожидание сообщений от разных отправителей...");
-
-				// Запускаем несколько отправителей
-				var senders = new List<Task>();
-				var senderCount = 3;
-
-				for (int i = 0; i < senderCount; i++)
+				try
 				{
-					int senderId = i + 1;
-					senders.Add(Task.Run(() =>
+					// Блокирующий вызов - поток ждёт в ОС
+					// Используем Socket.ReceiveFrom с EndPoint
+					EndPoint remoteEndpoint = new IPEndPoint(IPAddress.Any, 0);
+					int bytesRead = _udpClient.Client.ReceiveFrom(buffer, SocketFlags.None, ref remoteEndpoint);
+
+					Interlocked.Increment(ref _totalReceived);
+
+					// Преобразуем в IPEndPoint
+					IPEndPoint ipEndpoint = remoteEndpoint as IPEndPoint;
+					if (ipEndpoint != null)
 					{
-						using (var client = new UdpClient())
-						{
-							string message = $"Сообщение от отправителя #{senderId}";
-							byte[] data = Encoding.UTF8.GetBytes(message);
-
-							client.Send(data, data.Length, "127.0.0.1", port);
-							Console.WriteLine($"     Отправитель #{senderId} отправил: '{message}'");
-						}
-					}));
-				}
-
-				// Принимаем сообщения
-				Task.Run(async () =>
-				{
-					for (int i = 0; i < senderCount; i++)
-					{
-						var result = await server.ReceiveAsync();
-						string message = Encoding.UTF8.GetString(result.Buffer);
-
-						Console.WriteLine($"   Сервер получил: '{message}'");
-						Console.WriteLine($"     Отправитель: {result.RemoteEndPoint.Address}:{result.RemoteEndPoint.Port}");
+						// Быстрая обработка для предотвращения переполнения буфера
+						ProcessPacket(buffer, bytesRead, ipEndpoint);
 					}
-				}).Wait();
 
-				Task.WaitAll(senders.ToArray());
-			}
-		}
-
-		private static void DemonstrateBroadcast()
-		{
-			var broadcastPort = 9040;
-			var broadcastAddress = IPAddress.Broadcast; // 255.255.255.255
-
-			// Сервер для приема широковещательных сообщений
-			using (var server = new UdpClient(broadcastPort))
-			{
-				server.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-
-				Console.WriteLine($"   Сервер слушает широковещательные сообщения на порту {broadcastPort}");
-
-				// Клиент для отправки широковещательных сообщений
-				using (var client = new UdpClient())
+					// Проверка уровня заполнения буфера ОС
+					if (_udpClient.Client.Available > _udpClient.Client.ReceiveBufferSize * 0.8)
+					{
+						Console.WriteLine($"[ВНИМАНИЕ] Буфер ОС заполнен на {(_udpClient.Client.Available * 100.0 / _udpClient.Client.ReceiveBufferSize):F1}%");
+					}
+				}
+				catch (SocketException ex) when (ex.SocketErrorCode == SocketError.Interrupted)
 				{
-					client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
-
-					string message = "Широковещательное сообщение!";
-					byte[] data = Encoding.UTF8.GetBytes(message);
-
-					Console.WriteLine($"   Отправка широковещательного сообщения...");
-					client.Send(data, data.Length, broadcastAddress.ToString(), broadcastPort);
-
-					// Прием на сервере
-					IPEndPoint remoteEndpoint = new IPEndPoint(IPAddress.Any, 0);
-					byte[] receivedData = server.Receive(ref remoteEndpoint);
-
-					string receivedMessage = Encoding.UTF8.GetString(receivedData);
-					Console.WriteLine($"   Получено широковещательное: '{receivedMessage}'");
-					Console.WriteLine($"     Отправитель: {remoteEndpoint.Address}:{remoteEndpoint.Port}");
+					break;
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"[Ошибка приёма] {ex.Message}");
+					Thread.Sleep(100);
 				}
 			}
 		}
-	}
 
-	// Демонстрация практических сценариев
-	public class PracticalUdpScenarios
-	{
-		public static void DemonstrateScenarios()
+		private void ProcessPacket(byte[] data, int length, IPEndPoint remoteEndpoint)
 		{
-			Console.WriteLine("\n\n=== ПРАКТИЧЕСКИЕ СЦЕНАРИИ UDP ===\n");
+			// Быстрая обработка пакета
+			// В реальном приложении здесь была бы бизнес-логика
 
-			// 1. Видеостриминг (симуляция)
-			Console.WriteLine("1. ВИДЕОСТРИМИНГ (СИМУЛЯЦИЯ):");
-			DemonstrateVideoStreaming();
-
-			// 2. Игровая телеметрия
-			Console.WriteLine("\n2. ИГРОВАЯ ТЕЛЕМЕТРИЯ:");
-			DemonstrateGameTelemetry();
-
-			// 3. Сервис обнаружения
-			Console.WriteLine("\n3. СЕРВИС ОБНАРУЖЕНИЯ:");
-			DemonstrateDiscoveryService();
-
-			// 4. Надежный UDP поверх ненадежного
-			Console.WriteLine("\n4. НАДЕЖНЫЙ UDP ПОВЕРХ UDP:");
-			DemonstrateReliableUdp();
+			// Пример: эхо-ответ
+			try
+			{
+				_udpClient.Send(data, length, remoteEndpoint);
+			}
+			catch
+			{
+				Interlocked.Increment(ref _totalDropped);
+			}
 		}
 
-		private static void DemonstrateVideoStreaming()
+		public void PrintStatistics()
 		{
-			// Симуляция видеопотока
-			var frameCount = 10;
-			var frameLossProbability = 0.2; // 20% вероятность потери кадра
+			Console.WriteLine($"\n[Статистика сервера]");
+			Console.WriteLine($"   Принято пакетов: {_totalReceived}");
+			Console.WriteLine($"   Потеряно пакетов: {_totalDropped}");
+			Console.WriteLine($"   Доступно в буфере ОС: {_udpClient.Client.Available}");
+			Console.WriteLine($"   Размер буфера ОС: {_udpClient.Client.ReceiveBufferSize}");
+		}
 
-			Console.WriteLine($"   Симуляция видеопотока ({frameCount} кадров):");
-			Console.WriteLine($"   Вероятность потери кадра: {frameLossProbability:P0}");
+		public void Dispose()
+		{
+			_isRunning = false;
 
-			int framesSent = 0;
-			int framesLost = 0;
-			int framesReceived = 0;
-
-			var random = new Random();
-
-			for (int frame = 1; frame <= frameCount; frame++)
+			// Корректное освобождение ресурсов ОС
+			if (_udpClient != null)
 			{
-				framesSent++;
-
-				// Симуляция потери кадра
-				if (random.NextDouble() < frameLossProbability)
+				try
 				{
-					Console.WriteLine($"     Кадр #{frame}: ПОТЕРЯН");
-					framesLost++;
-					continue;
+					_udpClient.Client.Shutdown(SocketShutdown.Receive);
 				}
+				catch { }
 
-				framesReceived++;
-
-				// Симуляция задержки
-				int delay = random.Next(10, 50);
-				Console.WriteLine($"     Кадр #{frame}: доставлен (задержка: {delay}мс)");
-				Thread.Sleep(delay);
+				_udpClient.Close();
 			}
 
-			Console.WriteLine($"\n   Итоги:");
-			Console.WriteLine($"     Отправлено кадров: {framesSent}");
-			Console.WriteLine($"     Получено кадров: {framesReceived}");
-			Console.WriteLine($"     Потеряно кадров: {framesLost}");
-			Console.WriteLine($"     Потери: {(double)framesLost / framesSent:P0}");
+			_receiverThread?.Join(1000);
 
-			Console.WriteLine($"   Вывод: Для видео потеря части кадров приемлема, важна низкая задержка");
-		}
-
-		private static void DemonstrateGameTelemetry()
-		{
-			// Симуляция игровой телеметрии
-			Console.WriteLine($"   Симуляция игровой телеметрии:");
-
-			var playerStates = new[]
-			{
-				"Игрок1: X=100, Y=200, HP=100",
-				"Игрок1: X=102, Y=203, HP=99",
-				"Игрок1: X=105, Y=207, HP=95",
-				"Игрок1: X=110, Y=212, HP=90",
-				"Игрок1: X=115, Y=218, HP=85"
-			};
-
-			Console.WriteLine($"   Отправка состояний игрока:");
-
-			var random = new Random();
-			int outOfOrder = 0;
-			int duplicates = 0;
-
-			for (int i = 0; i < playerStates.Length; i++)
-			{
-				// Симуляция изменения порядка
-				if (i == 2 && random.NextDouble() < 0.3)
-				{
-					Console.WriteLine($"     Состояние #{i + 1} пришло ПОСЛЕ #{i + 2}");
-					outOfOrder++;
-				}
-
-				// Симуляция дублирования
-				if (i == 3 && random.NextDouble() < 0.2)
-				{
-					Console.WriteLine($"     Состояние #{i + 1} ДУБЛИРОВАНО");
-					duplicates++;
-				}
-
-				Console.WriteLine($"     Отправлено состояние #{i + 1}: {playerStates[i]}");
-				Thread.Sleep(30);
-			}
-
-			Console.WriteLine($"\n   Вывод: Для игр важно последнее состояние, порядок можно корректировать");
-		}
-
-		private static void DemonstrateDiscoveryService()
-		{
-			// Симуляция сервиса обнаружения в локальной сети
-			Console.WriteLine($"   Сервис обнаружения устройств:");
-
-			var discoveryPort = 9050;
-			var devices = new[]
-			{
-				("Принтер", "192.168.1.100"),
-				("Медиасервер", "192.168.1.101"),
-				("Умная колонка", "192.168.1.102"),
-				("Камера", "192.168.1.103")
-			};
-
-			// Симуляция широковещательного запроса
-			Console.WriteLine($"   Отправка широковещательного запроса обнаружения...");
-
-			// Симуляция ответов устройств
-			Console.WriteLine($"   Ответы устройств:");
-
-			var random = new Random();
-			int responsesReceived = 0;
-
-			foreach (var (deviceName, ipAddress) in devices)
-			{
-				// Не все устройства могут ответить
-				if (random.NextDouble() < 0.8) // 80% вероятность ответа
-				{
-					int delay = random.Next(50, 300);
-					Console.WriteLine($"     {deviceName} ({ipAddress}) ответил через {delay}мс");
-					responsesReceived++;
-					Thread.Sleep(delay);
-				}
-				else
-				{
-					Console.WriteLine($"     {deviceName} ({ipAddress}) не ответил");
-				}
-			}
-
-			Console.WriteLine($"\n   Обнаружено устройств: {responsesReceived}/{devices.Length}");
-			Console.WriteLine($"   Вывод: UDP идеален для обнаружения - не нужны постоянные соединения");
-		}
-
-		private static void DemonstrateReliableUdp()
-		{
-			// Демонстрация реализации надежности поверх UDP
-			Console.WriteLine($"   Реализация надежного UDP:");
-
-			Console.WriteLine($"\n   Компоненты надежного UDP:");
-			Console.WriteLine($"     1. Нумерация пакетов");
-			Console.WriteLine($"     2. Подтверждения доставки (ACK)");
-			Console.WriteLine($"     3. Повторные отправки (Retransmission)");
-			Console.WriteLine($"     4. Контроль потока");
-
-			Console.WriteLine($"\n   Пример структуры пакета:");
-			Console.WriteLine($"     +----------------------+");
-			Console.WriteLine($"     | Sequence Number (4б) |");
-			Console.WriteLine($"     +----------------------+");
-			Console.WriteLine($"     | ACK Number (4б)      |");
-			Console.WriteLine($"     +----------------------+");
-			Console.WriteLine($"     | Flags (1б)           |");
-			Console.WriteLine($"     +----------------------+");
-			Console.WriteLine($"     | Данные (до 1400б)    |");
-			Console.WriteLine($"     +----------------------+");
-
-			Console.WriteLine($"\n   Процесс обмена:");
-			Console.WriteLine($"     Клиент -> Сервер: Пакет #1");
-			Console.WriteLine($"     Сервер -> Клиент: ACK #1");
-			Console.WriteLine($"     [Таймаут 1с, нет ACK]");
-			Console.WriteLine($"     Клиент -> Сервер: Пакет #1 (повторно)");
-			Console.WriteLine($"     Сервер -> Клиент: ACK #1");
-			Console.WriteLine($"     Клиент -> Сервер: Пакет #2");
-
-			Console.WriteLine($"\n   Вывод: Можно реализовать надежность поверх UDP при необходимости");
+			Console.WriteLine($"\n[Сервер остановлен] Ресурсы ОС освобождены");
 		}
 	}
 
@@ -612,29 +751,26 @@ namespace UdpImplementationDemo
 	{
 		static void Main(string[] args)
 		{
-			Console.WriteLine("РАБОТА С UDP В C#");
-			Console.WriteLine("=================\n");
+			Console.WriteLine("UDP И ВЗАИМОДЕЙСТВИЕ С ОПЕРАЦИОННОЙ СИСТЕМОЙ");
+			Console.WriteLine("=============================================\n");
 
-			// Демонстрация низкоуровневых UDP сокетов
-			using (var udpDemo = new UdpRawSocketDemo())
+			using (var demo = new UdpOsInteractionDemo())
 			{
-				udpDemo.DemonstrateUdpSocket();
+				demo.DemonstrateUdpBasics();
 			}
 
-			// Демонстрация UdpClient
-			UdpClientDemo.DemonstrateUdpClient();
+			// Пример реального сервера с оптимизациями
+			Console.WriteLine("\n\n=== ПРИМЕР РЕАЛЬНОГО СЕРВЕРА С ОПТИМИЗАЦИЯМИ ===");
 
-			// Практические сценарии
-			PracticalUdpScenarios.DemonstrateScenarios();
+			using (var server = new UdpServerWithOsOptimization(11051))
+			{
+				server.Start();
 
-			Console.WriteLine("\n\n=== ИТОГИ UDP ===");
-			Console.WriteLine("✓ Не требует установки соединения");
-			Console.WriteLine("✓ Минимальные накладные расходы");
-			Console.WriteLine("✓ Низкая задержка");
-			Console.WriteLine("✗ Нет гарантий доставки");
-			Console.WriteLine("✗ Нет гарантий порядка");
-			Console.WriteLine("✗ Нет контроля перегрузки");
-			Console.WriteLine("\nИдеален для: видео, голоса, игр, телеметрии, обнаружения");
+				// Даём поработать серверу
+				Thread.Sleep(2000);
+
+				server.PrintStatistics();
+			}
 		}
 	}
 }
