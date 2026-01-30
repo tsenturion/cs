@@ -7,618 +7,567 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace UdpBroadcastDemo
+namespace UnicastDemo
 {
-	// Демонстрация широковещательной передачи данных
-	public class UdpBroadcastDemonstration : IDisposable
+	// Демонстрация unicast через TCP
+	public class TcpUnicastDemonstration : IDisposable
 	{
-		private UdpClient _broadcastSender;
-		private UdpClient _broadcastReceiver;
-		private Thread _receiverThread;
+		private TcpListener _listener;
+		private List<TcpClient> _connectedClients = new List<TcpClient>();
+		private readonly object _clientsLock = new object();
 		private bool _isRunning;
 		private int _port;
-		private int _receivedMessages = 0;
 
-		public UdpBroadcastDemonstration(int port = 11060)
+		public TcpUnicastDemonstration(int port = 11060)
 		{
 			_port = port;
 		}
 
-		public async Task DemonstrateBroadcast()
+		public void DemonstrateTcpUnicast()
 		{
-			Console.WriteLine("=== UDP BROADCAST: ШИРОКОВЕЩАТЕЛЬНАЯ ПЕРЕДАЧА ===\n");
+			Console.WriteLine("=== UNICAST ЧЕРЕЗ TCP ===");
+			Console.WriteLine("Один отправитель → один получатель с установлением соединения\n");
 
-			// Часть 1: Основные концепции broadcast
-			Console.WriteLine("1. ОСНОВНЫЕ КОНЦЕПЦИИ BROADCAST:");
-			ExplainBroadcastConcepts();
+			// Запуск TCP-сервера (получатель)
+			StartTcpServer();
 
-			// Часть 2: Техническая реализация broadcast адресации
-			Console.WriteLine("\n2. BROADCAST АДРЕСАЦИЯ:");
-			DemonstrateBroadcastAddressing();
+			// Даём время серверу запуститься
+			Thread.Sleep(1000);
 
-			// Часть 3: Service Discovery - основной сценарий использования
-			Console.WriteLine("\n3. SERVICE DISCOVERY:");
-			await DemonstrateServiceDiscovery();
+			// Подключение нескольких TCP-клиентов (отправители)
+			Console.WriteLine("\n1. УСТАНОВЛЕНИЕ СОЕДИНЕНИЙ:");
+			var clients = new List<TcpClient>();
 
-			// Часть 4: Ограничения и проблемы broadcast
-			Console.WriteLine("\n4. ОГРАНИЧЕНИЯ И ПРОБЛЕМЫ:");
-			DemonstrateBroadcastLimitations();
-
-			// Часть 5: Безопасность broadcast
-			Console.WriteLine("\n5. БЕЗОПАСНОСТЬ:");
-			DemonstrateBroadcastSecurity();
-
-			Console.WriteLine("\nДемонстрация завершена");
-		}
-
-		private void ExplainBroadcastConcepts()
-		{
-			Console.WriteLine("   Broadcast - отправка сообщения ВСЕМ узлам в сегменте сети");
-			Console.WriteLine("   Ключевые особенности:");
-			Console.WriteLine("     • Ограничен локальной сетью (не проходит через маршрутизаторы)");
-			Console.WriteLine("     • Работает только поверх UDP (TCP не поддерживает broadcast)");
-			Console.WriteLine("     • Ненадёжная доставка (нет подтверждений)");
-			Console.WriteLine("     • Пакет получают ВСЕ устройства в сети");
-			Console.WriteLine("     • Отправитель не знает конкретных получателей");
-
-			Console.WriteLine("\n   Сравнение моделей доставки:");
-			Console.WriteLine("     Unicast:   один отправитель → один получатель");
-			Console.WriteLine("     Broadcast: один отправитель → все в сети");
-			Console.WriteLine("     Multicast: один отправитель → группа получателей");
-		}
-
-		private void DemonstrateBroadcastAddressing()
-		{
-			Console.WriteLine("   Специальные broadcast адреса IPv4:");
-
-			// 1. Ограниченный broadcast (255.255.255.255)
-			Console.WriteLine("\n   1. Ограниченный broadcast:");
-			Console.WriteLine($"     Адрес: 255.255.255.255");
-			Console.WriteLine($"     Достигает всех узлов в ЛОКАЛЬНОМ сегменте сети");
-			Console.WriteLine($"     Не проходит через маршрутизаторы");
-
-			// 2. Направленный broadcast (адрес сети + все биты хоста)
-			Console.WriteLine("\n   2. Направленный broadcast:");
-
-			try
-			{
-				// Получаем локальные IP адреса
-				string hostName = Dns.GetHostName();
-				IPAddress[] addresses = Dns.GetHostAddresses(hostName);
-
-				foreach (var addr in addresses)
-				{
-					if (addr.AddressFamily == AddressFamily.InterNetwork) // IPv4
-					{
-						byte[] bytes = addr.GetAddressBytes();
-
-						// Пример вычисления broadcast адреса для сети /24
-						if (bytes.Length == 4)
-						{
-							bytes[3] = 255; // Последний октет = 255
-							IPAddress broadcastAddr = new IPAddress(bytes);
-
-							Console.WriteLine($"     Для сети {addr}/24: {broadcastAddr}");
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"     Ошибка получения адресов: {ex.Message}");
-			}
-
-			// 3. Пример настройки UdpClient для broadcast
-			Console.WriteLine("\n   3. Настройка UdpClient для broadcast:");
-
-			_broadcastSender = new UdpClient();
-			_broadcastSender.EnableBroadcast = true; // Ключевая настройка!
-
-			Console.WriteLine($"     EnableBroadcast = {_broadcastSender.EnableBroadcast}");
-			Console.WriteLine($"     Важно: по умолчанию broadcast отключен");
-
-			// Проверка текущей конфигурации
-			Console.WriteLine($"\n   4. Проверка конфигурации сокета:");
-			Socket socket = _broadcastSender.Client;
-			try
-			{
-				// Проверка опции broadcast на уровне сокета
-				object? optionValue = socket.GetSocketOption(
-					SocketOptionLevel.Socket,
-					SocketOptionName.Broadcast);
-				bool socketLevelBroadcast = optionValue is int optionInt && optionInt != 0;
-				Console.WriteLine($"     Уровень сокета: Broadcast = {socketLevelBroadcast}");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"     Ошибка проверки опций сокета: {ex.Message}");
-			}
-		}
-
-		private async Task DemonstrateServiceDiscovery()
-		{
-			Console.WriteLine("   Service Discovery - основной сценарий использования broadcast");
-
-			// Создаём и запускаем "сервис" в отдельном потоке
-			var service = new NetworkService(_port);
-			service.Start();
-
-			// Даём время сервису запуститься
-			await Task.Delay(1000);
-
-			Console.WriteLine("\n   Шаг 1: Клиент отправляет broadcast-запрос");
-
-			// Создаём клиента для поиска сервисов
-			using (var discoveryClient = new UdpClient())
-			{
-				discoveryClient.EnableBroadcast = true;
-
-				// Отправляем broadcast-запрос
-				string discoveryMessage = "SERVICE_DISCOVERY:FILE_SERVER";
-				byte[] requestData = Encoding.UTF8.GetBytes(discoveryMessage);
-
-				Console.WriteLine($"     Отправка запроса: '{discoveryMessage}'");
-				Console.WriteLine($"     Адрес: 255.255.255.255:{_port}");
-
-				// Отправка на broadcast адрес
-				int bytesSent = discoveryClient.Send(
-					requestData,
-					requestData.Length,
-					new IPEndPoint(IPAddress.Broadcast, _port));
-
-				Console.WriteLine($"     Отправлено байт: {bytesSent}");
-
-				// Ожидаем ответ от сервиса
-				Console.WriteLine("\n   Шаг 2: Ожидание ответа от сервиса");
-
-				discoveryClient.Client.ReceiveTimeout = 3000; // Таймаут 3 секунды
-
-				try
-				{
-					IPEndPoint serverEndpoint = new IPEndPoint(IPAddress.Any, 0);
-					byte[] responseData = discoveryClient.Receive(ref serverEndpoint);
-
-					string response = Encoding.UTF8.GetString(responseData);
-					Console.WriteLine($"     Получен ответ: '{response}'");
-					Console.WriteLine($"     От сервера: {serverEndpoint}");
-
-					Console.WriteLine("\n   Шаг 3: Установка unicast соединения");
-					Console.WriteLine($"     Теперь клиент знает адрес сервера: {serverEndpoint}");
-					Console.WriteLine($"     Дальнейшее взаимодействие через unicast");
-				}
-				catch (SocketException ex) when (ex.SocketErrorCode == SocketError.TimedOut)
-				{
-					Console.WriteLine($"     Сервис не найден (таймаут)");
-				}
-			}
-
-			// Останавливаем сервис
-			service.Stop();
-		}
-
-		private void DemonstrateBroadcastLimitations()
-		{
-			Console.WriteLine("   Ограничения broadcast передачи:");
-
-			// Создаём несколько приёмников для демонстрации нагрузки
-			var receivers = new List<UdpClient>();
-			int receiverCount = 5;
-
-			Console.WriteLine($"\n   1. Нагрузка на сеть и устройства:");
-			Console.WriteLine($"     Создаем {receiverCount} приёмников...");
-
-			for (int i = 0; i < receiverCount; i++)
+			for (int i = 1; i <= 3; i++)
 			{
 				try
 				{
-					var receiver = new UdpClient(_port + i);
-					receivers.Add(receiver);
+					var client = new TcpClient();
+					client.Connect(IPAddress.Loopback, _port);
+					clients.Add(client);
 
-					// Запускаем асинхронный приём в каждом
-					_ = Task.Run(() => SimulateReceiver(receiver, i));
+					Console.WriteLine($"   Клиент #{i} подключился к серверу");
+					Console.WriteLine($"     Локальная конечная точка: {client.Client.LocalEndPoint}");
+					Console.WriteLine($"     Удалённая конечная точка: {client.Client.RemoteEndPoint}");
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"   Ошибка подключения клиента #{i}: {ex.Message}");
+				}
+			}
+
+			// Обмен данными в unicast-режиме
+			Console.WriteLine("\n2. UNICAST ОБМЕН ДАННЫМИ:");
+
+			// Клиент 1 отправляет сообщение серверу
+			if (clients.Count > 0)
+			{
+				var client1 = clients[0];
+				string message1 = "Привет от клиента #1";
+				byte[] data1 = Encoding.UTF8.GetBytes(message1);
+
+				client1.GetStream().Write(data1, 0, data1.Length);
+				Console.WriteLine($"   Клиент #1 → Сервер: '{message1}'");
+
+				// Сервер получает сообщение от конкретного клиента
+				Thread.Sleep(100);
+			}
+
+			// Клиент 2 отправляет сообщение
+			if (clients.Count > 1)
+			{
+				var client2 = clients[1];
+				string message2 = "Сообщение от клиента #2";
+				byte[] data2 = Encoding.UTF8.GetBytes(message2);
+
+				client2.GetStream().Write(data2, 0, data2.Length);
+				Console.WriteLine($"   Клиент #2 → Сервер: '{message2}'");
+			}
+
+			// Сервер отправляет ответы конкретным клиентам
+			Console.WriteLine("\n3. СЕРВЕР ОТВЕЧАЕТ КОНКРЕТНЫМ КЛИЕНТАМ:");
+
+			List<TcpClient> connectedSnapshot;
+			lock (_clientsLock)
+			{
+				connectedSnapshot = new List<TcpClient>(_connectedClients);
+			}
+
+			foreach (var client in connectedSnapshot)
+			{
+				try
+				{
+					string response = $"Ответ для {client.Client.RemoteEndPoint}";
+					byte[] responseData = Encoding.UTF8.GetBytes(response);
+					client.GetStream().Write(responseData, 0, responseData.Length);
+
+					Console.WriteLine($"   Сервер → {client.Client.RemoteEndPoint}: '{response}'");
 				}
 				catch { }
 			}
 
-			// Отправляем broadcast сообщение
-			if (_broadcastSender != null)
+			// Демонстрация изоляции соединений
+			Console.WriteLine("\n4. ИЗОЛЯЦИЯ UNICAST-СОЕДИНЕНИЙ:");
+
+			int connectedCount;
+			lock (_clientsLock)
 			{
-				string message = "BROADCAST_TEST_MESSAGE";
-				byte[] data = Encoding.UTF8.GetBytes(message);
-
-				Console.WriteLine($"\n   2. Отправка broadcast сообщения:");
-				Console.WriteLine($"     Сообщение: '{message}'");
-				Console.WriteLine($"     Все {receiverCount} приёмников получат это сообщение");
-
-				int sent = _broadcastSender.Send(data, data.Length,
-					new IPEndPoint(IPAddress.Broadcast, _port));
-
-				Console.WriteLine($"     Отправлено байт: {sent}");
-
-				// Даём время на обработку
-				Thread.Sleep(2000);
-
-				Console.WriteLine($"\n   3. Статистика:");
-				Console.WriteLine($"     Сообщение получено {_receivedMessages} раз");
-				Console.WriteLine($"     Каждый пакет обработан {receiverCount} раза");
-				Console.WriteLine($"     В реальной сети - умножьте на количество устройств!");
+				connectedCount = _connectedClients.Count;
 			}
 
-			// Очистка
-			foreach (var receiver in receivers)
+			if (clients.Count > 2 && connectedCount > 2)
 			{
-				receiver.Close();
-			}
+				// Закрываем соединение только с третьим клиентом
+				clients[2].Close();
+				Console.WriteLine($"   Соединение с клиентом #3 закрыто");
 
-			// Демонстрация невозможности использования в интернете
-			Console.WriteLine($"\n   4. Ограничение маршрутизаторами:");
-			Console.WriteLine($"     Broadcast НЕ проходит через маршрутизаторы");
-			Console.WriteLine($"     Локальная сеть → ✓");
-			Console.WriteLine($"     Интернет → ✗");
-			Console.WriteLine($"     Разные сегменты сети → ✗");
-
-			// Демонстрация отсутствия подтверждений
-			Console.WriteLine($"\n   5. Отсутствие подтверждений:");
-			Console.WriteLine($"     Отправитель не знает, кто получил сообщение");
-			Console.WriteLine($"     Нет повторной отправки при потере");
-			Console.WriteLine($"     Нет гарантии доставки");
-		}
-
-		private async Task SimulateReceiver(UdpClient receiver, int id)
-		{
-			try
-			{
-				IPEndPoint endpoint = new IPEndPoint(IPAddress.Any, 0);
-				byte[] data = receiver.Receive(ref endpoint);
-
-				Interlocked.Increment(ref _receivedMessages);
-
-				// Имитация обработки
-				await Task.Delay(100);
-
-				// В реальном приложении здесь была бы проверка типа сообщения
-				// и отправка ответа если нужно
-			}
-			catch { }
-		}
-
-		private void DemonstrateBroadcastSecurity()
-		{
-			Console.WriteLine("   Проблемы безопасности broadcast:");
-
-			Console.WriteLine($"\n   1. Прослушивание всеми:");
-			Console.WriteLine($"     Любое устройство в сети может:");
-			Console.WriteLine($"       • Прослушивать broadcast трафик");
-			Console.WriteLine($"       • Анализировать содержимое сообщений");
-			Console.WriteLine($"       • Подделывать broadcast сообщения");
-
-			// Демонстрация "прослушки"
-			Console.WriteLine($"\n   2. Демонстрация прослушивания:");
-
-			using (var sniffer = new UdpClient(_port + 100))
-			{
-				sniffer.Client.SetSocketOption(
-					SocketOptionLevel.Socket,
-					SocketOptionName.ReuseAddress,
-					true);
-
-				// Отправляем тестовое сообщение
-				if (_broadcastSender != null)
+				// Пытаемся отправить данные через закрытое соединение
+				try
 				{
-					string secretMessage = "SECRET:BROADCAST_DATA";
-					byte[] data = Encoding.UTF8.GetBytes(secretMessage);
-
-					_broadcastSender.Send(data, data.Length,
-						new IPEndPoint(IPAddress.Broadcast, _port + 100));
-
-					Console.WriteLine($"     Отправлено: '{secretMessage}'");
-
-					// Пытаемся "подслушать"
-					sniffer.Client.ReceiveTimeout = 1000;
-
-					try
-					{
-						IPEndPoint endpoint = new IPEndPoint(IPAddress.Any, 0);
-						byte[] received = sniffer.Receive(ref endpoint);
-						string sniffed = Encoding.UTF8.GetString(received);
-
-						Console.WriteLine($"     'Сниффер' получил: '{sniffed}'");
-						Console.WriteLine($"     Доказано: данные не защищены!");
-					}
-					catch { }
+					byte[] testData = Encoding.UTF8.GetBytes("Тест");
+					clients[2].GetStream().Write(testData, 0, testData.Length);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"   Ошибка отправки через закрытое соединение: {ex.Message}");
+					Console.WriteLine($"   Другие соединения продолжают работать");
 				}
 			}
 
-			Console.WriteLine($"\n   3. Рекомендации по безопасности:");
-			Console.WriteLine($"     • Не передавать конфиденциальные данные");
-			Console.WriteLine($"     • Использовать шифрование при необходимости");
-			Console.WriteLine($"     • Проверять подлинность отправителя");
-			Console.WriteLine($"     • Ограничивать частоту broadcast сообщений");
+			// Очистка
+			foreach (var client in clients)
+			{
+				client.Close();
+			}
 
-			Console.WriteLine($"\n   4. Альтернативы для безопасного общения:");
-			Console.WriteLine($"     • Multicast с аутентификацией");
-			Console.WriteLine($"     • Сервер обнаружения с авторизацией");
-			Console.WriteLine($"     • Предварительная настройка адресов");
+			StopTcpServer();
+
+			Console.WriteLine("\n   TCP unicast демонстрация завершена");
+		}
+
+		private void StartTcpServer()
+		{
+			_listener = new TcpListener(IPAddress.Loopback, _port);
+			_listener.Start();
+
+			Console.WriteLine($"   TCP сервер запущен на {_listener.LocalEndpoint}");
+			Console.WriteLine($"   Ожидает unicast-подключений");
+
+			_isRunning = true;
+
+			// Асинхронный приём подключений
+			Task.Run(async () =>
+			{
+				while (_isRunning)
+				{
+					try
+					{
+						var client = await _listener.AcceptTcpClientAsync();
+						lock (_clientsLock)
+						{
+							_connectedClients.Add(client);
+						}
+
+						Console.WriteLine($"   Сервер принял unicast-соединение от {client.Client.RemoteEndPoint}");
+
+						// Асинхронная обработка данных от клиента
+						_ = Task.Run(async () =>
+						{
+							try
+							{
+								var stream = client.GetStream();
+								var buffer = new byte[1024];
+
+								while (client.Connected)
+								{
+									int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+									if (bytesRead == 0) break;
+
+									string received = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+									Console.WriteLine($"   Сервер получил от {client.Client.RemoteEndPoint}: '{received}'");
+								}
+							}
+							catch { }
+							finally
+							{
+								lock (_clientsLock)
+								{
+									_connectedClients.Remove(client);
+								}
+								client.Close();
+							}
+						});
+					}
+					catch { }
+				}
+			});
+		}
+
+		private void StopTcpServer()
+		{
+			_isRunning = false;
+			_listener?.Stop();
+
+			List<TcpClient> clientsToClose;
+			lock (_clientsLock)
+			{
+				clientsToClose = new List<TcpClient>(_connectedClients);
+				_connectedClients.Clear();
+			}
+
+			foreach (var client in clientsToClose)
+			{
+				client.Close();
+			}
+		}
+
+		public void Dispose()
+		{
+			StopTcpServer();
+		}
+	}
+
+	// Демонстрация unicast через UDP
+	public class UdpUnicastDemonstration : IDisposable
+	{
+		private UdpClient _server;
+		private UdpClient _client1;
+		private UdpClient _client2;
+		private bool _isRunning;
+		private int _serverPort;
+		private int _client1Port;
+		private int _client2Port;
+
+		public UdpUnicastDemonstration(int basePort = 11070)
+		{
+			_serverPort = basePort;
+			_client1Port = basePort + 1;
+			_client2Port = basePort + 2;
+		}
+
+		public void DemonstrateUdpUnicast()
+		{
+			Console.WriteLine("\n\n=== UNICAST ЧЕРЕЗ UDP ===");
+			Console.WriteLine("Один отправитель → один получатель без установления соединения\n");
+
+			try
+			{
+				// Создание UDP-сервера
+				_server = new UdpClient(_serverPort);
+				Console.WriteLine($"   UDP сервер запущен на порту {_serverPort}");
+				Console.WriteLine($"   Локальная конечная точка: {_server.Client.LocalEndPoint}");
+
+				// Создание UDP-клиентов с фиксированными портами
+				_client1 = new UdpClient(_client1Port);
+				_client2 = new UdpClient(_client2Port);
+
+				Console.WriteLine($"\n   UDP клиенты созданы:");
+				Console.WriteLine($"     Клиент #1 на порту {_client1Port}");
+				Console.WriteLine($"     Клиент #2 на порту {_client2Port}");
+
+				// Явное указание удалённых адресов для unicast
+				var serverEndpoint = new IPEndPoint(IPAddress.Loopback, _serverPort);
+				var client1Endpoint = new IPEndPoint(IPAddress.Loopback, _client1Port);
+				var client2Endpoint = new IPEndPoint(IPAddress.Loopback, _client2Port);
+
+				Console.WriteLine($"\n1. ЯВНОЕ УКАЗАНИЕ UNICAST-АДРЕСОВ:");
+				Console.WriteLine($"   Сервер слушает: {serverEndpoint}");
+				Console.WriteLine($"   Клиент #1 адрес: {client1Endpoint}");
+				Console.WriteLine($"   Клиент #2 адрес: {client2Endpoint}");
+
+				// Запуск приёма на сервере
+				_isRunning = true;
+				Task.Run(ServerReceiveLoop);
+
+				// Даём время серверу начать приём
+				Thread.Sleep(500);
+
+				Console.WriteLine("\n2. UNICAST ОТПРАВКА ОТ КОНКРЕТНЫХ КЛИЕНТОВ:");
+
+				// Клиент 1 отправляет сообщение конкретному серверу
+				string message1 = "Сообщение от клиента #1 серверу";
+				byte[] data1 = Encoding.UTF8.GetBytes(message1);
+				_client1.Send(data1, data1.Length, serverEndpoint);
+				Console.WriteLine($"   Клиент #1 → Сервер: '{message1}'");
+
+				Thread.Sleep(200);
+
+				// Клиент 2 отправляет сообщение тому же серверу
+				string message2 = "Данные от клиента #2";
+				byte[] data2 = Encoding.UTF8.GetBytes(message2);
+				_client2.Send(data2, data2.Length, serverEndpoint);
+				Console.WriteLine($"   Клиент #2 → Сервер: '{message2}'");
+
+				Thread.Sleep(200);
+
+				Console.WriteLine("\n3. СЕРВЕР ОТВЕЧАЕТ КОНКРЕТНЫМ КЛИЕНТАМ:");
+
+				// Сервер отвечает клиенту 1
+				string response1 = "Ответ клиенту #1";
+				byte[] responseData1 = Encoding.UTF8.GetBytes(response1);
+				_server.Send(responseData1, responseData1.Length, client1Endpoint);
+				Console.WriteLine($"   Сервер → Клиент #1: '{response1}'");
+
+				// Сервер отвечает клиенту 2
+				string response2 = "Ответ для клиента #2";
+				byte[] responseData2 = Encoding.UTF8.GetBytes(response2);
+				_server.Send(responseData2, responseData2.Length, client2Endpoint);
+				Console.WriteLine($"   Сервер → Клиент #2: '{response2}'");
+
+				Thread.Sleep(200);
+
+				Console.WriteLine("\n4. ПРЯМОЕ UNICAST ВЗАИМОДЕЙСТВИЕ КЛИЕНТОВ:");
+
+				// Клиент 1 отправляет сообщение напрямую клиенту 2
+				string directMessage = "Привет от клиента #1 клиенту #2";
+				byte[] directData = Encoding.UTF8.GetBytes(directMessage);
+				_client1.Send(directData, directData.Length, client2Endpoint);
+				Console.WriteLine($"   Клиент #1 → Клиент #2: '{directMessage}'");
+
+				// Клиент 2 принимает сообщение
+				Task.Run(async () =>
+				{
+					try
+					{
+						var result = await _client2.ReceiveAsync();
+						string received = Encoding.UTF8.GetString(result.Buffer);
+						Console.WriteLine($"   Клиент #2 получил: '{received}' от {result.RemoteEndPoint}");
+					}
+					catch { }
+				});
+
+				Thread.Sleep(500);
+
+				Console.WriteLine("\n5. ДЕМОНСТРАЦИЯ ОТСУТСТВИЯ ГАРАНТИЙ В UDP UNICAST:");
+
+				// Отправка нескольких сообщений для демонстрации возможных потерь
+				Console.WriteLine($"   Отправка 10 быстрых сообщений...");
+				for (int i = 1; i <= 10; i++)
+				{
+					string fastMessage = $"Быстрое сообщение #{i}";
+					byte[] fastData = Encoding.UTF8.GetBytes(fastMessage);
+					_client1.Send(fastData, fastData.Length, serverEndpoint);
+
+					// Минимальная задержка для имитации быстрой отправки
+					Thread.Sleep(5);
+				}
+
+				Thread.Sleep(300);
+
+				Console.WriteLine("\n   UDP unicast демонстрация завершена");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"   Ошибка: {ex.Message}");
+			}
+		}
+
+		private async void ServerReceiveLoop()
+		{
+			Console.WriteLine($"   [Сервер] Начало приёма unicast-пакетов...");
+
+			while (_isRunning && _server != null)
+			{
+				try
+				{
+					var result = await _server.ReceiveAsync();
+					string message = Encoding.UTF8.GetString(result.Buffer);
+
+					Console.WriteLine($"   [Сервер] Получен unicast-пакет от {result.RemoteEndPoint}: '{message}'");
+
+					// Сохраняем информацию об отправителе для возможного ответа
+					// В реальном приложении здесь могла бы быть логика маршрутизации
+				}
+				catch (ObjectDisposedException)
+				{
+					break;
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"   [Сервер] Ошибка приёма: {ex.Message}");
+					Thread.Sleep(100);
+				}
+			}
+
+			Console.WriteLine($"   [Сервер] Приём unicast-пакетов завершён");
 		}
 
 		public void Dispose()
 		{
 			_isRunning = false;
 
-			_broadcastSender?.Close();
-			_broadcastReceiver?.Close();
+			_server?.Close();
+			_client1?.Close();
+			_client2?.Close();
 
-			_receiverThread?.Join(1000);
-		}
-
-		// Класс для имитации сетевого сервиса
-		private class NetworkService : IDisposable
-		{
-			private UdpClient _serviceReceiver;
-			private Thread _serviceThread;
-			private bool _isRunning;
-			private int _port;
-
-			public NetworkService(int port)
-			{
-				_port = port;
-			}
-
-			public void Start()
-			{
-				_isRunning = true;
-				_serviceReceiver = new UdpClient(_port);
-
-				_serviceThread = new Thread(ServiceWorker);
-				_serviceThread.IsBackground = true;
-				_serviceThread.Start();
-
-				Console.WriteLine($"     Сервис запущен на порту {_port}");
-			}
-
-			private void ServiceWorker()
-			{
-				Console.WriteLine($"     [Сервис] Ожидание broadcast запросов...");
-
-				while (_isRunning)
-				{
-					try
-					{
-						IPEndPoint clientEndpoint = new IPEndPoint(IPAddress.Any, 0);
-						byte[] requestData = _serviceReceiver.Receive(ref clientEndpoint);
-
-						string request = Encoding.UTF8.GetString(requestData);
-
-						if (request.StartsWith("SERVICE_DISCOVERY:"))
-						{
-							string serviceType = request.Substring("SERVICE_DISCOVERY:".Length);
-
-							Console.WriteLine($"     [Сервис] Получен запрос на {serviceType} от {clientEndpoint}");
-
-							// Отправляем ответ с информацией о сервисе
-							string response = $"SERVICE_RESPONSE:FILE_SERVER:{Dns.GetHostName()}:{_port}";
-							byte[] responseData = Encoding.UTF8.GetBytes(response);
-
-							// Ответ отправляется unicast - напрямую клиенту
-							_serviceReceiver.Send(responseData, responseData.Length, clientEndpoint);
-							Console.WriteLine($"     [Сервис] Ответ отправлен клиенту");
-						}
-					}
-					catch (SocketException ex) when (ex.SocketErrorCode == SocketError.Interrupted)
-					{
-						break;
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine($"     [Сервис] Ошибка: {ex.Message}");
-						Thread.Sleep(1000);
-					}
-				}
-			}
-
-			public void Stop()
-			{
-				_isRunning = false;
-				_serviceReceiver?.Close();
-				_serviceThread?.Join(1000);
-
-				Console.WriteLine($"     Сервис остановлен");
-			}
-
-			public void Dispose()
-			{
-				Stop();
-			}
+			Console.WriteLine($"\n   Ресурсы UDP unicast освобождены");
 		}
 	}
 
-	// Практический пример: Discovery сервер для домашней сети
-	public class HomeNetworkDiscovery
+	// Демонстрация безопасности в unicast
+	public class SecureUnicastDemonstration
 	{
-		public class DeviceInfo
+		public void DemonstrateSecurityAspects()
 		{
-			public string DeviceName { get; set; }
-			public string DeviceType { get; set; }
-			public IPAddress IPAddress { get; set; }
-			public int Port { get; set; }
-			public DateTime LastSeen { get; set; }
+			Console.WriteLine("\n\n=== БЕЗОПАСНОСТЬ В UNICAST ===");
+			Console.WriteLine("Контроль отправителя и получателя в одноадресной передаче\n");
 
-			public override string ToString()
+			Console.WriteLine("1. ИДЕНТИФИКАЦИЯ УЧАСТНИКОВ:");
+			Console.WriteLine($"   • Отправитель всегда знает точный адрес получателя");
+			Console.WriteLine($"   • Получатель всегда знает точный адрес отправителя");
+			Console.WriteLine($"   • Нет неопределённости в маршрутизации");
+
+			Console.WriteLine("\n2. ВОЗМОЖНОСТИ АУТЕНТИФИКАЦИИ:");
+
+			// Пример простой аутентификации в unicast
+			Console.WriteLine($"   Пример кода аутентификации:");
+			Console.WriteLine($"   ```csharp");
+			Console.WriteLine($"   // Сервер проверяет клиента");
+			Console.WriteLine($"   bool AuthenticateClient(IPEndPoint clientEndpoint)");
+			Console.WriteLine($"   {{");
+			Console.WriteLine($"       // Проверка по белому списку");
+			Console.WriteLine($"       var allowedClients = new[] {{ \"192.168.1.100\", \"10.0.0.5\" }};");
+			Console.WriteLine($"       return allowedClients.Contains(clientEndpoint.Address.ToString());");
+			Console.WriteLine($"   }}");
+			Console.WriteLine($"   ```");
+
+			Console.WriteLine("\n3. ШИФРОВАНИЕ ДАННЫХ:");
+			Console.WriteLine($"   • TLS/SSL поверх TCP для защищённого канала");
+			Console.WriteLine($"   • Диффи-Хеллман для обмена ключами");
+			Console.WriteLine($"   • Индивидуальные ключи для каждой пары участников");
+
+			Console.WriteLine("\n4. АУДИТ И ЛОГИРОВАНИЕ:");
+			Console.WriteLine($"   • Каждое взаимодействие можно залогировать");
+			Console.WriteLine($"   • Легко отслеживать кто, кому и что отправил");
+			Console.WriteLine($"   • Простая трассировка цепочки событий");
+
+			// Демонстрация валидации отправителя
+			Console.WriteLine("\n5. ПРАКТИЧЕСКАЯ ДЕМОНСТРАЦИЯ ВАЛИДАЦИИ:");
+
+			var trustedClients = new List<IPAddress>
 			{
-				return $"{DeviceName} ({DeviceType}) at {IPAddress}:{Port} - seen {LastSeen:HH:mm:ss}";
-			}
+				IPAddress.Parse("127.0.0.1"),
+				IPAddress.Parse("192.168.1.100")
+			};
+
+			// Тестовые конечные точки
+			var trustedEndpoint = new IPEndPoint(IPAddress.Loopback, 12345);
+			var untrustedEndpoint = new IPEndPoint(IPAddress.Parse("192.168.1.200"), 12345);
+
+			bool isTrusted1 = trustedClients.Contains(trustedEndpoint.Address);
+			bool isTrusted2 = trustedClients.Contains(untrustedEndpoint.Address);
+
+			Console.WriteLine($"   Проверка {trustedEndpoint.Address}: {(isTrusted1 ? "ДОВЕРЕННЫЙ" : "НЕДОВЕРЕННЫЙ")}");
+			Console.WriteLine($"   Проверка {untrustedEndpoint.Address}: {(isTrusted2 ? "ДОВЕРЕННЫЙ" : "НЕДОВЕРЕННЫЙ")}");
+
+			Console.WriteLine("\n6. ОГРАНИЧЕНИЯ ДОСТУПА:");
+			Console.WriteLine($"   • Ролевая модель доступа (RBAC)");
+			Console.WriteLine($"   • Квоты на количество соединений");
+			Console.WriteLine($"   • Лимиты скорости передачи (rate limiting)");
+
+			Console.WriteLine("\n   Unicast обеспечивает основу для построения безопасных систем");
 		}
+	}
 
-		private UdpClient _discoveryServer;
-		private Dictionary<string, DeviceInfo> _discoveredDevices = new();
-		private bool _isRunning;
-		private int _discoveryPort;
-
-		public HomeNetworkDiscovery(int port = 11070)
+	// Демонстрация массовой рассылки через unicast (неоптимальный способ)
+	public class UnicastMassDistribution
+	{
+		public void DemonstrateMassUnicast()
 		{
-			_discoveryPort = port;
-		}
+			Console.WriteLine("\n\n=== МАССОВАЯ РАССЫЛКА ЧЕРЕЗ UNICAST ===");
+			Console.WriteLine("Почему unicast неэффективен для широковещательных сценариев\n");
 
-		public void StartDiscoveryServer()
-		{
-			Console.WriteLine("\n=== ПРАКТИЧЕСКИЙ ПРИМЕР: ДОМАШНИЙ DISCOVERY СЕРВЕР ===\n");
-
-			_isRunning = true;
-			_discoveryServer = new UdpClient(_discoveryPort);
-			_discoveryServer.EnableBroadcast = true;
-
-			Console.WriteLine($"Discovery сервер запущен на порту {_discoveryPort}");
-			Console.WriteLine("Ожидание объявлений устройств...");
-
-			Task.Run(() => DiscoveryServerWorker());
-
-			// Также запускаем периодический broadcast для поиска устройств
-			Task.Run(() => BroadcastDiscoveryRequests());
-		}
-
-		private async Task DiscoveryServerWorker()
-		{
-			while (_isRunning)
+			// Симуляция списка клиентов
+			var clientEndpoints = new List<IPEndPoint>
 			{
-				try
+				new IPEndPoint(IPAddress.Parse("192.168.1.10"), 10001),
+				new IPEndPoint(IPAddress.Parse("192.168.1.11"), 10002),
+				new IPEndPoint(IPAddress.Parse("192.168.1.12"), 10003),
+				new IPEndPoint(IPAddress.Parse("192.168.1.13"), 10004),
+				new IPEndPoint(IPAddress.Parse("192.168.1.14"), 10005)
+			};
+
+			string broadcastMessage = "Важное сообщение для всех клиентов";
+			byte[] messageData = Encoding.UTF8.GetBytes(broadcastMessage);
+
+			Console.WriteLine("1. РАССЫЛКА ОДИНАКОВОГО СООБЩЕНИЯ:");
+			Console.WriteLine($"   Сообщение: '{broadcastMessage}'");
+			Console.WriteLine($"   Получателей: {clientEndpoints.Count}");
+			Console.WriteLine($"   Размер сообщения: {messageData.Length} байт");
+
+			Console.WriteLine("\n2. UNICAST ПОДХОД (НЕЭФФЕКТИВНЫЙ):");
+
+			using (var udpClient = new UdpClient())
+			{
+				int totalBytesSent = 0;
+				Stopwatch sw = Stopwatch.StartNew();
+
+				foreach (var endpoint in clientEndpoints)
 				{
-					IPEndPoint senderEndpoint = new IPEndPoint(IPAddress.Any, 0);
-					byte[] data = _discoveryServer.Receive(ref senderEndpoint);
-					string message = Encoding.UTF8.GetString(data);
+					// Каждому клиенту - отдельная отправка
+					int bytesSent = udpClient.Send(messageData, messageData.Length, endpoint);
+					totalBytesSent += bytesSent;
 
-					// Обработка сообщений от устройств
-					if (message.StartsWith("DEVICE_ANNOUNCE:"))
-					{
-						ProcessDeviceAnnouncement(message, senderEndpoint);
-					}
-					else if (message.StartsWith("DISCOVERY_REQUEST:"))
-					{
-						ProcessDiscoveryRequest(senderEndpoint);
-					}
+					Console.WriteLine($"   Отправка {endpoint}: {bytesSent} байт");
+
+					// Имитация сетевой задержки
+					Thread.Sleep(10);
 				}
-				catch { }
-			}
-		}
 
-		private void ProcessDeviceAnnouncement(string message, IPEndPoint endpoint)
-		{
-			// Формат: DEVICE_ANNOUNCE:DeviceName:DeviceType:Port
-			var parts = message.Split(':');
-			if (parts.Length >= 4)
-			{
-				var deviceInfo = new DeviceInfo
-				{
-					DeviceName = parts[1],
-					DeviceType = parts[2],
-					IPAddress = endpoint.Address,
-					Port = int.Parse(parts[3]),
-					LastSeen = DateTime.Now
-				};
+				sw.Stop();
 
-				string deviceKey = $"{deviceInfo.IPAddress}:{deviceInfo.Port}";
-				_discoveredDevices[deviceKey] = deviceInfo;
-
-				Console.WriteLine($"Обнаружено устройство: {deviceInfo}");
-
-				// Отправляем подтверждение
-				string ack = $"DEVICE_ACK:{deviceInfo.DeviceName}";
-				byte[] ackData = Encoding.UTF8.GetBytes(ack);
-				_discoveryServer.Send(ackData, ackData.Length, endpoint);
-			}
-		}
-
-		private void ProcessDiscoveryRequest(IPEndPoint requester)
-		{
-			// Отправляем список известных устройств
-			var deviceList = new List<string>();
-			foreach (var device in _discoveredDevices.Values)
-			{
-				deviceList.Add($"{device.DeviceName}:{device.DeviceType}:{device.IPAddress}:{device.Port}");
+				Console.WriteLine($"\n   ИТОГИ UNICAST РАССЫЛКИ:");
+				Console.WriteLine($"     Всего отправок: {clientEndpoints.Count}");
+				Console.WriteLine($"     Всего байт отправлено: {totalBytesSent}");
+				Console.WriteLine($"     Избыточных данных: {totalBytesSent - messageData.Length} байт");
+				Console.WriteLine($"     Время выполнения: {sw.ElapsedMilliseconds} мс");
+				Console.WriteLine($"     Среднее время на клиента: {sw.ElapsedMilliseconds / (double)clientEndpoints.Count:F1} мс");
 			}
 
-			string response = $"DISCOVERY_RESPONSE:" + string.Join(";", deviceList);
-			byte[] responseData = Encoding.UTF8.GetBytes(response);
+			Console.WriteLine("\n3. ПРОБЛЕМЫ UNICAST ДЛЯ РАССЫЛКИ:");
+			Console.WriteLine($"   • Множественные копии одинаковых данных");
+			Console.WriteLine($"   • Высокая нагрузка на сервер");
+			Console.WriteLine($"   • Повторная передача по одному маршруту");
+			Console.WriteLine($"   • Сложность синхронизации доставки");
 
-			_discoveryServer.Send(responseData, responseData.Length, requester);
-		}
+			Console.WriteLine("\n4. КОГДА UNICAST ПОДХОДИТ ДЛЯ РАССЫЛКИ:");
+			Console.WriteLine($"   • Малое количество получателей (< 10)");
+			Console.WriteLine($"   • Индивидуализированные сообщения");
+			Console.WriteLine($"   • Требуется подтверждение доставки");
+			Console.WriteLine($"   • Важна безопасность каждого канала");
 
-		private async Task BroadcastDiscoveryRequests()
-		{
-			using (var broadcastClient = new UdpClient())
-			{
-				broadcastClient.EnableBroadcast = true;
-
-				while (_isRunning)
-				{
-					// Регулярный broadcast для поиска устройств
-					string discoveryRequest = "DISCOVERY_REQUEST:SERVER";
-					byte[] requestData = Encoding.UTF8.GetBytes(discoveryRequest);
-
-					broadcastClient.Send(requestData, requestData.Length,
-						new IPEndPoint(IPAddress.Broadcast, _discoveryPort));
-
-					Console.WriteLine($"Отправлен broadcast запрос для поиска устройств");
-
-					// Очистка устаревших устройств
-					CleanupOldDevices();
-
-					await Task.Delay(30000); // Каждые 30 секунд
-				}
-			}
-		}
-
-		private void CleanupOldDevices()
-		{
-			var now = DateTime.Now;
-			var toRemove = new List<string>();
-
-			foreach (var kvp in _discoveredDevices)
-			{
-				if ((now - kvp.Value.LastSeen).TotalMinutes > 5) // 5 минут
-				{
-					toRemove.Add(kvp.Key);
-				}
-			}
-
-			foreach (var key in toRemove)
-			{
-				Console.WriteLine($"Устройство удалено (таймаут): {_discoveredDevices[key].DeviceName}");
-				_discoveredDevices.Remove(key);
-			}
-		}
-
-		public void Stop()
-		{
-			_isRunning = false;
-			_discoveryServer?.Close();
-
-			Console.WriteLine("\nDiscovery сервер остановлен");
-			Console.WriteLine($"Всего обнаружено устройств: {_discoveredDevices.Count}");
+			Console.WriteLine("\n   Вывод: unicast оптимален для точечного взаимодействия,");
+			Console.WriteLine("          но неэффективен для массовых одинаковых рассылок");
 		}
 	}
 
 	// Главная программа
 	class Program
 	{
-		static async Task Main(string[] args)
+		static void Main(string[] args)
 		{
-			Console.WriteLine("UDP BROADCAST: ШИРОКОВЕЩАТЕЛЬНАЯ ПЕРЕДАЧА ДАННЫХ");
-			Console.WriteLine("================================================\n");
+			Console.WriteLine("UNICAST ВЗАИМОДЕЙСТВИЕ В C#");
+			Console.WriteLine("===========================\n");
 
-			using (var demo = new UdpBroadcastDemonstration())
+			// Демонстрация unicast через TCP
+			using (var tcpDemo = new TcpUnicastDemonstration())
 			{
-				await demo.DemonstrateBroadcast();
+				tcpDemo.DemonstrateTcpUnicast();
 			}
 
-			// Практический пример
-			var homeDiscovery = new HomeNetworkDiscovery();
-			homeDiscovery.StartDiscoveryServer();
+			// Демонстрация unicast через UDP
+			using (var udpDemo = new UdpUnicastDemonstration())
+			{
+				udpDemo.DemonstrateUdpUnicast();
+			}
 
-			// Даём поработать discovery серверу
-			Console.WriteLine("\nDiscovery сервер работает 15 секунд...");
-			await Task.Delay(15000);
+			// Демонстрация аспектов безопасности
+			var secureDemo = new SecureUnicastDemonstration();
+			secureDemo.DemonstrateSecurityAspects();
 
-			homeDiscovery.Stop();
+			// Демонстрация проблем массовой рассылки через unicast
+			var massDemo = new UnicastMassDistribution();
+			massDemo.DemonstrateMassUnicast();
 		}
 	}
 }
