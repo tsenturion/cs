@@ -1,685 +1,488 @@
 ﻿using System;
-using System.Net;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading.Tasks;
+using System.IO;
+using System.Text;
+using System.Net;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Diagnostics;
 
-namespace HttpAuthCookiesDemo
+namespace HttpServerDemo
 {
-	// Модели данных для демонстрации
-	public class UserCredentials
+	// Базовая модель для демонстрации
+	public class User
 	{
-		public string Username { get; set; }
-		public string Password { get; set; }
-	}
-
-	public class UserProfile
-	{
-		public string Username { get; set; }
+		public int Id { get; set; }
+		public string Name { get; set; }
 		public string Email { get; set; }
-		public string[] Roles { get; set; }
-		public DateTime CreatedAt { get; set; }
-	}
 
-	public class ApiResponse<T>
-	{
-		public bool Success { get; set; }
-		public T Data { get; set; }
-		public string Error { get; set; }
-	}
+		public User() { }
 
-	public class AuthToken
-	{
-		public string AccessToken { get; set; }
-		public string RefreshToken { get; set; }
-		public DateTime ExpiresAt { get; set; }
-		public string TokenType { get; set; } = "Bearer";
-	}
-
-	// Демонстрация работы с cookies в C#
-	public class CookieDemonstration
-	{
-		public static void DemonstrateCookieMechanism()
+		public User(int id, string name, string email)
 		{
-			Console.WriteLine("=== COOKIES В HTTP ===\n");
+			Id = id;
+			Name = name;
+			Email = email;
+		}
+	}
 
-			// 1. Создание HTTP клиента с поддержкой cookies
-			Console.WriteLine("1. СОЗДАНИЕ HTTP КЛИЕНТА С COOKIES:");
+	public class Product
+	{
+		public int Id { get; set; }
+		public string Name { get; set; }
+		public decimal Price { get; set; }
+		public int Stock { get; set; }
+	}
 
-			// CookieContainer - контейнер для хранения cookies на стороне клиента
-			var cookieContainer = new CookieContainer();
+	// Простой HTTP-сервер на сырых сокетах для понимания основ
+	public class RawHttpServer : IDisposable
+	{
+		private HttpListener _listener;
+		private Thread _serverThread;
+		private bool _isRunning;
+		private readonly string _prefix;
+		private readonly Dictionary<string, Func<HttpListenerContext, Task>> _routes = new();
 
-			// HttpClientHandler с настроенным контейнером cookies
-			var handler = new HttpClientHandler
-			{
-				CookieContainer = cookieContainer,
-				UseCookies = true,
-				AllowAutoRedirect = true
-			};
-
-			var httpClient = new HttpClient(handler);
-
-			Console.WriteLine($"   HttpClient создан с поддержкой cookies");
-			Console.WriteLine($"   CookieContainer: {cookieContainer.Count} cookies");
-			Console.WriteLine($"   UseCookies: {handler.UseCookies}");
-
-			// 2. Пример cookie, которую мог бы отправить сервер
-			Console.WriteLine("\n2. СОЗДАНИЕ COOKIE (имитация серверного ответа):");
-
-			var sessionCookie = new Cookie
-			{
-				Name = "session_id",
-				Value = "abc123def456ghi789",
-				Domain = "localhost",
-				Path = "/",
-				Expires = DateTime.Now.AddHours(2),
-				HttpOnly = true,      // Защита от JavaScript
-				Secure = false        // Только HTTPS (false для localhost)
-			};
-
-			Console.WriteLine($"   Cookie '{sessionCookie.Name}':");
-			Console.WriteLine($"     Value: {sessionCookie.Value}");
-			Console.WriteLine($"     Domain: {sessionCookie.Domain}");
-			Console.WriteLine($"     Path: {sessionCookie.Path}");
-			Console.WriteLine($"     Expires: {sessionCookie.Expires}");
-			Console.WriteLine($"     HttpOnly: {sessionCookie.HttpOnly}");
-			Console.WriteLine($"     Secure: {sessionCookie.Secure}");
-			Console.WriteLine($"     SameSite: Lax (имитация, в System.Net.Cookie нет свойства)");
-
-			// 3. Добавление cookie в контейнер (имитация получения от сервера)
-			Console.WriteLine("\n3. ДОБАВЛЕНИЕ COOKIE В КОНТЕЙНЕР:");
-
-			cookieContainer.Add(new Uri("http://localhost"), sessionCookie);
-			Console.WriteLine($"   Cookie добавлена в контейнер");
-			Console.WriteLine($"   Теперь в контейнере: {cookieContainer.Count} cookies");
-
-			// 4. Получение cookies для конкретного URI
-			Console.WriteLine("\n4. ПОЛУЧЕНИЕ COOKIES ДЛЯ URI:");
-
-			var uri = new Uri("http://localhost/api");
-			var cookiesForUri = cookieContainer.GetCookies(uri);
-
-			Console.WriteLine($"   Cookies для {uri}:");
-			foreach (Cookie cookie in cookiesForUri)
-			{
-				Console.WriteLine($"     - {cookie.Name}: {cookie.Value}");
-			}
-
-			// 5. Работа с несколькими cookies
-			Console.WriteLine("\n5. РАБОТА С НЕСКОЛЬКИМИ COOKIES:");
-
-			var themeCookie = new Cookie("theme", "dark", "/", "localhost");
-			var languageCookie = new Cookie("lang", "ru", "/", "localhost");
-
-			cookieContainer.Add(uri, themeCookie);
-			cookieContainer.Add(uri, languageCookie);
-
-			Console.WriteLine($"   Добавлены дополнительные cookies");
-			Console.WriteLine($"   Всего cookies: {cookieContainer.Count}");
-
-			// 6. Удаление cookie
-			Console.WriteLine("\n6. УДАЛЕНИЕ COOKIE:");
-
-			var cookieToDelete = cookieContainer.GetCookies(uri)["theme"];
-			if (cookieToDelete != null)
-			{
-				cookieToDelete.Expired = true;
-				Console.WriteLine($"   Cookie 'theme' помечена как удалённая");
-			}
-
-			Console.WriteLine($"   Активные cookies: {cookieContainer.GetCookies(uri).Count}");
+		public RawHttpServer(string prefix = "http://localhost:8080/")
+		{
+			_prefix = prefix;
+			_listener = new HttpListener();
+			_listener.Prefixes.Add(prefix);
 		}
 
-		public static async Task DemonstrateHttpClientWithCookies()
+		public void Start()
 		{
-			Console.WriteLine("\n\n=== HTTPCLIENT С COOKIES НА ПРАКТИКЕ ===\n");
+			Console.WriteLine($"=== ПРОСТОЙ HTTP-СЕРВЕР НА СЫРЫХ СОКЕТАХ ===\n");
+			Console.WriteLine($"Сервер запускается на: {_prefix}");
+			Console.WriteLine($"Сервер слушает HTTP-запросы...\n");
 
-			// Имитация сервера, который использует cookies
-			var testServerUri = "http://localhost:5000";
+			_isRunning = true;
+			_serverThread = new Thread(RunServer);
+			_serverThread.Start();
+		}
 
-			// Клиент с cookies
-			var handler = new HttpClientHandler
+		// Регистрация маршрутов
+		public void MapGet(string path, Func<HttpListenerContext, Task> handler)
+		{
+			_routes[$"GET {path}"] = handler;
+		}
+
+		public void MapPost(string path, Func<HttpListenerContext, Task> handler)
+		{
+			_routes[$"POST {path}"] = handler;
+		}
+
+		public void MapPut(string path, Func<HttpListenerContext, Task> handler)
+		{
+			_routes[$"PUT {path}"] = handler;
+		}
+
+		public void MapDelete(string path, Func<HttpListenerContext, Task> handler)
+		{
+			_routes[$"DELETE {path}"] = handler;
+		}
+
+		private async void RunServer()
+		{
+			_listener.Start();
+			Console.WriteLine($"Сервер запущен. Ожидание запросов...");
+
+			while (_isRunning)
 			{
-				CookieContainer = new CookieContainer(),
-				UseCookies = true
-			};
+				try
+				{
+					// Блокирующее ожидание HTTP-запроса
+					var context = await _listener.GetContextAsync();
 
-			var httpClient = new HttpClient(handler);
+					// Асинхронная обработка запроса
+					_ = Task.Run(() => ProcessRequest(context));
+				}
+				catch (HttpListenerException) when (!_isRunning)
+				{
+					break;
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"Ошибка при принятии запроса: {ex.Message}");
+				}
+			}
+		}
+
+		private async Task ProcessRequest(HttpListenerContext context)
+		{
+			var request = context.Request;
+			var response = context.Response;
+
+			Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {request.HttpMethod} {request.Url?.AbsolutePath}");
 
 			try
 			{
-				Console.WriteLine("1. ПЕРВЫЙ ЗАПРОС (без cookies):");
+				// Маршрутизация
+				string routeKey = $"{request.HttpMethod} {request.Url?.AbsolutePath}";
 
-				// Имитация запроса, который устанавливает cookie
-				var firstRequest = new HttpRequestMessage(HttpMethod.Get, $"{testServerUri}/set-cookie");
-				var firstResponse = await httpClient.SendAsync(firstRequest);
-
-				Console.WriteLine($"   Статус: {firstResponse.StatusCode}");
-
-				// Проверка полученных cookies
-				var cookies = handler.CookieContainer.GetCookies(new Uri(testServerUri));
-				Console.WriteLine($"   Получено cookies: {cookies.Count}");
-
-				if (cookies.Count > 0)
+				if (_routes.TryGetValue(routeKey, out var handler))
 				{
-					foreach (Cookie cookie in cookies)
-					{
-						Console.WriteLine($"     - {cookie.Name}: {cookie.Value}");
-					}
+					await handler(context);
 				}
-
-				Console.WriteLine("\n2. ВТОРОЙ ЗАПРОС (с cookies):");
-
-				// Второй запрос уже содержит cookies
-				var secondRequest = new HttpRequestMessage(HttpMethod.Get, $"{testServerUri}/check-cookie");
-				var secondResponse = await httpClient.SendAsync(secondRequest);
-
-				Console.WriteLine($"   Статус: {secondResponse.StatusCode}");
-
-				// Чтение ответа
-				var responseContent = await secondResponse.Content.ReadAsStringAsync();
-				Console.WriteLine($"   Ответ: {responseContent}");
-
+				else
+				{
+					// 404 - маршрут не найден
+					await SendResponse(response, 404, "text/plain", "Not Found");
+				}
 			}
-			catch (HttpRequestException ex)
+			catch (Exception ex)
 			{
-				Console.WriteLine($"   Ошибка: {ex.Message}");
-				Console.WriteLine($"   (Имитация - сервер не запущен)");
+				Console.WriteLine($"Ошибка обработки запроса: {ex.Message}");
+				await SendResponse(response, 500, "text/plain", $"Internal Server Error: {ex.Message}");
 			}
+			finally
+			{
+				response.Close();
+			}
+		}
+
+		public async Task SendResponse(HttpListenerResponse response, int statusCode, string contentType, string content)
+		{
+			response.StatusCode = statusCode;
+			response.ContentType = contentType;
+			response.ContentEncoding = Encoding.UTF8;
+
+			byte[] buffer = Encoding.UTF8.GetBytes(content);
+			response.ContentLength64 = buffer.Length;
+
+			await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+			response.OutputStream.Close();
+		}
+
+		public async Task SendJsonResponse<T>(HttpListenerResponse response, int statusCode, T data)
+		{
+			response.StatusCode = statusCode;
+			response.ContentType = "application/json";
+			response.ContentEncoding = Encoding.UTF8;
+
+			var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
+			{
+				PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+				WriteIndented = true
+			});
+
+			byte[] buffer = Encoding.UTF8.GetBytes(json);
+			response.ContentLength64 = buffer.Length;
+
+			await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+			response.OutputStream.Close();
+		}
+
+		public void Stop()
+		{
+			_isRunning = false;
+			_listener.Stop();
+			_serverThread?.Join(3000);
+			Console.WriteLine($"\nСервер остановлен");
+		}
+
+		public void Dispose()
+		{
+			Stop();
+			_listener.Close();
 		}
 	}
 
-	// Демонстрация сессий (серверная сторона)
-	public class SessionDemonstration
+	// HTTP-сервер на ASP.NET Core для сравнения
+	public class AspNetHttpServerDemo
 	{
-		// Имитация хранилища сессий на сервере
-		private static Dictionary<string, UserSession> _sessionStore = new Dictionary<string, UserSession>();
-
-		public class UserSession
+		public static async Task RunDemo()
 		{
-			public string SessionId { get; set; }
-			public string UserId { get; set; }
-			public UserProfile UserProfile { get; set; }
-			public DateTime CreatedAt { get; set; }
-			public DateTime LastAccessed { get; set; }
-			public Dictionary<string, object> SessionData { get; set; } = new Dictionary<string, object>();
+			Console.WriteLine("\n\n=== HTTP-СЕРВЕР НА ASP.NET CORE ===\n");
+			Console.WriteLine("Это демонстрация того, как бы выглядел код на ASP.NET Core.");
+			Console.WriteLine("В реальности это отдельное приложение с использованием WebApplication.");
+			Console.WriteLine("Ниже показаны основные концепции и паттерны.\n");
 
-			public bool IsExpired(int timeoutMinutes = 30)
-			{
-				return (DateTime.Now - LastAccessed).TotalMinutes > timeoutMinutes;
-			}
+			// Демонстрация конфигурации
+			Console.WriteLine("1. КОНФИГУРАЦИЯ HTTP-СЕРВЕРА:");
+			Console.WriteLine("   var builder = WebApplication.CreateBuilder(args);");
+			Console.WriteLine("   var app = builder.Build();\n");
+
+			// Демонстрация маршрутизации
+			Console.WriteLine("2. МАРШРУТИЗАЦИЯ:");
+			Console.WriteLine("   app.MapGet(\"/\", () => \"Hello, World!\");");
+			Console.WriteLine("   app.MapGet(\"/api/users/{id}\", (int id) => GetUser(id));");
+			Console.WriteLine("   app.MapPost(\"/api/users\", (User user) => CreateUser(user));");
+			Console.WriteLine("   app.MapPut(\"/api/users/{id}\", (int id, User user) => UpdateUser(id, user));");
+			Console.WriteLine("   app.MapDelete(\"/api/users/{id}\", (int id) => DeleteUser(id));\n");
+
+			// Демонстрация конвейера middleware
+			Console.WriteLine("3. КОНВЕЙЕР ОБРАБОТКИ (MIDDLEWARE):");
+			Console.WriteLine("   app.UseHttpsRedirection();");
+			Console.WriteLine("   app.UseAuthentication();");
+			Console.WriteLine("   app.UseAuthorization();");
+			Console.WriteLine("   app.UseCors();");
+			Console.WriteLine("   app.UseRateLimiting();");
+			Console.WriteLine("   app.MapControllers();");
+			Console.WriteLine("   app.UseExceptionHandler(\"/error\");\n");
+
+			// Демонстрация запуска
+			Console.WriteLine("4. ЗАПУСК СЕРВЕРА:");
+			Console.WriteLine("   app.Run();");
+			Console.WriteLine("   // Сервер начинает слушать порт и обрабатывать запросы\n");
+
+			await Task.Delay(1000);
+		}
+	}
+
+	// Демонстрация HTTP-сервера
+	public class HttpServerDemonstration : IDisposable
+	{
+		private RawHttpServer _server;
+
+		public async Task RunDemonstration()
+		{
+			Console.WriteLine("ПРАКТИЧЕСКАЯ ДЕМОНСТРАЦИЯ HTTP-СЕРВЕРА В C#");
+			Console.WriteLine("=============================================\n");
+
+			// Создаём сервер
+			_server = new RawHttpServer();
+
+			// Настраиваем маршруты
+			ConfigureRoutes();
+
+			// Запускаем сервер
+			_server.Start();
+
+			// Демонстрация запросов
+			await DemonstrateHttpRequests();
+
+			// Демонстрация ASP.NET Core
+			await AspNetHttpServerDemo.RunDemo();
+
+			Console.WriteLine("\nДемонстрация завершена.");
 		}
 
-		public static void DemonstrateSessionManagement()
+		private void ConfigureRoutes()
 		{
-			Console.WriteLine("\n\n=== СЕССИИ НА СЕРВЕРЕ ===\n");
-
-			// 1. Создание сессии (имитация обработки входа пользователя)
-			Console.WriteLine("1. СОЗДАНИЕ СЕССИИ:");
-
-			var credentials = new UserCredentials
+			// GET / - корневой маршрут
+			_server.MapGet("/", async (context) =>
 			{
-				Username = "john_doe",
-				Password = "secure_password"
-			};
+				var response = @"
+                    <html>
+                        <head><title>HTTP Server Demo</title></head>
+                        <body>
+                            <h1>HTTP Server Demo</h1>
+                            <p>Доступные эндпоинты:</p>
+                            <ul>
+                                <li>GET /hello - Простое приветствие</li>
+                                <li>GET /api/users - Список пользователей</li>
+                                <li>GET /api/users/{id} - Конкретный пользователь</li>
+                                <li>POST /api/users - Создание пользователя</li>
+                                <li>GET /status - Статус сервера</li>
+                            </ul>
+                        </body>
+                    </html>";
 
-			// Проверка учётных данных (имитация)
-			if (AuthenticateUser(credentials))
+				await _server.SendResponse(context.Response, 200, "text/html", response);
+			});
+
+			// GET /hello - простое приветствие
+			_server.MapGet("/hello", async (context) =>
 			{
-				var sessionId = GenerateSessionId();
-				var userProfile = GetUserProfile(credentials.Username);
+				await _server.SendResponse(context.Response, 200, "text/plain", "Hello, World!");
+			});
 
-				var session = new UserSession
+			// GET /api/users - список пользователей
+			_server.MapGet("/api/users", async (context) =>
+			{
+				var users = new List<User>
 				{
-					SessionId = sessionId,
-					UserId = "user_123",
-					UserProfile = userProfile,
-					CreatedAt = DateTime.Now,
-					LastAccessed = DateTime.Now,
-					SessionData = new Dictionary<string, object>
-					{
-						["cart_items"] = new List<string> { "item1", "item2" },
-						["preferences"] = new { theme = "dark", language = "ru" }
-					}
+					new User(1, "Иван Иванов", "ivan@example.com"),
+					new User(2, "Мария Петрова", "maria@example.com"),
+					new User(3, "Алексей Сидоров", "alexey@example.com")
 				};
 
-				// Сохранение сессии в хранилище
-				_sessionStore[sessionId] = session;
+				await _server.SendJsonResponse(context.Response, 200, users);
+			});
 
-				Console.WriteLine($"   Сессия создана:");
-				Console.WriteLine($"     SessionId: {session.SessionId}");
-				Console.WriteLine($"     UserId: {session.UserId}");
-				Console.WriteLine($"     Username: {session.UserProfile.Username}");
-				Console.WriteLine($"     CreatedAt: {session.CreatedAt}");
-				Console.WriteLine($"     SessionData: {session.SessionData.Count} элементов");
-
-				// 2. Получение сессии по идентификатору
-				Console.WriteLine("\n2. ПОЛУЧЕНИЕ СЕССИИ ПО ID:");
-
-				if (_sessionStore.TryGetValue(sessionId, out var retrievedSession))
+			// GET /api/users/{id} - конкретный пользователь
+			_server.MapGet("/api/users/{id}", async (context) =>
+			{
+				var idStr = context.Request.Url.Segments[^1];
+				if (int.TryParse(idStr, out int id))
 				{
-					Console.WriteLine($"   Сессия найдена:");
-					Console.WriteLine($"     User: {retrievedSession.UserProfile.Username}");
-					Console.WriteLine($"     Email: {retrievedSession.UserProfile.Email}");
-					Console.WriteLine($"     Roles: {string.Join(", ", retrievedSession.UserProfile.Roles)}");
+					var user = id switch
+					{
+						1 => new User(1, "Иван Иванов", "ivan@example.com"),
+						2 => new User(2, "Мария Петрова", "maria@example.com"),
+						3 => new User(3, "Алексей Сидоров", "alexey@example.com"),
+						_ => null
+					};
 
-					// Обновление времени доступа
-					retrievedSession.LastAccessed = DateTime.Now;
-					Console.WriteLine($"     LastAccessed обновлено: {retrievedSession.LastAccessed}");
+					if (user != null)
+					{
+						await _server.SendJsonResponse(context.Response, 200, user);
+					}
+					else
+					{
+						await _server.SendResponse(context.Response, 404, "text/plain", "User not found");
+					}
 				}
-
-				// 3. Проверка истечения сессии
-				Console.WriteLine("\n3. ПРОВЕРКА ИСТЕЧЕНИЯ СЕССИИ:");
-
-				// Симуляция просроченной сессии
-				var expiredSession = new UserSession
+				else
 				{
-					SessionId = "expired_session",
-					UserId = "user_456",
-					CreatedAt = DateTime.Now.AddHours(-2),
-					LastAccessed = DateTime.Now.AddHours(-1)
+					await _server.SendResponse(context.Response, 400, "text/plain", "Invalid user ID");
+				}
+			});
+
+			// POST /api/users - создание пользователя
+			_server.MapPost("/api/users", async (context) =>
+			{
+				try
+				{
+					// Чтение тела запроса
+					using var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
+					string body = await reader.ReadToEndAsync();
+
+					var user = JsonSerializer.Deserialize<User>(body);
+					if (user == null || string.IsNullOrEmpty(user.Name) || string.IsNullOrEmpty(user.Email))
+					{
+						await _server.SendResponse(context.Response, 400, "text/plain", "Invalid user data");
+						return;
+					}
+
+					// Имитация сохранения
+					user.Id = new Random().Next(100, 1000);
+
+					// 201 Created с Location header
+					context.Response.Headers.Add("Location", $"/api/users/{user.Id}");
+					await _server.SendJsonResponse(context.Response, 201, user);
+				}
+				catch (JsonException)
+				{
+					await _server.SendResponse(context.Response, 400, "text/plain", "Invalid JSON");
+				}
+			});
+
+			// GET /status - статус сервера
+			_server.MapGet("/status", async (context) =>
+			{
+				var status = new
+				{
+					Server = "RawHttpServer",
+					Status = "Running",
+					Timestamp = DateTime.UtcNow,
+					ProcessId = Process.GetCurrentProcess().Id,
+					ThreadCount = Process.GetCurrentProcess().Threads.Count
 				};
 
-				Console.WriteLine($"   Новая сессия истекла: {expiredSession.IsExpired(30)}");
-				Console.WriteLine($"   Активная сессия истекла: {session.IsExpired(30)}");
+				await _server.SendJsonResponse(context.Response, 200, status);
+			});
 
-				// 4. Удаление сессии (имитация выхода)
-				Console.WriteLine("\n4. УДАЛЕНИЕ СЕССИИ (ВЫХОД):");
-
-				_sessionStore.Remove(sessionId);
-				Console.WriteLine($"   Сессия удалена из хранилища");
-				Console.WriteLine($"   Осталось сессий: {_sessionStore.Count}");
-
-				// 5. Очистка просроченных сессий
-				Console.WriteLine("\n5. ОЧИСТКА ПРОСРОЧЕННЫХ СЕССИЙ:");
-
-				var expiredSessions = _sessionStore
-					.Where(kv => kv.Value.IsExpired())
-					.Select(kv => kv.Key)
-					.ToList();
-
-				foreach (var expiredId in expiredSessions)
-				{
-					_sessionStore.Remove(expiredId);
-				}
-
-				Console.WriteLine($"   Удалено просроченных сессий: {expiredSessions.Count}");
-				Console.WriteLine($"   Всего активных сессий: {_sessionStore.Count}");
-			}
-		}
-
-		private static bool AuthenticateUser(UserCredentials credentials)
-		{
-			// Имитация проверки учётных данных
-			return credentials.Username == "john_doe" && credentials.Password == "secure_password";
-		}
-
-		private static string GenerateSessionId()
-		{
-			// Генерация уникального идентификатора сессии
-			return Guid.NewGuid().ToString("N");
-		}
-
-		private static UserProfile GetUserProfile(string username)
-		{
-			return new UserProfile
+			// GET /error - демонстрация ошибки
+			_server.MapGet("/error", async (context) =>
 			{
-				Username = username,
-				Email = "john@example.com",
-				Roles = new[] { "user", "premium" },
-				CreatedAt = DateTime.Now.AddMonths(-6)
-			};
-		}
-	}
+				throw new InvalidOperationException("Демонстрационная ошибка обработки запроса");
+			});
 
-	// Демонстрация авторизации с токенами
-	public class TokenAuthDemonstration
-	{
-		public static void DemonstrateTokenBasedAuth()
-		{
-			Console.WriteLine("\n\n=== АВТОРИЗАЦИЯ НА ОСНОВЕ ТОКЕНОВ ===\n");
-
-			// 1. Процесс аутентификации и получения токена
-			Console.WriteLine("1. АУТЕНТИФИКАЦИЯ И ПОЛУЧЕНИЕ ТОКЕНА:");
-
-			var credentials = new UserCredentials
+			// Middleware для логирования всех запросов
+			_server.MapGet("*", async (context) =>
 			{
-				Username = "alice",
-				Password = "secret123"
-			};
-
-			// Имитация запроса на получение токена
-			var token = AuthenticateAndGetToken(credentials);
-
-			if (token != null)
-			{
-				Console.WriteLine($"   Токен получен:");
-				Console.WriteLine($"     AccessToken: {token.AccessToken.Substring(0, 20)}...");
-				Console.WriteLine($"     TokenType: {token.TokenType}");
-				Console.WriteLine($"     ExpiresAt: {token.ExpiresAt}");
-				Console.WriteLine($"     RefreshToken: {token.RefreshToken.Substring(0, 20)}...");
-			}
-
-			// 2. Использование токена для доступа к защищённому ресурсу
-			Console.WriteLine("\n2. ИСПОЛЬЗОВАНИЕ ТОКЕНА В ЗАПРОСАХ:");
-
-			if (token != null)
-			{
-				Console.WriteLine($"   Формирование запроса с токеном:");
-				Console.WriteLine($"     Заголовок: Authorization: {token.TokenType} {token.AccessToken}");
-
-				// Имитация проверки токена на сервере
-				var isValid = ValidateToken(token.AccessToken);
-				Console.WriteLine($"     Токен валиден: {isValid}");
-
-				if (isValid)
-				{
-					var userInfo = ExtractUserInfoFromToken(token.AccessToken);
-					Console.WriteLine($"     Пользователь: {userInfo.Username}");
-					Console.WriteLine($"     Роли: {string.Join(", ", userInfo.Roles)}");
-				}
-			}
-
-			// 3. Обновление токена
-			Console.WriteLine("\n3. ОБНОВЛЕНИЕ ТОКЕНА:");
-
-			if (token != null && token.ExpiresAt < DateTime.Now.AddMinutes(5))
-			{
-				var newToken = RefreshToken(token.RefreshToken);
-				Console.WriteLine($"   Токен обновлён:");
-				Console.WriteLine($"     Новый AccessToken: {newToken.AccessToken.Substring(0, 20)}...");
-				Console.WriteLine($"     Новый ExpiresAt: {newToken.ExpiresAt}");
-			}
-
-			// 4. Сравнение с cookie-based авторизацией
-			Console.WriteLine("\n4. СРАВНЕНИЕ С COOKIE-BASED АВТОРИЗАЦИЕЙ:");
-
-			Console.WriteLine("   Cookie-based:");
-			Console.WriteLine($"     • Состояние хранится на сервере");
-			Console.WriteLine($"     • Идентификатор передаётся в cookie");
-			Console.WriteLine($"     • Автоматическая отправка браузером");
-			Console.WriteLine($"     • Уязвимо к CSRF (требует защиты)");
-
-			Console.WriteLine("\n   Token-based:");
-			Console.WriteLine($"     • Состояние в токене (stateless сервер)");
-			Console.WriteLine($"     • Токен передаётся в заголовке Authorization");
-			Console.WriteLine($"     • Явная отправка клиентом");
-			Console.WriteLine($"     • Защищено от CSRF");
-			Console.WriteLine($"     • Легче масштабируется");
+				// Этот маршрут будет перехватывать все GET-запросы к несуществующим маршрутам
+				Console.WriteLine($"[404] Запрошен несуществующий маршрут: {context.Request.Url}");
+				await _server.SendResponse(context.Response, 404, "text/plain", "Route not found");
+			});
 		}
 
-		private static AuthToken AuthenticateAndGetToken(UserCredentials credentials)
+		private async Task DemonstrateHttpRequests()
 		{
-			// Имитация аутентификации и выдачи токена
-			if (credentials.Username == "alice" && credentials.Password == "secret123")
-			{
-				return new AuthToken
-				{
-					AccessToken = GenerateJwtToken(credentials.Username),
-					RefreshToken = Guid.NewGuid().ToString("N"),
-					ExpiresAt = DateTime.Now.AddHours(1),
-					TokenType = "Bearer"
-				};
-			}
+			Console.WriteLine("ДЕМОНСТРАЦИЯ HTTP-ЗАПРОСОВ К СЕРВЕРУ:\n");
 
-			return null;
+			// Даём серверу время запуститься
+			await Task.Delay(1000);
+
+			// Демонстрационные запросы
+			var baseUrl = "http://localhost:8080";
+
+			Console.WriteLine("1. GET /hello - Простое приветствие");
+			await MakeRequest($"{baseUrl}/hello", "GET");
+
+			Console.WriteLine("\n2. GET /api/users - Список пользователей");
+			await MakeRequest($"{baseUrl}/api/users", "GET");
+
+			Console.WriteLine("\n3. GET /api/users/1 - Конкретный пользователь");
+			await MakeRequest($"{baseUrl}/api/users/1", "GET");
+
+			Console.WriteLine("\n4. GET /api/users/999 - Несуществующий пользователь");
+			await MakeRequest($"{baseUrl}/api/users/999", "GET");
+
+			Console.WriteLine("\n5. POST /api/users - Создание пользователя");
+			var newUser = new { Name = "Новый Пользователь", Email = "new@example.com" };
+			await MakeRequest($"{baseUrl}/api/users", "POST", JsonSerializer.Serialize(newUser));
+
+			Console.WriteLine("\n6. GET /status - Статус сервера");
+			await MakeRequest($"{baseUrl}/status", "GET");
+
+			Console.WriteLine("\n7. GET /notfound - Несуществующий маршрут");
+			await MakeRequest($"{baseUrl}/notfound", "GET");
+
+			await Task.Delay(500);
 		}
 
-		private static string GenerateJwtToken(string username)
+		private async Task MakeRequest(string url, string method, string body = null)
 		{
-			// Имитация JWT токена
-			var header = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
-			var payload = $"{{\"sub\":\"{username}\",\"roles\":[\"user\",\"admin\"],\"exp\":{DateTimeOffset.Now.AddHours(1).ToUnixTimeSeconds()}}}";
-
-			var headerBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(header));
-			var payloadBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(payload));
-
-			return $"{headerBase64}.{payloadBase64}.signature";
-		}
-
-		private static bool ValidateToken(string token)
-		{
-			// Имитация проверки токена
-			return !string.IsNullOrEmpty(token) && token.Contains(".");
-		}
-
-		private static UserProfile ExtractUserInfoFromToken(string token)
-		{
-			// Имитация извлечения информации из токена
-			return new UserProfile
-			{
-				Username = "alice",
-				Email = "alice@example.com",
-				Roles = new[] { "user", "admin" },
-				CreatedAt = DateTime.Now.AddYears(-1)
-			};
-		}
-
-		private static AuthToken RefreshToken(string refreshToken)
-		{
-			// Имитация обновления токена
-			return new AuthToken
-			{
-				AccessToken = GenerateJwtToken("alice"),
-				RefreshToken = Guid.NewGuid().ToString("N"),
-				ExpiresAt = DateTime.Now.AddHours(1),
-				TokenType = "Bearer"
-			};
-		}
-	}
-
-	// Практический пример: клиент с полным циклом авторизации
-	public class AuthHttpClient : IDisposable
-	{
-		private readonly HttpClient _httpClient;
-		private readonly CookieContainer _cookieContainer;
-		private AuthToken _currentToken;
-		private string _baseUrl;
-
-		public bool IsAuthenticated => _currentToken != null && _currentToken.ExpiresAt > DateTime.Now;
-
-		public AuthHttpClient(string baseUrl)
-		{
-			_baseUrl = baseUrl;
-			_cookieContainer = new CookieContainer();
-
-			var handler = new HttpClientHandler
-			{
-				CookieContainer = _cookieContainer,
-				UseCookies = true
-			};
-
-			_httpClient = new HttpClient(handler);
-			_httpClient.BaseAddress = new Uri(baseUrl);
-			_httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("AuthDemoClient/1.0");
-		}
-
-		public async Task<bool> LoginAsync(string username, string password)
-		{
-			Console.WriteLine($"\n[AuthHttpClient] Попытка входа пользователя: {username}");
-
-			// Вариант 1: Cookie-based аутентификация
-			var loginData = new UserCredentials
-			{
-				Username = username,
-				Password = password
-			};
-
-			var json = JsonSerializer.Serialize(loginData);
-			var content = new StringContent(json, Encoding.UTF8, "application/json");
-
 			try
 			{
-				// Запрос на вход
-				var response = await _httpClient.PostAsync("/api/auth/login", content);
+				var request = WebRequest.Create(url);
+				request.Method = method;
 
-				if (response.IsSuccessStatusCode)
+				if (!string.IsNullOrEmpty(body) && method == "POST")
 				{
-					// Проверка полученных cookies
-					var cookies = _cookieContainer.GetCookies(new Uri(_baseUrl));
-					Console.WriteLine($"[AuthHttpClient] Получено cookies: {cookies.Count}");
+					request.ContentType = "application/json";
+					var data = Encoding.UTF8.GetBytes(body);
+					request.ContentLength = data.Length;
 
-					if (cookies.Count > 0)
+					using (var requestStream = await request.GetRequestStreamAsync())
 					{
-						Console.WriteLine($"[AuthHttpClient] Аутентификация через cookies успешна");
-						return true;
+						await requestStream.WriteAsync(data, 0, data.Length);
 					}
 				}
 
-				// Вариант 2: Token-based аутентификация
-				var tokenResponse = await _httpClient.PostAsync("/api/auth/token", content);
+				using var response = (HttpWebResponse)await request.GetResponseAsync();
+				using var responseStream = response.GetResponseStream();
+				using var reader = new StreamReader(responseStream);
+				string result = await reader.ReadToEndAsync();
 
-				if (tokenResponse.IsSuccessStatusCode)
-				{
-					var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
-					_currentToken = JsonSerializer.Deserialize<AuthToken>(tokenJson);
+				Console.WriteLine($"   → {method} {url}");
+				Console.WriteLine($"   ← Status: {response.StatusCode} ({response.StatusDescription})");
+				Console.WriteLine($"   ← Response: {result.Truncate(100)}...");
+			}
+			catch (WebException ex) when (ex.Response is HttpWebResponse response)
+			{
+				using var errorStream = response.GetResponseStream();
+				using var reader = new StreamReader(errorStream);
+				string result = await reader.ReadToEndAsync();
 
-					// Установка токена в заголовки
-					_httpClient.DefaultRequestHeaders.Authorization =
-						new System.Net.Http.Headers.AuthenticationHeaderValue(
-							_currentToken.TokenType,
-							_currentToken.AccessToken);
-
-					Console.WriteLine($"[AuthHttpClient] Токен получен, истекает: {_currentToken.ExpiresAt}");
-					return true;
-				}
+				Console.WriteLine($"   → {method} {url}");
+				Console.WriteLine($"   ← Status: {response.StatusCode} ({response.StatusDescription})");
+				Console.WriteLine($"   ← Response: {result.Truncate(100)}...");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[AuthHttpClient] Ошибка входа: {ex.Message}");
-			}
-
-			return false;
-		}
-
-		public async Task<UserProfile> GetProfileAsync()
-		{
-			Console.WriteLine($"\n[AuthHttpClient] Запрос профиля пользователя");
-
-			try
-			{
-				var response = await _httpClient.GetAsync("/api/user/profile");
-
-				if (response.IsSuccessStatusCode)
-				{
-					var json = await response.Content.ReadAsStringAsync();
-					var profile = JsonSerializer.Deserialize<UserProfile>(json);
-
-					Console.WriteLine($"[AuthHttpClient] Профиль получен: {profile.Username}");
-					return profile;
-				}
-				else if (response.StatusCode == HttpStatusCode.Unauthorized)
-				{
-					Console.WriteLine($"[AuthHttpClient] Доступ запрещён (401 Unauthorized)");
-
-					// Попытка обновить токен, если он есть
-					if (_currentToken != null && await RefreshTokenAsync())
-					{
-						// Повторный запрос после обновления токена
-						return await GetProfileAsync();
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"[AuthHttpClient] Ошибка получения профиля: {ex.Message}");
-			}
-
-			return null;
-		}
-
-		public async Task<bool> LogoutAsync()
-		{
-			Console.WriteLine($"\n[AuthHttpClient] Выход из системы");
-
-			try
-			{
-				var response = await _httpClient.PostAsync("/api/auth/logout", null);
-
-				if (response.IsSuccessStatusCode)
-				{
-					// Очистка локальных данных
-					_currentToken = null;
-					_httpClient.DefaultRequestHeaders.Authorization = null;
-					_cookieContainer.GetCookies(new Uri(_baseUrl)).Clear();
-
-					Console.WriteLine($"[AuthHttpClient] Выход выполнен успешно");
-					return true;
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"[AuthHttpClient] Ошибка выхода: {ex.Message}");
-			}
-
-			return false;
-		}
-
-		private async Task<bool> RefreshTokenAsync()
-		{
-			if (_currentToken == null || string.IsNullOrEmpty(_currentToken.RefreshToken))
-				return false;
-
-			Console.WriteLine($"[AuthHttpClient] Попытка обновления токена");
-
-			try
-			{
-				var refreshData = new { refreshToken = _currentToken.RefreshToken };
-				var json = JsonSerializer.Serialize(refreshData);
-				var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-				var response = await _httpClient.PostAsync("/api/auth/refresh", content);
-
-				if (response.IsSuccessStatusCode)
-				{
-					var tokenJson = await response.Content.ReadAsStringAsync();
-					_currentToken = JsonSerializer.Deserialize<AuthToken>(tokenJson);
-
-					// Обновление заголовка авторизации
-					_httpClient.DefaultRequestHeaders.Authorization =
-						new System.Net.Http.Headers.AuthenticationHeaderValue(
-							_currentToken.TokenType,
-							_currentToken.AccessToken);
-
-					Console.WriteLine($"[AuthHttpClient] Токен обновлён, новый срок: {_currentToken.ExpiresAt}");
-					return true;
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"[AuthHttpClient] Ошибка обновления токена: {ex.Message}");
-			}
-
-			return false;
-		}
-
-		public void PrintAuthStatus()
-		{
-			Console.WriteLine($"\n[AuthHttpClient] Статус аутентификации:");
-			Console.WriteLine($"   IsAuthenticated: {IsAuthenticated}");
-
-			if (_currentToken != null)
-			{
-				Console.WriteLine($"   Token-based: Да");
-				Console.WriteLine($"   Token expires: {_currentToken.ExpiresAt}");
-				Console.WriteLine($"   Time to expire: {(_currentToken.ExpiresAt - DateTime.Now).TotalMinutes:F0} минут");
-			}
-
-			var cookies = _cookieContainer.GetCookies(new Uri(_baseUrl));
-			Console.WriteLine($"   Cookies: {cookies.Count}");
-
-			foreach (Cookie cookie in cookies)
-			{
-				Console.WriteLine($"     - {cookie.Name}: {cookie.Value} (HttpOnly: {cookie.HttpOnly})");
+				Console.WriteLine($"   → {method} {url}");
+				Console.WriteLine($"   ← Error: {ex.Message}");
 			}
 		}
 
 		public void Dispose()
 		{
-			_httpClient?.Dispose();
+			_server?.Dispose();
+		}
+	}
+
+	public static class StringExtensions
+	{
+		public static string Truncate(this string value, int maxLength)
+		{
+			if (string.IsNullOrEmpty(value)) return value;
+			return value.Length <= maxLength ? value : value.Substring(0, maxLength) + "...";
 		}
 	}
 
@@ -688,43 +491,12 @@ namespace HttpAuthCookiesDemo
 	{
 		static async Task Main(string[] args)
 		{
-			Console.WriteLine("COOKIES, СЕССИИ И АВТОРИЗАЦИЯ В HTTP");
-			Console.WriteLine("=====================================\n");
+			Console.WriteLine("HTTP-СЕРВЕР В C#");
+			Console.WriteLine("===============\n");
 
-			// 1. Демонстрация cookies
-			CookieDemonstration.DemonstrateCookieMechanism();
-			await CookieDemonstration.DemonstrateHttpClientWithCookies();
-
-			// 2. Демонстрация сессий
-			SessionDemonstration.DemonstrateSessionManagement();
-
-			// 3. Демонстрация токенной авторизации
-			TokenAuthDemonstration.DemonstrateTokenBasedAuth();
-
-			// 4. Практический пример клиента
-			Console.WriteLine("\n\n=== ПРАКТИЧЕСКИЙ ПРИМЕР HTTP КЛИЕНТА ===\n");
-
-			using (var authClient = new AuthHttpClient("https://api.example.com"))
+			using (var demo = new HttpServerDemonstration())
 			{
-				// Симуляция различных сценариев
-				Console.WriteLine("Сценарий 1: Попытка доступа без аутентификации");
-				var profile = await authClient.GetProfileAsync();
-				authClient.PrintAuthStatus();
-
-				Console.WriteLine("\nСценарий 2: Аутентификация пользователя");
-				var loggedIn = await authClient.LoginAsync("john_doe", "password123");
-				Console.WriteLine($"Login successful: {loggedIn}");
-				authClient.PrintAuthStatus();
-
-				if (loggedIn)
-				{
-					Console.WriteLine("\nСценарий 3: Доступ к защищённому ресурсу");
-					profile = await authClient.GetProfileAsync();
-
-					Console.WriteLine("\nСценарий 4: Выход из системы");
-					await authClient.LogoutAsync();
-					authClient.PrintAuthStatus();
-				}
+				await demo.RunDemonstration();
 			}
 		}
 	}
