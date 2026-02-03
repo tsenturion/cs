@@ -1,734 +1,685 @@
 ﻿using System;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Collections.Generic;
-using System.Net.Http;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using System.Linq;
 
-namespace HttpSerializationDemo
+namespace HttpAuthCookiesDemo
 {
-	// Базовые модели данных для демонстрации
-	public class User
+	// Модели данных для демонстрации
+	public class UserCredentials
 	{
-		public int Id { get; set; }
-		public string Name { get; set; }
+		public string Username { get; set; }
+		public string Password { get; set; }
+	}
+
+	public class UserProfile
+	{
+		public string Username { get; set; }
 		public string Email { get; set; }
-
-		// Метод для демонстрации бизнес-логики, которая не сериализуется
-		public bool IsValid()
-		{
-			return !string.IsNullOrEmpty(Name) &&
-				   !string.IsNullOrEmpty(Email) &&
-				   Email.Contains('@');
-		}
-
-		public override string ToString()
-		{
-			return $"User[Id={Id}, Name='{Name}', Email='{Email}']";
-		}
+		public string[] Roles { get; set; }
+		public DateTime CreatedAt { get; set; }
 	}
 
-	// DTO (Data Transfer Object) для внешнего API
-	public class UserDto
+	public class ApiResponse<T>
 	{
-		public int id { get; set; }
-		public string full_name { get; set; }
-		public string email_address { get; set; }
-		public DateTime created_at { get; set; }
-		public bool is_active { get; set; }
+		public bool Success { get; set; }
+		public T Data { get; set; }
+		public string Error { get; set; }
+	}
 
-		public static UserDto FromUser(User user)
+	public class AuthToken
+	{
+		public string AccessToken { get; set; }
+		public string RefreshToken { get; set; }
+		public DateTime ExpiresAt { get; set; }
+		public string TokenType { get; set; } = "Bearer";
+	}
+
+	// Демонстрация работы с cookies в C#
+	public class CookieDemonstration
+	{
+		public static void DemonstrateCookieMechanism()
 		{
-			return new UserDto
+			Console.WriteLine("=== COOKIES В HTTP ===\n");
+
+			// 1. Создание HTTP клиента с поддержкой cookies
+			Console.WriteLine("1. СОЗДАНИЕ HTTP КЛИЕНТА С COOKIES:");
+
+			// CookieContainer - контейнер для хранения cookies на стороне клиента
+			var cookieContainer = new CookieContainer();
+
+			// HttpClientHandler с настроенным контейнером cookies
+			var handler = new HttpClientHandler
 			{
-				id = user.Id,
-				full_name = user.Name,
-				email_address = user.Email,
-				created_at = DateTime.UtcNow,
-				is_active = true
-			};
-		}
-
-		public User ToUser()
-		{
-			return new User
-			{
-				Id = id,
-				Name = full_name,
-				Email = email_address
-			};
-		}
-	}
-
-	// Сложная модель с вложенными объектами
-	public class Order
-	{
-		public string OrderId { get; set; }
-		public User Customer { get; set; }
-		public List<OrderItem> Items { get; set; } = new List<OrderItem>();
-		public decimal TotalAmount { get; set; }
-		public OrderStatus Status { get; set; }
-		public DateTime? CompletedAt { get; set; }
-
-		public override string ToString()
-		{
-			return $"Order[Id='{OrderId}', Customer={Customer?.Name}, Items={Items.Count}, Total={TotalAmount:C}]";
-		}
-	}
-
-	public class OrderItem
-	{
-		public string ProductId { get; set; }
-		public string ProductName { get; set; }
-		public int Quantity { get; set; }
-		public decimal Price { get; set; }
-
-		public decimal Subtotal => Quantity * Price;
-	}
-
-	public enum OrderStatus
-	{
-		Pending,
-		Processing,
-		Shipped,
-		Delivered,
-		Cancelled
-	}
-
-	// Модель с nullable значениями для демонстрации
-	public class Product
-	{
-		public int? Id { get; set; }
-		public string Name { get; set; }
-		public string? Description { get; set; } // Nullable reference type
-		public decimal? Price { get; set; }
-		public int? StockQuantity { get; set; }
-		public List<string>? Tags { get; set; }
-
-		public override string ToString()
-		{
-			return $"Product[Id={Id?.ToString() ?? "null"}, Name='{Name}', Price={Price?.ToString("C") ?? "null"}]";
-		}
-	}
-
-	// Демонстрация сериализации и десериализации
-	public class SerializationDemonstration
-	{
-		public static void RunBasicDemo()
-		{
-			Console.WriteLine("=== СЕРИАЛИЗАЦИЯ И ДЕСЕРИАЛИЗАЦИЯ В HTTP-КЛИЕНТЕ ===\n");
-
-			Console.WriteLine("1. БАЗОВАЯ СЕРИАЛИЗАЦИЯ ОБЪЕКТА В JSON:");
-			DemonstrateBasicSerialization();
-
-			Console.WriteLine("\n2. ДЕСЕРИАЛИЗАЦИЯ JSON В ОБЪЕКТ:");
-			DemonstrateBasicDeserialization();
-
-			Console.WriteLine("\n3. НАСТРОЙКИ СЕРИАЛИЗАЦИИ:");
-			DemonstrateSerializationOptions();
-
-			Console.WriteLine("\n4. NULLABLE ЗНАЧЕНИЯ И ОТСУТСТВУЮЩИЕ ПОЛЯ:");
-			DemonstrateNullableValues();
-
-			Console.WriteLine("\n5. СЛОЖНЫЕ ОБЪЕКТЫ И ВЛОЖЕННОСТЬ:");
-			DemonstrateComplexObjects();
-
-			Console.WriteLine("\n6. DTO И ИЗОЛЯЦИЯ КОНТРАКТОВ:");
-			DemonstrateDtoIsolation();
-
-			Console.WriteLine("\n7. ИНТЕГРАЦИЯ С HTTPCLIENT:");
-			DemonstrateHttpClientIntegration();
-		}
-
-		private static void DemonstrateBasicSerialization()
-		{
-			// Создаём объект в памяти приложения
-			var user = new User
-			{
-				Id = 1,
-				Name = "Иван Петров",
-				Email = "ivan@example.com"
+				CookieContainer = cookieContainer,
+				UseCookies = true,
+				AllowAutoRedirect = true
 			};
 
-			Console.WriteLine($"   Исходный объект в C#: {user}");
-			Console.WriteLine($"   Проверка бизнес-логики: IsValid = {user.IsValid()}");
+			var httpClient = new HttpClient(handler);
 
-			// Сериализация объекта в JSON
-			string json = JsonSerializer.Serialize(user);
+			Console.WriteLine($"   HttpClient создан с поддержкой cookies");
+			Console.WriteLine($"   CookieContainer: {cookieContainer.Count} cookies");
+			Console.WriteLine($"   UseCookies: {handler.UseCookies}");
 
-			Console.WriteLine($"\n   Результат сериализации:");
-			Console.WriteLine($"     {json}");
+			// 2. Пример cookie, которую мог бы отправить сервер
+			Console.WriteLine("\n2. СОЗДАНИЕ COOKIE (имитация серверного ответа):");
 
-			Console.WriteLine($"\n   Анализ JSON:");
-			Console.WriteLine($"     Тип данных: {json.GetType().Name}");
-			Console.WriteLine($"     Длина: {json.Length} символов");
-			Console.WriteLine($"     Кодировка: UTF-8 (внутреннее представление)");
-
-			// Демонстрация байтового представления
-			byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
-			Console.WriteLine($"     Байтовое представление: {jsonBytes.Length} байт");
-
-			// Сериализация с форматированием для читаемости
-			string formattedJson = JsonSerializer.Serialize(user, new JsonSerializerOptions
+			var sessionCookie = new Cookie
 			{
-				WriteIndented = true
-			});
+				Name = "session_id",
+				Value = "abc123def456ghi789",
+				Domain = "localhost",
+				Path = "/",
+				Expires = DateTime.Now.AddHours(2),
+				HttpOnly = true,      // Защита от JavaScript
+				Secure = false        // Только HTTPS (false для localhost)
+			};
 
-			Console.WriteLine($"\n   Форматированный JSON:");
-			Console.WriteLine(formattedJson);
+			Console.WriteLine($"   Cookie '{sessionCookie.Name}':");
+			Console.WriteLine($"     Value: {sessionCookie.Value}");
+			Console.WriteLine($"     Domain: {sessionCookie.Domain}");
+			Console.WriteLine($"     Path: {sessionCookie.Path}");
+			Console.WriteLine($"     Expires: {sessionCookie.Expires}");
+			Console.WriteLine($"     HttpOnly: {sessionCookie.HttpOnly}");
+			Console.WriteLine($"     Secure: {sessionCookie.Secure}");
+			Console.WriteLine($"     SameSite: Lax (имитация, в System.Net.Cookie нет свойства)");
+
+			// 3. Добавление cookie в контейнер (имитация получения от сервера)
+			Console.WriteLine("\n3. ДОБАВЛЕНИЕ COOKIE В КОНТЕЙНЕР:");
+
+			cookieContainer.Add(new Uri("http://localhost"), sessionCookie);
+			Console.WriteLine($"   Cookie добавлена в контейнер");
+			Console.WriteLine($"   Теперь в контейнере: {cookieContainer.Count} cookies");
+
+			// 4. Получение cookies для конкретного URI
+			Console.WriteLine("\n4. ПОЛУЧЕНИЕ COOKIES ДЛЯ URI:");
+
+			var uri = new Uri("http://localhost/api");
+			var cookiesForUri = cookieContainer.GetCookies(uri);
+
+			Console.WriteLine($"   Cookies для {uri}:");
+			foreach (Cookie cookie in cookiesForUri)
+			{
+				Console.WriteLine($"     - {cookie.Name}: {cookie.Value}");
+			}
+
+			// 5. Работа с несколькими cookies
+			Console.WriteLine("\n5. РАБОТА С НЕСКОЛЬКИМИ COOKIES:");
+
+			var themeCookie = new Cookie("theme", "dark", "/", "localhost");
+			var languageCookie = new Cookie("lang", "ru", "/", "localhost");
+
+			cookieContainer.Add(uri, themeCookie);
+			cookieContainer.Add(uri, languageCookie);
+
+			Console.WriteLine($"   Добавлены дополнительные cookies");
+			Console.WriteLine($"   Всего cookies: {cookieContainer.Count}");
+
+			// 6. Удаление cookie
+			Console.WriteLine("\n6. УДАЛЕНИЕ COOKIE:");
+
+			var cookieToDelete = cookieContainer.GetCookies(uri)["theme"];
+			if (cookieToDelete != null)
+			{
+				cookieToDelete.Expired = true;
+				Console.WriteLine($"   Cookie 'theme' помечена как удалённая");
+			}
+
+			Console.WriteLine($"   Активные cookies: {cookieContainer.GetCookies(uri).Count}");
 		}
 
-		private static void DemonstrateBasicDeserialization()
+		public static async Task DemonstrateHttpClientWithCookies()
 		{
-			// Исходный JSON (например, полученный от HTTP-сервера)
-			string json = @"
-            {
-                ""id"": 42,
-                ""name"": ""Анна Сидорова"",
-                ""email"": ""anna@example.com""
-            }";
+			Console.WriteLine("\n\n=== HTTPCLIENT С COOKIES НА ПРАКТИКЕ ===\n");
 
-			Console.WriteLine($"   Полученный JSON от HTTP-сервера:");
-			Console.WriteLine($"     {json}");
+			// Имитация сервера, который использует cookies
+			var testServerUri = "http://localhost:5000";
 
-			// Десериализация JSON в объект C#
-			User user = JsonSerializer.Deserialize<User>(json);
+			// Клиент с cookies
+			var handler = new HttpClientHandler
+			{
+				CookieContainer = new CookieContainer(),
+				UseCookies = true
+			};
 
-			Console.WriteLine($"\n   Результат десериализации:");
-			Console.WriteLine($"     Объект в памяти: {user}");
-			Console.WriteLine($"     Тип: {user.GetType().FullName}");
-			Console.WriteLine($"     Проверка бизнес-логики: IsValid = {user.IsValid()}");
-
-			Console.WriteLine($"\n   Анализ преобразования:");
-			Console.WriteLine($"     JSON 'id': 42 → C# user.Id: {user.Id} (тип: {user.Id.GetType().Name})");
-			Console.WriteLine($"     JSON 'name': 'Анна Сидорова' → C# user.Name: '{user.Name}'");
-			Console.WriteLine($"     JSON 'email': 'anna@example.com' → C# user.Email: '{user.Email}'");
-
-			// Демонстрация ошибки десериализации
-			Console.WriteLine($"\n   Тест ошибки десериализации:");
-			string invalidJson = @"{ ""id"": ""not_a_number"", ""name"": ""Test"" }";
+			var httpClient = new HttpClient(handler);
 
 			try
 			{
-				User invalidUser = JsonSerializer.Deserialize<User>(invalidJson);
-				Console.WriteLine($"     Ошибка: десериализация прошла некорректно");
-			}
-			catch (JsonException ex)
-			{
-				Console.WriteLine($"     Ожидаемая ошибка: {ex.Message}");
-				Console.WriteLine($"     JSON не может быть преобразован в объект из-за несоответствия типов");
-			}
-		}
+				Console.WriteLine("1. ПЕРВЫЙ ЗАПРОС (без cookies):");
 
-		private static void DemonstrateSerializationOptions()
-		{
-			var user = new User
-			{
-				Id = 100,
-				Name = "Мария Иванова",
-				Email = "maria@company.com"
-			};
+				// Имитация запроса, который устанавливает cookie
+				var firstRequest = new HttpRequestMessage(HttpMethod.Get, $"{testServerUri}/set-cookie");
+				var firstResponse = await httpClient.SendAsync(firstRequest);
 
-			Console.WriteLine($"   Объект для сериализации: {user}");
+				Console.WriteLine($"   Статус: {firstResponse.StatusCode}");
 
-			// 1. Сериализация по умолчанию
-			string defaultJson = JsonSerializer.Serialize(user);
-			Console.WriteLine($"\n   Сериализация по умолчанию:");
-			Console.WriteLine($"     {defaultJson}");
-			Console.WriteLine($"     Свойства сохраняют оригинальные имена (PascalCase)");
+				// Проверка полученных cookies
+				var cookies = handler.CookieContainer.GetCookies(new Uri(testServerUri));
+				Console.WriteLine($"   Получено cookies: {cookies.Count}");
 
-			// 2. Сериализация с camelCase
-			var camelCaseOptions = new JsonSerializerOptions
-			{
-				PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-				WriteIndented = true
-			};
-
-			string camelCaseJson = JsonSerializer.Serialize(user, camelCaseOptions);
-			Console.WriteLine($"\n   Сериализация с camelCase:");
-			Console.WriteLine($"     {camelCaseJson}");
-			Console.WriteLine($"     Id → id, Name → name, Email → email");
-
-			// 3. Сериализация с игнорированием null значений
-			var userWithNulls = new User
-			{
-				Id = 101,
-				Name = null, // Будет проигнорировано
-				Email = "test@example.com"
-			};
-
-			var ignoreNullOptions = new JsonSerializerOptions
-			{
-				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-				PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-			};
-
-			string ignoreNullJson = JsonSerializer.Serialize(userWithNulls, ignoreNullOptions);
-			Console.WriteLine($"\n   Сериализация с игнорированием null:");
-			Console.WriteLine($"     {ignoreNullJson}");
-			Console.WriteLine($"     Свойство Name=null отсутствует в JSON");
-
-			// 4. Десериализация с учетом стиля именования
-			Console.WriteLine($"\n   Десериализация camelCase JSON:");
-
-			string camelCaseInput = @"{ ""id"": 200, ""name"": ""Тест"", ""email"": ""test@test.com"" }";
-			User camelCaseUser = JsonSerializer.Deserialize<User>(camelCaseInput, camelCaseOptions);
-
-			Console.WriteLine($"     Входной JSON: {camelCaseInput}");
-			Console.WriteLine($"     Десериализованный объект: {camelCaseUser}");
-			Console.WriteLine($"     Важно: при десериализации нужно использовать те же настройки!");
-
-			// 5. Сериализация с конвертером для enum
-			var order = new Order
-			{
-				OrderId = "ORD-001",
-				Status = OrderStatus.Processing
-			};
-
-			var enumOptions = new JsonSerializerOptions
-			{
-				PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-				WriteIndented = true,
-				Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
-			};
-
-			string enumJson = JsonSerializer.Serialize(order, enumOptions);
-			Console.WriteLine($"\n   Сериализация enum как строки:");
-			Console.WriteLine($"     {enumJson}");
-			Console.WriteLine($"     OrderStatus.Processing → 'processing'");
-		}
-
-		private static void DemonstrateNullableValues()
-		{
-			Console.WriteLine($"   Демонстрация работы с nullable значениями:");
-
-			// JSON с отсутствующими полями
-			string partialJson = @"
-            {
-                ""name"": ""Товар без цены"",
-                ""stockQuantity"": 10
-            }";
-
-			Console.WriteLine($"\n   Входной JSON (неполный):");
-			Console.WriteLine($"     {partialJson}");
-			Console.WriteLine($"     Отсутствуют поля: id, description, price, tags");
-
-			// Десериализация
-			Product product = JsonSerializer.Deserialize<Product>(partialJson);
-
-			Console.WriteLine($"\n   Результат десериализации:");
-			Console.WriteLine($"     {product}");
-			Console.WriteLine($"     Id: {product.Id?.ToString() ?? "null"} (не было в JSON → null)");
-			Console.WriteLine($"     Name: '{product.Name}' (было в JSON → значение)");
-			Console.WriteLine($"     Description: '{product.Description ?? "null"}' (не было в JSON → null)");
-			Console.WriteLine($"     Price: {product.Price?.ToString("C") ?? "null"} (не было в JSON → null)");
-			Console.WriteLine($"     StockQuantity: {product.StockQuantity} (было в JSON → значение)");
-			Console.WriteLine($"     Tags: {(product.Tags == null ? "null" : $"List[{product.Tags.Count}]")}");
-
-			// Обратная сериализация
-			Console.WriteLine($"\n   Обратная сериализация (с null значениями):");
-			string serializedBack = JsonSerializer.Serialize(product, new JsonSerializerOptions { WriteIndented = true });
-			Console.WriteLine(serializedBack);
-
-			Console.WriteLine($"\n   Обратная сериализация (без null значений):");
-			var ignoreNullOptions = new JsonSerializerOptions
-			{
-				WriteIndented = true,
-				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-			};
-
-			string serializedWithoutNulls = JsonSerializer.Serialize(product, ignoreNullOptions);
-			Console.WriteLine(serializedWithoutNulls);
-		}
-
-		private static void DemonstrateComplexObjects()
-		{
-			Console.WriteLine($"   Демонстрация сложных объектов с вложенностью:");
-
-			// Создаём сложный объект
-			var order = new Order
-			{
-				OrderId = "ORDER-2024-001",
-				Customer = new User
+				if (cookies.Count > 0)
 				{
-					Id = 1,
-					Name = "Петр Сергеев",
-					Email = "peter@example.com"
-				},
-				Items = new List<OrderItem>
-				{
-					new OrderItem
+					foreach (Cookie cookie in cookies)
 					{
-						ProductId = "P-001",
-						ProductName = "Ноутбук",
-						Quantity = 1,
-						Price = 1500.00m
-					},
-					new OrderItem
-					{
-						ProductId = "P-002",
-						ProductName = "Мышь",
-						Quantity = 2,
-						Price = 25.50m
+						Console.WriteLine($"     - {cookie.Name}: {cookie.Value}");
 					}
-				},
-				TotalAmount = 1551.00m,
-				Status = OrderStatus.Processing,
-				CompletedAt = null
-			};
+				}
 
-			Console.WriteLine($"\n   Сложный объект Order:");
-			Console.WriteLine($"     {order}");
-			Console.WriteLine($"     Вложенный Customer: {order.Customer}");
-			Console.WriteLine($"     Количество Items: {order.Items.Count}");
+				Console.WriteLine("\n2. ВТОРОЙ ЗАПРОС (с cookies):");
 
-			// Сериализация
-			var options = new JsonSerializerOptions
-			{
-				PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-				WriteIndented = true,
-				Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
-			};
+				// Второй запрос уже содержит cookies
+				var secondRequest = new HttpRequestMessage(HttpMethod.Get, $"{testServerUri}/check-cookie");
+				var secondResponse = await httpClient.SendAsync(secondRequest);
 
-			string orderJson = JsonSerializer.Serialize(order, options);
+				Console.WriteLine($"   Статус: {secondResponse.StatusCode}");
 
-			Console.WriteLine($"\n   Сериализованный JSON:");
-			Console.WriteLine(orderJson);
+				// Чтение ответа
+				var responseContent = await secondResponse.Content.ReadAsStringAsync();
+				Console.WriteLine($"   Ответ: {responseContent}");
 
-			Console.WriteLine($"\n   Анализ структуры JSON:");
-			Console.WriteLine($"     Корневой объект: Order");
-			Console.WriteLine($"     Вложенный объект: customer (тип User)");
-			Console.WriteLine($"     Массив: items (список OrderItem)");
-			Console.WriteLine($"     Enum: status (преобразовано в строку)");
-			Console.WriteLine($"     Null значение: completedAt (отсутствует в JSON)");
-
-			// Десериализация обратно
-			Console.WriteLine($"\n   Десериализация обратно в объект:");
-			Order deserializedOrder = JsonSerializer.Deserialize<Order>(orderJson, options);
-
-			Console.WriteLine($"     OrderId совпадает: {order.OrderId == deserializedOrder.OrderId}");
-			Console.WriteLine($"     Customer совпадает: {order.Customer.Name == deserializedOrder.Customer.Name}");
-			Console.WriteLine($"     Items count совпадает: {order.Items.Count == deserializedOrder.Items.Count}");
-			Console.WriteLine($"     TotalAmount совпадает: {order.TotalAmount == deserializedOrder.TotalAmount}");
-		}
-
-		private static void DemonstrateDtoIsolation()
-		{
-			Console.WriteLine($"   Демонстрация DTO и изоляции контрактов:");
-
-			// Внутренняя бизнес-модель
-			var internalUser = new User
-			{
-				Id = 500,
-				Name = "Внутренний Пользователь",
-				Email = "internal@company.com"
-			};
-
-			Console.WriteLine($"\n   Внутренняя бизнес-модель:");
-			Console.WriteLine($"     {internalUser}");
-			Console.WriteLine($"     Свойства: Id, Name, Email");
-			Console.WriteLine($"     Методы: IsValid(), ToString()");
-
-			// Преобразование в DTO для внешнего API
-			UserDto dto = UserDto.FromUser(internalUser);
-
-			Console.WriteLine($"\n   DTO для внешнего API:");
-			Console.WriteLine($"     Свойства: id, full_name, email_address, created_at, is_active");
-			Console.WriteLine($"     Конвертеры: FromUser(), ToUser()");
-
-			// Сериализация DTO
-			string dtoJson = JsonSerializer.Serialize(dto, new JsonSerializerOptions
-			{
-				PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-				WriteIndented = true
-			});
-
-			Console.WriteLine($"\n   Сериализованный DTO (для отправки по HTTP):");
-			Console.WriteLine(dtoJson);
-
-			// Симуляция получения DTO от внешнего API
-			string externalApiResponse = @"
-            {
-                ""id"": 600,
-                ""full_name"": ""Внешний Пользователь"",
-                ""email_address"": ""external@api.com"",
-                ""created_at"": ""2024-01-15T10:30:00Z"",
-                ""is_active"": true
-            }";
-
-			Console.WriteLine($"\n   Получен ответ от внешнего API:");
-			Console.WriteLine(externalApiResponse);
-
-			// Десериализация DTO
-			UserDto receivedDto = JsonSerializer.Deserialize<UserDto>(externalApiResponse);
-
-			// Преобразование DTO во внутреннюю модель
-			User externalUser = receivedDto.ToUser();
-
-			Console.WriteLine($"\n   Преобразование во внутреннюю модель:");
-			Console.WriteLine($"     {externalUser}");
-
-			Console.WriteLine($"\n   Преимущества DTO подхода:");
-			Console.WriteLine($"     1. Изоляция: изменение API не затрагивает бизнес-логику");
-			Console.WriteLine($"     2. Адаптация: разные форматы для разных API");
-			Console.WriteLine($"     3. Безопасность: скрытие внутренней структуры");
-			Console.WriteLine($"     4. Стабильность: внутренняя модель может эволюционировать независимо");
-		}
-
-		private static void DemonstrateHttpClientIntegration()
-		{
-			Console.WriteLine($"   Интеграция сериализации с HttpClient:");
-
-			// Симуляция HTTP-запроса
-			Console.WriteLine($"\n   1. ПОДГОТОВКА ДАННЫХ ДЛЯ ОТПРАВКИ:");
-
-			var newUser = new User
-			{
-				Name = "Новый Пользователь",
-				Email = "new@example.com"
-			};
-
-			Console.WriteLine($"     Создан объект: {newUser}");
-
-			// Сериализация
-			string requestJson = JsonSerializer.Serialize(newUser, new JsonSerializerOptions
-			{
-				PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-			});
-
-			Console.WriteLine($"     Сериализован в JSON: {requestJson}");
-
-			// Создание HTTP-контента
-			var content = new StringContent(
-				requestJson,
-				Encoding.UTF8,
-				"application/json"
-			);
-
-			Console.WriteLine($"\n     HTTP Content создан:");
-			Console.WriteLine($"       Тип: StringContent");
-			Console.WriteLine($"       Кодировка: UTF-8");
-			Console.WriteLine($"       Content-Type: application/json");
-			Console.WriteLine($"       Длина: {requestJson.Length} символов");
-
-			Console.WriteLine($"\n   2. ОТПРАВКА HTTP-ЗАПРОСА (симуляция):");
-			Console.WriteLine($"     Метод: POST");
-			Console.WriteLine($"     URL: https://api.example.com/users");
-			Console.WriteLine($"     Тело запроса: application/json");
-			Console.WriteLine($"     Данные переданы в сеть в виде байтов");
-
-			Console.WriteLine($"\n   3. ОБРАБОТКА HTTP-ОТВЕТА (симуляция):");
-
-			// Симуляция ответа от сервера
-			string simulatedResponse = @"
-            {
-                ""id"": 999,
-                ""name"": ""Новый Пользователь"",
-                ""email"": ""new@example.com"",
-                ""createdAt"": ""2024-01-15T12:00:00Z""
-            }";
-
-			Console.WriteLine($"     Получен ответ от сервера:");
-			Console.WriteLine($"       Status Code: 201 Created");
-			Console.WriteLine($"       Content-Type: application/json");
-			Console.WriteLine($"       Длина тела: {simulatedResponse.Length} символов");
-			Console.WriteLine($"       Тело ответа: {simulatedResponse}");
-
-			// Чтение тела ответа
-			Console.WriteLine($"\n     Чтение тела ответа как строки...");
-			string responseJson = simulatedResponse; // В реальности: await response.Content.ReadAsStringAsync();
-
-			// Десериализация
-			Console.WriteLine($"\n   4. ДЕСЕРИАЛИЗАЦИЯ ОТВЕТА:");
-
-			var responseOptions = new JsonSerializerOptions
-			{
-				PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-			};
-
-			User createdUser = JsonSerializer.Deserialize<User>(responseJson, responseOptions);
-
-			Console.WriteLine($"     Десериализованный объект: {createdUser}");
-			Console.WriteLine($"     Проверка бизнес-логики: IsValid = {createdUser.IsValid()}");
-
-			Console.WriteLine($"\n   5. ОБРАБОТКА ОШИБОК СЕРИАЛИЗАЦИИ:");
-
-			// Симуляция ошибки
-			string errorResponse = @"Невалидный JSON";
-
-			try
-			{
-				User errorUser = JsonSerializer.Deserialize<User>(errorResponse);
-				Console.WriteLine($"     Ошибка: десериализация прошла некорректно");
-			}
-			catch (JsonException ex)
-			{
-				Console.WriteLine($"     Обработана ошибка десериализации:");
-				Console.WriteLine($"       Тип: {ex.GetType().Name}");
-				Console.WriteLine($"       Сообщение: {ex.Message}");
-				Console.WriteLine($"       В реальном приложении: логирование и fallback");
-			}
-
-			Console.WriteLine($"\n   РЕКОМЕНДАЦИИ ПО ИНТЕГРАЦИИ:");
-			Console.WriteLine($"     1. Всегда указывайте Content-Type: application/json");
-			Console.WriteLine($"     2. Используйте одинаковые настройки сериализации на клиенте и сервере");
-			Console.WriteLine($"     3. Обрабатывайте ошибки десериализации");
-			Console.WriteLine($"     4. Логируйте отправляемые и получаемые данные для отладки");
-			Console.WriteLine($"     5. Используйте DTO для изоляции контрактов API");
-		}
-	}
-
-	// Демонстрационный HTTP-клиент с сериализацией
-	public class JsonHttpClientDemo : IDisposable
-	{
-		private readonly HttpClient _httpClient;
-		private readonly JsonSerializerOptions _jsonOptions;
-		private bool _disposed;
-
-		public JsonHttpClientDemo()
-		{
-			_httpClient = new HttpClient();
-			_httpClient.BaseAddress = new Uri("https://jsonplaceholder.typicode.com/");
-
-			_jsonOptions = new JsonSerializerOptions
-			{
-				PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-				PropertyNameCaseInsensitive = true,
-				WriteIndented = false
-			};
-		}
-
-		public async Task DemonstrateRealHttpCalls()
-		{
-			Console.WriteLine("\n=== РЕАЛЬНЫЕ HTTP-ВЫЗОВЫ С СЕРИАЛИЗАЦИЕЙ ===\n");
-
-			try
-			{
-				Console.WriteLine("1. GET-запрос с десериализацией:");
-				await DemonstrateGetRequest();
-
-				Console.WriteLine("\n2. POST-запрос с сериализацией:");
-				await DemonstratePostRequest();
-
-				Console.WriteLine("\n3. PUT-запрос с полным циклом:");
-				await DemonstratePutRequest();
 			}
 			catch (HttpRequestException ex)
 			{
-				Console.WriteLine($"   Ошибка HTTP: {ex.Message}");
+				Console.WriteLine($"   Ошибка: {ex.Message}");
+				Console.WriteLine($"   (Имитация - сервер не запущен)");
 			}
-			catch (JsonException ex)
+		}
+	}
+
+	// Демонстрация сессий (серверная сторона)
+	public class SessionDemonstration
+	{
+		// Имитация хранилища сессий на сервере
+		private static Dictionary<string, UserSession> _sessionStore = new Dictionary<string, UserSession>();
+
+		public class UserSession
+		{
+			public string SessionId { get; set; }
+			public string UserId { get; set; }
+			public UserProfile UserProfile { get; set; }
+			public DateTime CreatedAt { get; set; }
+			public DateTime LastAccessed { get; set; }
+			public Dictionary<string, object> SessionData { get; set; } = new Dictionary<string, object>();
+
+			public bool IsExpired(int timeoutMinutes = 30)
 			{
-				Console.WriteLine($"   Ошибка сериализации: {ex.Message}");
+				return (DateTime.Now - LastAccessed).TotalMinutes > timeoutMinutes;
 			}
 		}
 
-		private async Task DemonstrateGetRequest()
+		public static void DemonstrateSessionManagement()
 		{
-			Console.WriteLine($"   Отправка GET /posts/1");
+			Console.WriteLine("\n\n=== СЕССИИ НА СЕРВЕРЕ ===\n");
 
-			// Отправка запроса
-			HttpResponseMessage response = await _httpClient.GetAsync("posts/1");
-			response.EnsureSuccessStatusCode();
+			// 1. Создание сессии (имитация обработки входа пользователя)
+			Console.WriteLine("1. СОЗДАНИЕ СЕССИИ:");
 
-			Console.WriteLine($"   Ответ получен: {response.StatusCode}");
-
-			// Чтение и десериализация
-			string json = await response.Content.ReadAsStringAsync();
-			Console.WriteLine($"   Тело ответа (сырой JSON): {json.Substring(0, Math.Min(100, json.Length))}...");
-
-			// Десериализация в динамический объект для демонстрации
-			var post = JsonSerializer.Deserialize<Dictionary<string, object>>(json, _jsonOptions);
-
-			Console.WriteLine($"\n   Десериализованные данные:");
-			Console.WriteLine($"     ID: {post["id"]}");
-			Console.WriteLine($"     Title: {post["title"]}");
-			Console.WriteLine($"     Body: {post["body"]?.ToString()?.Substring(0, 50)}...");
-		}
-
-		private async Task DemonstratePostRequest()
-		{
-			Console.WriteLine($"   Подготовка данных для POST /posts");
-
-			// Создание объекта для отправки
-			var newPost = new
+			var credentials = new UserCredentials
 			{
-				title = "Новый пост",
-				body = "Содержание нового поста",
-				userId = 1
+				Username = "john_doe",
+				Password = "secure_password"
 			};
 
-			Console.WriteLine($"   Объект C#: {{ title: '{newPost.title}', userId: {newPost.userId} }}");
+			// Проверка учётных данных (имитация)
+			if (AuthenticateUser(credentials))
+			{
+				var sessionId = GenerateSessionId();
+				var userProfile = GetUserProfile(credentials.Username);
 
-			// Сериализация
-			string json = JsonSerializer.Serialize(newPost, _jsonOptions);
-			Console.WriteLine($"   Сериализованный JSON: {json}");
+				var session = new UserSession
+				{
+					SessionId = sessionId,
+					UserId = "user_123",
+					UserProfile = userProfile,
+					CreatedAt = DateTime.Now,
+					LastAccessed = DateTime.Now,
+					SessionData = new Dictionary<string, object>
+					{
+						["cart_items"] = new List<string> { "item1", "item2" },
+						["preferences"] = new { theme = "dark", language = "ru" }
+					}
+				};
 
-			// Создание HTTP-контента
-			var content = new StringContent(json, Encoding.UTF8, "application/json");
+				// Сохранение сессии в хранилище
+				_sessionStore[sessionId] = session;
 
-			// Отправка запроса
-			Console.WriteLine($"\n   Отправка POST /posts");
-			HttpResponseMessage response = await _httpClient.PostAsync("posts", content);
-			response.EnsureSuccessStatusCode();
+				Console.WriteLine($"   Сессия создана:");
+				Console.WriteLine($"     SessionId: {session.SessionId}");
+				Console.WriteLine($"     UserId: {session.UserId}");
+				Console.WriteLine($"     Username: {session.UserProfile.Username}");
+				Console.WriteLine($"     CreatedAt: {session.CreatedAt}");
+				Console.WriteLine($"     SessionData: {session.SessionData.Count} элементов");
 
-			Console.WriteLine($"   Ответ: {response.StatusCode}");
+				// 2. Получение сессии по идентификатору
+				Console.WriteLine("\n2. ПОЛУЧЕНИЕ СЕССИИ ПО ID:");
 
-			// Обработка ответа
-			string responseJson = await response.Content.ReadAsStringAsync();
-			var createdPost = JsonSerializer.Deserialize<Dictionary<string, object>>(responseJson, _jsonOptions);
+				if (_sessionStore.TryGetValue(sessionId, out var retrievedSession))
+				{
+					Console.WriteLine($"   Сессия найдена:");
+					Console.WriteLine($"     User: {retrievedSession.UserProfile.Username}");
+					Console.WriteLine($"     Email: {retrievedSession.UserProfile.Email}");
+					Console.WriteLine($"     Roles: {string.Join(", ", retrievedSession.UserProfile.Roles)}");
 
-			Console.WriteLine($"\n   Созданный пост (с сервера):");
-			Console.WriteLine($"     ID: {createdPost["id"]}");
-			Console.WriteLine($"     Title: {createdPost["title"]}");
+					// Обновление времени доступа
+					retrievedSession.LastAccessed = DateTime.Now;
+					Console.WriteLine($"     LastAccessed обновлено: {retrievedSession.LastAccessed}");
+				}
+
+				// 3. Проверка истечения сессии
+				Console.WriteLine("\n3. ПРОВЕРКА ИСТЕЧЕНИЯ СЕССИИ:");
+
+				// Симуляция просроченной сессии
+				var expiredSession = new UserSession
+				{
+					SessionId = "expired_session",
+					UserId = "user_456",
+					CreatedAt = DateTime.Now.AddHours(-2),
+					LastAccessed = DateTime.Now.AddHours(-1)
+				};
+
+				Console.WriteLine($"   Новая сессия истекла: {expiredSession.IsExpired(30)}");
+				Console.WriteLine($"   Активная сессия истекла: {session.IsExpired(30)}");
+
+				// 4. Удаление сессии (имитация выхода)
+				Console.WriteLine("\n4. УДАЛЕНИЕ СЕССИИ (ВЫХОД):");
+
+				_sessionStore.Remove(sessionId);
+				Console.WriteLine($"   Сессия удалена из хранилища");
+				Console.WriteLine($"   Осталось сессий: {_sessionStore.Count}");
+
+				// 5. Очистка просроченных сессий
+				Console.WriteLine("\n5. ОЧИСТКА ПРОСРОЧЕННЫХ СЕССИЙ:");
+
+				var expiredSessions = _sessionStore
+					.Where(kv => kv.Value.IsExpired())
+					.Select(kv => kv.Key)
+					.ToList();
+
+				foreach (var expiredId in expiredSessions)
+				{
+					_sessionStore.Remove(expiredId);
+				}
+
+				Console.WriteLine($"   Удалено просроченных сессий: {expiredSessions.Count}");
+				Console.WriteLine($"   Всего активных сессий: {_sessionStore.Count}");
+			}
 		}
 
-		private async Task DemonstratePutRequest()
+		private static bool AuthenticateUser(UserCredentials credentials)
 		{
-			Console.WriteLine($"   Полный цикл: GET → модификация → PUT");
+			// Имитация проверки учётных данных
+			return credentials.Username == "john_doe" && credentials.Password == "secure_password";
+		}
 
-			// 1. Получение существующих данных
-			HttpResponseMessage getResponse = await _httpClient.GetAsync("posts/1");
-			string originalJson = await getResponse.Content.ReadAsStringAsync();
-			var originalPost = JsonSerializer.Deserialize<Dictionary<string, object>>(originalJson, _jsonOptions);
+		private static string GenerateSessionId()
+		{
+			// Генерация уникального идентификатора сессии
+			return Guid.NewGuid().ToString("N");
+		}
 
-			Console.WriteLine($"\n   Исходный пост:");
-			Console.WriteLine($"     Title: {originalPost["title"]}");
+		private static UserProfile GetUserProfile(string username)
+		{
+			return new UserProfile
+			{
+				Username = username,
+				Email = "john@example.com",
+				Roles = new[] { "user", "premium" },
+				CreatedAt = DateTime.Now.AddMonths(-6)
+			};
+		}
+	}
 
-			// 2. Модификация данных
-			originalPost["title"] = "Обновленный заголовок";
-			originalPost["body"] = "Обновленное содержание";
+	// Демонстрация авторизации с токенами
+	public class TokenAuthDemonstration
+	{
+		public static void DemonstrateTokenBasedAuth()
+		{
+			Console.WriteLine("\n\n=== АВТОРИЗАЦИЯ НА ОСНОВЕ ТОКЕНОВ ===\n");
 
-			// 3. Сериализация модифицированных данных
-			string updatedJson = JsonSerializer.Serialize(originalPost, _jsonOptions);
+			// 1. Процесс аутентификации и получения токена
+			Console.WriteLine("1. АУТЕНТИФИКАЦИЯ И ПОЛУЧЕНИЕ ТОКЕНА:");
 
-			// 4. Отправка PUT-запроса
-			var content = new StringContent(updatedJson, Encoding.UTF8, "application/json");
-			HttpResponseMessage putResponse = await _httpClient.PutAsync("posts/1", content);
+			var credentials = new UserCredentials
+			{
+				Username = "alice",
+				Password = "secret123"
+			};
 
-			Console.WriteLine($"\n   PUT-запрос отправлен: {putResponse.StatusCode}");
+			// Имитация запроса на получение токена
+			var token = AuthenticateAndGetToken(credentials);
 
-			// 5. Проверка результата
-			string finalJson = await putResponse.Content.ReadAsStringAsync();
-			var finalPost = JsonSerializer.Deserialize<Dictionary<string, object>>(finalJson, _jsonOptions);
+			if (token != null)
+			{
+				Console.WriteLine($"   Токен получен:");
+				Console.WriteLine($"     AccessToken: {token.AccessToken.Substring(0, 20)}...");
+				Console.WriteLine($"     TokenType: {token.TokenType}");
+				Console.WriteLine($"     ExpiresAt: {token.ExpiresAt}");
+				Console.WriteLine($"     RefreshToken: {token.RefreshToken.Substring(0, 20)}...");
+			}
 
-			Console.WriteLine($"\n   Обновленный пост:");
-			Console.WriteLine($"     Title: {finalPost["title"]}");
-			Console.WriteLine($"     Проверка: заголовок обновлен = {finalPost["title"] == "Обновленный заголовок"}");
+			// 2. Использование токена для доступа к защищённому ресурсу
+			Console.WriteLine("\n2. ИСПОЛЬЗОВАНИЕ ТОКЕНА В ЗАПРОСАХ:");
+
+			if (token != null)
+			{
+				Console.WriteLine($"   Формирование запроса с токеном:");
+				Console.WriteLine($"     Заголовок: Authorization: {token.TokenType} {token.AccessToken}");
+
+				// Имитация проверки токена на сервере
+				var isValid = ValidateToken(token.AccessToken);
+				Console.WriteLine($"     Токен валиден: {isValid}");
+
+				if (isValid)
+				{
+					var userInfo = ExtractUserInfoFromToken(token.AccessToken);
+					Console.WriteLine($"     Пользователь: {userInfo.Username}");
+					Console.WriteLine($"     Роли: {string.Join(", ", userInfo.Roles)}");
+				}
+			}
+
+			// 3. Обновление токена
+			Console.WriteLine("\n3. ОБНОВЛЕНИЕ ТОКЕНА:");
+
+			if (token != null && token.ExpiresAt < DateTime.Now.AddMinutes(5))
+			{
+				var newToken = RefreshToken(token.RefreshToken);
+				Console.WriteLine($"   Токен обновлён:");
+				Console.WriteLine($"     Новый AccessToken: {newToken.AccessToken.Substring(0, 20)}...");
+				Console.WriteLine($"     Новый ExpiresAt: {newToken.ExpiresAt}");
+			}
+
+			// 4. Сравнение с cookie-based авторизацией
+			Console.WriteLine("\n4. СРАВНЕНИЕ С COOKIE-BASED АВТОРИЗАЦИЕЙ:");
+
+			Console.WriteLine("   Cookie-based:");
+			Console.WriteLine($"     • Состояние хранится на сервере");
+			Console.WriteLine($"     • Идентификатор передаётся в cookie");
+			Console.WriteLine($"     • Автоматическая отправка браузером");
+			Console.WriteLine($"     • Уязвимо к CSRF (требует защиты)");
+
+			Console.WriteLine("\n   Token-based:");
+			Console.WriteLine($"     • Состояние в токене (stateless сервер)");
+			Console.WriteLine($"     • Токен передаётся в заголовке Authorization");
+			Console.WriteLine($"     • Явная отправка клиентом");
+			Console.WriteLine($"     • Защищено от CSRF");
+			Console.WriteLine($"     • Легче масштабируется");
+		}
+
+		private static AuthToken AuthenticateAndGetToken(UserCredentials credentials)
+		{
+			// Имитация аутентификации и выдачи токена
+			if (credentials.Username == "alice" && credentials.Password == "secret123")
+			{
+				return new AuthToken
+				{
+					AccessToken = GenerateJwtToken(credentials.Username),
+					RefreshToken = Guid.NewGuid().ToString("N"),
+					ExpiresAt = DateTime.Now.AddHours(1),
+					TokenType = "Bearer"
+				};
+			}
+
+			return null;
+		}
+
+		private static string GenerateJwtToken(string username)
+		{
+			// Имитация JWT токена
+			var header = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+			var payload = $"{{\"sub\":\"{username}\",\"roles\":[\"user\",\"admin\"],\"exp\":{DateTimeOffset.Now.AddHours(1).ToUnixTimeSeconds()}}}";
+
+			var headerBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(header));
+			var payloadBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(payload));
+
+			return $"{headerBase64}.{payloadBase64}.signature";
+		}
+
+		private static bool ValidateToken(string token)
+		{
+			// Имитация проверки токена
+			return !string.IsNullOrEmpty(token) && token.Contains(".");
+		}
+
+		private static UserProfile ExtractUserInfoFromToken(string token)
+		{
+			// Имитация извлечения информации из токена
+			return new UserProfile
+			{
+				Username = "alice",
+				Email = "alice@example.com",
+				Roles = new[] { "user", "admin" },
+				CreatedAt = DateTime.Now.AddYears(-1)
+			};
+		}
+
+		private static AuthToken RefreshToken(string refreshToken)
+		{
+			// Имитация обновления токена
+			return new AuthToken
+			{
+				AccessToken = GenerateJwtToken("alice"),
+				RefreshToken = Guid.NewGuid().ToString("N"),
+				ExpiresAt = DateTime.Now.AddHours(1),
+				TokenType = "Bearer"
+			};
+		}
+	}
+
+	// Практический пример: клиент с полным циклом авторизации
+	public class AuthHttpClient : IDisposable
+	{
+		private readonly HttpClient _httpClient;
+		private readonly CookieContainer _cookieContainer;
+		private AuthToken _currentToken;
+		private string _baseUrl;
+
+		public bool IsAuthenticated => _currentToken != null && _currentToken.ExpiresAt > DateTime.Now;
+
+		public AuthHttpClient(string baseUrl)
+		{
+			_baseUrl = baseUrl;
+			_cookieContainer = new CookieContainer();
+
+			var handler = new HttpClientHandler
+			{
+				CookieContainer = _cookieContainer,
+				UseCookies = true
+			};
+
+			_httpClient = new HttpClient(handler);
+			_httpClient.BaseAddress = new Uri(baseUrl);
+			_httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("AuthDemoClient/1.0");
+		}
+
+		public async Task<bool> LoginAsync(string username, string password)
+		{
+			Console.WriteLine($"\n[AuthHttpClient] Попытка входа пользователя: {username}");
+
+			// Вариант 1: Cookie-based аутентификация
+			var loginData = new UserCredentials
+			{
+				Username = username,
+				Password = password
+			};
+
+			var json = JsonSerializer.Serialize(loginData);
+			var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+			try
+			{
+				// Запрос на вход
+				var response = await _httpClient.PostAsync("/api/auth/login", content);
+
+				if (response.IsSuccessStatusCode)
+				{
+					// Проверка полученных cookies
+					var cookies = _cookieContainer.GetCookies(new Uri(_baseUrl));
+					Console.WriteLine($"[AuthHttpClient] Получено cookies: {cookies.Count}");
+
+					if (cookies.Count > 0)
+					{
+						Console.WriteLine($"[AuthHttpClient] Аутентификация через cookies успешна");
+						return true;
+					}
+				}
+
+				// Вариант 2: Token-based аутентификация
+				var tokenResponse = await _httpClient.PostAsync("/api/auth/token", content);
+
+				if (tokenResponse.IsSuccessStatusCode)
+				{
+					var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
+					_currentToken = JsonSerializer.Deserialize<AuthToken>(tokenJson);
+
+					// Установка токена в заголовки
+					_httpClient.DefaultRequestHeaders.Authorization =
+						new System.Net.Http.Headers.AuthenticationHeaderValue(
+							_currentToken.TokenType,
+							_currentToken.AccessToken);
+
+					Console.WriteLine($"[AuthHttpClient] Токен получен, истекает: {_currentToken.ExpiresAt}");
+					return true;
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[AuthHttpClient] Ошибка входа: {ex.Message}");
+			}
+
+			return false;
+		}
+
+		public async Task<UserProfile> GetProfileAsync()
+		{
+			Console.WriteLine($"\n[AuthHttpClient] Запрос профиля пользователя");
+
+			try
+			{
+				var response = await _httpClient.GetAsync("/api/user/profile");
+
+				if (response.IsSuccessStatusCode)
+				{
+					var json = await response.Content.ReadAsStringAsync();
+					var profile = JsonSerializer.Deserialize<UserProfile>(json);
+
+					Console.WriteLine($"[AuthHttpClient] Профиль получен: {profile.Username}");
+					return profile;
+				}
+				else if (response.StatusCode == HttpStatusCode.Unauthorized)
+				{
+					Console.WriteLine($"[AuthHttpClient] Доступ запрещён (401 Unauthorized)");
+
+					// Попытка обновить токен, если он есть
+					if (_currentToken != null && await RefreshTokenAsync())
+					{
+						// Повторный запрос после обновления токена
+						return await GetProfileAsync();
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[AuthHttpClient] Ошибка получения профиля: {ex.Message}");
+			}
+
+			return null;
+		}
+
+		public async Task<bool> LogoutAsync()
+		{
+			Console.WriteLine($"\n[AuthHttpClient] Выход из системы");
+
+			try
+			{
+				var response = await _httpClient.PostAsync("/api/auth/logout", null);
+
+				if (response.IsSuccessStatusCode)
+				{
+					// Очистка локальных данных
+					_currentToken = null;
+					_httpClient.DefaultRequestHeaders.Authorization = null;
+					_cookieContainer.GetCookies(new Uri(_baseUrl)).Clear();
+
+					Console.WriteLine($"[AuthHttpClient] Выход выполнен успешно");
+					return true;
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[AuthHttpClient] Ошибка выхода: {ex.Message}");
+			}
+
+			return false;
+		}
+
+		private async Task<bool> RefreshTokenAsync()
+		{
+			if (_currentToken == null || string.IsNullOrEmpty(_currentToken.RefreshToken))
+				return false;
+
+			Console.WriteLine($"[AuthHttpClient] Попытка обновления токена");
+
+			try
+			{
+				var refreshData = new { refreshToken = _currentToken.RefreshToken };
+				var json = JsonSerializer.Serialize(refreshData);
+				var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+				var response = await _httpClient.PostAsync("/api/auth/refresh", content);
+
+				if (response.IsSuccessStatusCode)
+				{
+					var tokenJson = await response.Content.ReadAsStringAsync();
+					_currentToken = JsonSerializer.Deserialize<AuthToken>(tokenJson);
+
+					// Обновление заголовка авторизации
+					_httpClient.DefaultRequestHeaders.Authorization =
+						new System.Net.Http.Headers.AuthenticationHeaderValue(
+							_currentToken.TokenType,
+							_currentToken.AccessToken);
+
+					Console.WriteLine($"[AuthHttpClient] Токен обновлён, новый срок: {_currentToken.ExpiresAt}");
+					return true;
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[AuthHttpClient] Ошибка обновления токена: {ex.Message}");
+			}
+
+			return false;
+		}
+
+		public void PrintAuthStatus()
+		{
+			Console.WriteLine($"\n[AuthHttpClient] Статус аутентификации:");
+			Console.WriteLine($"   IsAuthenticated: {IsAuthenticated}");
+
+			if (_currentToken != null)
+			{
+				Console.WriteLine($"   Token-based: Да");
+				Console.WriteLine($"   Token expires: {_currentToken.ExpiresAt}");
+				Console.WriteLine($"   Time to expire: {(_currentToken.ExpiresAt - DateTime.Now).TotalMinutes:F0} минут");
+			}
+
+			var cookies = _cookieContainer.GetCookies(new Uri(_baseUrl));
+			Console.WriteLine($"   Cookies: {cookies.Count}");
+
+			foreach (Cookie cookie in cookies)
+			{
+				Console.WriteLine($"     - {cookie.Name}: {cookie.Value} (HttpOnly: {cookie.HttpOnly})");
+			}
 		}
 
 		public void Dispose()
 		{
-			if (_disposed)
-			{
-				return;
-			}
-
-			_httpClient.Dispose();
-			_disposed = true;
-			GC.SuppressFinalize(this);
+			_httpClient?.Dispose();
 		}
 	}
 
@@ -737,16 +688,43 @@ namespace HttpSerializationDemo
 	{
 		static async Task Main(string[] args)
 		{
-			Console.WriteLine("СЕРИАЛИЗАЦИЯ И ДЕСЕРИАЛИЗАЦИЯ В HTTP-КЛИЕНТЕ");
-			Console.WriteLine("=============================================\n");
+			Console.WriteLine("COOKIES, СЕССИИ И АВТОРИЗАЦИЯ В HTTP");
+			Console.WriteLine("=====================================\n");
 
-			// Базовая демонстрация
-			SerializationDemonstration.RunBasicDemo();
+			// 1. Демонстрация cookies
+			CookieDemonstration.DemonstrateCookieMechanism();
+			await CookieDemonstration.DemonstrateHttpClientWithCookies();
 
-			// Демонстрация реальных HTTP-вызовов
-			using (var httpDemo = new JsonHttpClientDemo())
+			// 2. Демонстрация сессий
+			SessionDemonstration.DemonstrateSessionManagement();
+
+			// 3. Демонстрация токенной авторизации
+			TokenAuthDemonstration.DemonstrateTokenBasedAuth();
+
+			// 4. Практический пример клиента
+			Console.WriteLine("\n\n=== ПРАКТИЧЕСКИЙ ПРИМЕР HTTP КЛИЕНТА ===\n");
+
+			using (var authClient = new AuthHttpClient("https://api.example.com"))
 			{
-				await httpDemo.DemonstrateRealHttpCalls();
+				// Симуляция различных сценариев
+				Console.WriteLine("Сценарий 1: Попытка доступа без аутентификации");
+				var profile = await authClient.GetProfileAsync();
+				authClient.PrintAuthStatus();
+
+				Console.WriteLine("\nСценарий 2: Аутентификация пользователя");
+				var loggedIn = await authClient.LoginAsync("john_doe", "password123");
+				Console.WriteLine($"Login successful: {loggedIn}");
+				authClient.PrintAuthStatus();
+
+				if (loggedIn)
+				{
+					Console.WriteLine("\nСценарий 3: Доступ к защищённому ресурсу");
+					profile = await authClient.GetProfileAsync();
+
+					Console.WriteLine("\nСценарий 4: Выход из системы");
+					await authClient.LogoutAsync();
+					authClient.PrintAuthStatus();
+				}
 			}
 		}
 	}
