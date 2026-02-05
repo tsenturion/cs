@@ -1,564 +1,530 @@
 ﻿using System;
 using System.Net;
-using System.Net.Http;
+using System.Net.Sockets;
 using System.Net.Security;
-using System.Security.Authentication;
-using System.Security.Cryptography.X509Certificates;
+using System.Net.Mail;
 using System.Text;
+using System.Threading;
+using System.IO;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
-using System.Diagnostics;
 
-namespace HttpsClientImplementation
+namespace SmtpFundamentals
 {
-	public class HttpsClientDemonstration : IDisposable
+	// Низкоуровневая демонстрация SMTP протокола
+	public class RawSmtpClient : IDisposable
 	{
-		private HttpClient _httpClient;
-		private HttpClientHandler _httpClientHandler;
+		private TcpClient _tcpClient;
+		private NetworkStream _networkStream;
+		private SslStream _sslStream;
+		private StreamReader _reader;
+		private StreamWriter _writer;
+		private bool _useSsl;
+		private string _smtpServer;
+		private int _smtpPort;
 
-		public HttpsClientDemonstration()
+		// Константы SMTP
+		private const int DEFAULT_SMTP_PORT = 25;
+		private const int SSL_SMTP_PORT = 465;
+		private const int SUBMISSION_PORT = 587;
+
+		// Коды ответов SMTP
+		public class SmtpResponse
 		{
-			InitializeHttpClient();
+			public int Code { get; set; }
+			public string Message { get; set; }
+			public bool IsSuccess => Code >= 200 && Code < 400;
+			public bool IsError => Code >= 400;
+
+			public override string ToString() => $"{Code} {Message}";
 		}
 
-		private void InitializeHttpClient()
+		public RawSmtpClient(string smtpServer, int port = 587)
 		{
-			Console.WriteLine("=== ИНИЦИАЛИЗАЦИЯ HTTPS-CLIENT ===\n");
-
-			// Создание обработчика HTTP с настройками для HTTPS
-			_httpClientHandler = new HttpClientHandler
-			{
-				// Автоматическая проверка сертификатов (по умолчанию включена)
-				ServerCertificateCustomValidationCallback = null,
-
-				// Настройки TLS
-				SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
-
-				// Максимальное количество подключений
-				MaxConnectionsPerServer = 10,
-
-				// Использование Keep-Alive (важно для HTTPS)
-				UseProxy = false,
-				UseCookies = false,
-
-				// Автоматическое перенаправление
-				AllowAutoRedirect = true,
-				MaxAutomaticRedirections = 5
-			};
-
-			Console.WriteLine($"  Создан HttpClientHandler:");
-			Console.WriteLine($"    SslProtocols: {_httpClientHandler.SslProtocols}");
-			Console.WriteLine($"    MaxConnectionsPerServer: {_httpClientHandler.MaxConnectionsPerServer}");
-			Console.WriteLine($"    ServerCertificateCustomValidationCallback: {(_httpClientHandler.ServerCertificateCustomValidationCallback == null ? "стандартная" : "кастомная")}");
-
-			// Создание HttpClient с настройками для HTTPS
-			_httpClient = new HttpClient(_httpClientHandler)
-			{
-				Timeout = TimeSpan.FromSeconds(30),
-
-				// Базовый адрес для переиспользования соединений
-				BaseAddress = new Uri("https://httpbin.org/")
-			};
-
-			// Настройка заголовков по умолчанию
-			_httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("MyHttpsClient/1.0");
-			_httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-
-			Console.WriteLine($"\n  Создан HttpClient:");
-			Console.WriteLine($"    BaseAddress: {_httpClient.BaseAddress}");
-			Console.WriteLine($"    Timeout: {_httpClient.Timeout.TotalSeconds} сек");
-			Console.WriteLine($"    User-Agent: {_httpClient.DefaultRequestHeaders.UserAgent}");
+			_smtpServer = smtpServer ?? throw new ArgumentNullException(nameof(smtpServer));
+			_smtpPort = port;
+			_useSsl = port == SSL_SMTP_PORT;
 		}
 
-		public async Task DemonstrateHttpsRequest()
+		// Подключение к SMTP серверу
+		public async Task<SmtpResponse> ConnectAsync()
 		{
-			Console.WriteLine("\n=== ВЫПОЛНЕНИЕ HTTPS-ЗАПРОСА ===\n");
+			Console.WriteLine($"[SMTP] Установка TCP-соединения с {_smtpServer}:{_smtpPort}");
 
-			string url = "https://httpbin.org/get";
+			_tcpClient = new TcpClient();
+			await _tcpClient.ConnectAsync(_smtpServer, _smtpPort);
 
-			Console.WriteLine($"  Отправка GET запроса: {url}");
-			Console.WriteLine($"  Используется схема: {new Uri(url).Scheme}");
+			_networkStream = _tcpClient.GetStream();
 
-			Stopwatch stopwatch = Stopwatch.StartNew();
-
-			try
+			if (_useSsl)
 			{
-				// Отправка HTTPS-запроса
-				HttpResponseMessage response = await _httpClient.GetAsync(url);
+				Console.WriteLine($"[SMTP] Установка SSL-соединения");
+				_sslStream = new SslStream(_networkStream, false, ValidateServerCertificate);
+				await _sslStream.AuthenticateAsClientAsync(_smtpServer);
 
-				stopwatch.Stop();
-
-				Console.WriteLine($"\n  Ответ получен за {stopwatch.ElapsedMilliseconds} мс");
-				Console.WriteLine($"  Status Code: {(int)response.StatusCode} {response.StatusCode}");
-				Console.WriteLine($"  IsSuccessStatusCode: {response.IsSuccessStatusCode}");
-
-				// Проверка, был ли запрос отправлен через HTTPS
-				Console.WriteLine($"  RequestMessage.RequestUri: {response.RequestMessage.RequestUri}");
-				Console.WriteLine($"  RequestMessage.Version: {response.RequestMessage.Version}");
-
-				// Проверка заголовков безопасности
-				Console.WriteLine($"\n  Заголовки ответа:");
-				foreach (var header in response.Headers)
-				{
-					if (header.Key.StartsWith("Strict-Transport-Security") ||
-						header.Key.StartsWith("Content-Security") ||
-						header.Key.StartsWith("X-Content-Type"))
-					{
-						Console.WriteLine($"    {header.Key}: {string.Join(", ", header.Value)}");
-					}
-				}
-
-				// Чтение тела ответа
-				if (response.IsSuccessStatusCode)
-				{
-					string responseBody = await response.Content.ReadAsStringAsync();
-					Console.WriteLine($"\n  Тело ответа (первые 500 символов):");
-					Console.WriteLine($"    {responseBody.Substring(0, Math.Min(500, responseBody.Length))}...");
-				}
-
-				// Анализ информации о подключении
-				Console.WriteLine($"\n  Информация о подключении:");
-				Console.WriteLine($"    Headers count: {response.Headers.Count()}");
-
-				// Демонстрация редиректов
-				if (response.Headers.Location != null)
-				{
-					Console.WriteLine($"    Location header: {response.Headers.Location}");
-				}
+				_reader = new StreamReader(_sslStream);
+				_writer = new StreamWriter(_sslStream) { AutoFlush = true };
 			}
-			catch (HttpRequestException ex)
+			else
 			{
-				stopwatch.Stop();
-				Console.WriteLine($"\n  ОШИБКА HTTP-запроса:");
-				Console.WriteLine($"    Тип: {ex.GetType().Name}");
-				Console.WriteLine($"    Сообщение: {ex.Message}");
-				Console.WriteLine($"    InnerException: {ex.InnerException?.GetType().Name} - {ex.InnerException?.Message}");
+				_reader = new StreamReader(_networkStream);
+				_writer = new StreamWriter(_networkStream) { AutoFlush = true };
+			}
 
-				// Анализ ошибки TLS
-				if (ex.InnerException is AuthenticationException authEx)
-				{
-					Console.WriteLine($"    Это ошибка аутентификации TLS!");
-				}
-			}
-			catch (TaskCanceledException ex)
+			// Чтение приветственного сообщения сервера
+			var welcomeResponse = await ReadResponseAsync();
+			Console.WriteLine($"[SMTP] Сервер ответил: {welcomeResponse}");
+
+			if (welcomeResponse.Code != 220)
 			{
-				Console.WriteLine($"\n  ОШИБКА: Таймаут запроса ({_httpClient.Timeout.TotalSeconds} сек)");
-				Console.WriteLine($"    Сообщение: {ex.Message}");
+				throw new SmtpException($"Сервер не готов: {welcomeResponse}");
 			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"\n  НЕОЖИДАННАЯ ОШИБКА:");
-				Console.WriteLine($"    Тип: {ex.GetType().Name}");
-				Console.WriteLine($"    Сообщение: {ex.Message}");
-			}
+
+			return welcomeResponse;
 		}
 
-		public void DemonstrateCertificateValidation()
+		private bool ValidateServerCertificate(object sender, X509Certificate certificate,
+			X509Chain chain, SslPolicyErrors sslPolicyErrors)
 		{
-			Console.WriteLine("\n=== ПРОВЕРКА СЕРТИФИКАТОВ ===\n");
+			// В реальном приложении здесь была бы более строгая проверка
+			Console.WriteLine($"[SSL] Сертификат: {certificate.Subject}");
+			Console.WriteLine($"[SSL] Ошибки SSL: {sslPolicyErrors}");
+			return sslPolicyErrors == SslPolicyErrors.None;
+		}
 
-			// 1. Стандартная проверка сертификатов
-			Console.WriteLine("1. СТАНДАРТНАЯ ПРОВЕРКА СЕРТИФИКАТОВ:");
+		// Отправка команды и чтение ответа
+		private async Task<SmtpResponse> SendCommandAsync(string command)
+		{
+			Console.WriteLine($"[SMTP →] {command}");
+			await _writer.WriteLineAsync(command);
 
-			Console.WriteLine($"   HttpClient проверяет:");
-			Console.WriteLine($"     • Цепочку доверия до корневого сертификата");
-			Console.WriteLine($"     • Срок действия сертификата");
-			Console.WriteLine($"     • Соответствие имени хоста (Subject Alternative Names)");
-			Console.WriteLine($"     • Отзыв сертификата (CRL/OCSP)");
-			Console.WriteLine($"     • Ключевую подпись и алгоритмы");
+			return await ReadResponseAsync();
+		}
 
-			// 2. Кастомная проверка сертификатов
-			Console.WriteLine("\n2. КАСТОМНАЯ ПРОВЕРКА СЕРТИФИКАТОВ:");
+		// Чтение ответа сервера
+		private async Task<SmtpResponse> ReadResponseAsync()
+		{
+			StringBuilder responseBuilder = new StringBuilder();
+			SmtpResponse finalResponse = null;
 
-			var customHandler = new HttpClientHandler
+			while (true)
 			{
-				ServerCertificateCustomValidationCallback = (httpRequestMessage, cert, chain, sslPolicyErrors) =>
+				string line = await _reader.ReadLineAsync();
+
+				if (string.IsNullOrEmpty(line))
 				{
-					Console.WriteLine($"\n   Кастомная проверка для: {httpRequestMessage.RequestUri.Host}");
-					Console.WriteLine($"     SSL Policy Errors: {sslPolicyErrors}");
+					Console.WriteLine($"[SMTP ←] (пустой ответ)");
+					continue;
+				}
 
-					if (cert != null)
+				Console.WriteLine($"[SMTP ←] {line}");
+
+				// SMTP ответы начинаются с 3-значного кода
+				if (line.Length >= 4 && int.TryParse(line.Substring(0, 3), out int code))
+				{
+					responseBuilder.AppendLine(line.Substring(4));
+
+					// Если 4-й символ не дефис, значит это последняя строка ответа
+					if (line[3] != '-')
 					{
-						Console.WriteLine($"     Сертификат субъекта: {cert.Subject}");
-						Console.WriteLine($"     Действителен с: {cert.NotBefore} до: {cert.NotAfter}");
-						Console.WriteLine($"     Издатель: {cert.Issuer}");
-						Console.WriteLine($"     Отпечаток: {cert.Thumbprint}");
-					}
-
-					if (chain != null)
-					{
-						Console.WriteLine($"     Цепочка сертификатов: {chain.ChainElements.Count} элементов");
-
-						for (int i = 0; i < chain.ChainElements.Count; i++)
+						finalResponse = new SmtpResponse
 						{
-							var element = chain.ChainElements[i];
-							Console.WriteLine($"       [{i}] {element.Certificate.Subject} ({element.Certificate.Issuer})");
-						}
+							Code = code,
+							Message = responseBuilder.ToString().Trim()
+						};
+						break;
 					}
-
-					// Пример: разрешаем определённые самоподписанные сертификаты
-					bool allowSelfSigned = cert?.Subject?.Contains("CN=localhost") == true;
-
-					if (allowSelfSigned)
+					else
 					{
-						Console.WriteLine($"     ⚠️  Разрешаем самоподписанный сертификат localhost");
-						return true;
+						responseBuilder.AppendLine(line.Substring(4));
 					}
-
-					// Возвращаем стандартную проверку
-					return sslPolicyErrors == SslPolicyErrors.None;
 				}
-			};
-
-			Console.WriteLine($"   Кастомный обработчик создан с валидацией");
-
-			// 3. Опасный вариант: отключение проверки сертификатов
-			Console.WriteLine("\n3. ОПАСНО: ОТКЛЮЧЕНИЕ ПРОВЕРКИ СЕРТИФИКАТОВ:");
-
-			var dangerousHandler = new HttpClientHandler
-			{
-				ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
-			};
-
-			Console.WriteLine($"   ⚠️  ОПАСНОСТЬ: Все сертификаты принимаются!");
-			Console.WriteLine($"   ❌ НИКОГДА не используйте в продакшене!");
-
-			dangerousHandler.Dispose();
-			customHandler.Dispose();
-		}
-
-		public void DemonstrateSslProtocols()
-		{
-			Console.WriteLine("\n=== НАСТРОЙКА SSL/TLS ПРОТОКОЛОВ ===\n");
-
-			Console.WriteLine("  Поддерживаемые протоколы в системе:");
-
-			foreach (SslProtocols protocol in Enum.GetValues(typeof(SslProtocols)))
-			{
-				if (protocol != SslProtocols.None && protocol != SslProtocols.Default)
+				else
 				{
-					Console.WriteLine($"    • {protocol}");
+					responseBuilder.AppendLine(line);
 				}
 			}
 
-			// Тестирование подключения с разными протоколами
-			Console.WriteLine("\n  Тестирование подключений с разными протоколами:");
-
-			var testUrls = new[]
-			{
-				"https://httpbin.org/",
-				"https://tls-v1-2.badssl.com:1012/",
-				"https://tls-v1-0.badssl.com:1010/"
-			};
-
-			foreach (var url in testUrls)
-			{
-				try
-				{
-					using var testHandler = new HttpClientHandler
-					{
-						SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
-					};
-
-					using var testClient = new HttpClient(testHandler);
-					testClient.Timeout = TimeSpan.FromSeconds(5);
-
-					var response = testClient.GetAsync(url).GetAwaiter().GetResult();
-					Console.WriteLine($"    ✓ {url}: {response.StatusCode} (TLS 1.2+)");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"    ✗ {url}: {ex.GetType().Name}");
-				}
-			}
+			return finalResponse;
 		}
 
-		public async Task DemonstrateConnectionReuse()
+		// Команда EHLO - идентификация клиента
+		public async Task<SmtpResponse> EhloAsync(string clientName = "localhost")
 		{
-			Console.WriteLine("\n=== ПЕРЕИСПОЛЬЗОВАНИЕ СОЕДИНЕНИЙ ===\n");
+			var response = await SendCommandAsync($"EHLO {clientName}");
 
-			string baseUrl = "https://httpbin.org";
-
-			Console.WriteLine($"  Тест переиспользования соединений к {baseUrl}");
-			Console.WriteLine($"  MaxConnectionsPerServer: {_httpClientHandler.MaxConnectionsPerServer}");
-
-			var tasks = new Task[3];
-			var stopwatches = new Stopwatch[3];
-
-			for (int i = 0; i < 3; i++)
+			if (response.Code == 250)
 			{
-				int index = i;
-				stopwatches[index] = Stopwatch.StartNew();
-
-				tasks[index] = Task.Run(async () =>
-				{
-					try
-					{
-						string endpoint = i == 0 ? "/get" : i == 1 ? "/headers" : "/ip";
-						var response = await _httpClient.GetAsync(endpoint);
-						stopwatches[index].Stop();
-
-						Console.WriteLine($"    Запрос {index + 1} ({endpoint}): {response.StatusCode} за {stopwatches[index].ElapsedMilliseconds} мс");
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine($"    Запрос {index + 1}: Ошибка - {ex.Message}");
-					}
-				});
+				Console.WriteLine($"[SMTP] Сервер поддерживает расширения:");
+				Console.WriteLine($"[SMTP] {response.Message}");
+			}
+			else if (response.Code == 502) // Если EHLO не поддерживается, пробуем HELO
+			{
+				Console.WriteLine($"[SMTP] EHLO не поддерживается, пробуем HELO");
+				response = await SendCommandAsync($"HELO {clientName}");
 			}
 
-			await Task.WhenAll(tasks);
+			return response;
+		}
 
-			Console.WriteLine($"\n  Анализ производительности:");
-			long firstRequestTime = stopwatches[0].ElapsedMilliseconds;
+		// Команда STARTTLS - переход на шифрованное соединение
+		public async Task<SmtpResponse> StartTlsAsync()
+		{
+			var response = await SendCommandAsync("STARTTLS");
 
-			for (int i = 1; i < 3; i++)
+			if (response.Code == 220)
 			{
-				if (stopwatches[i].ElapsedMilliseconds < firstRequestTime)
+				Console.WriteLine($"[SMTP] Переход на TLS...");
+
+				// Создаём SSL поток поверх существующего TCP-соединения
+				_sslStream = new SslStream(_networkStream, false, ValidateServerCertificate);
+				await _sslStream.AuthenticateAsClientAsync(_smtpServer);
+
+				// Заменяем ридеры и врайтеры для работы с SSL
+				_reader = new StreamReader(_sslStream);
+				_writer = new StreamWriter(_sslStream) { AutoFlush = true };
+
+				Console.WriteLine($"[SMTP] TLS соединение установлено");
+
+				// После STARTTLS нужно снова отправить EHLO
+				return await EhloAsync();
+			}
+
+			return response;
+		}
+
+		// Аутентификация PLAIN методом
+		public async Task<SmtpResponse> AuthenticatePlainAsync(string username, string password)
+		{
+			// Кодируем логин и пароль в Base64
+			string credentials = Convert.ToBase64String(
+				Encoding.UTF8.GetBytes($"\0{username}\0{password}"));
+
+			var response = await SendCommandAsync("AUTH PLAIN");
+
+			if (response.Code == 334) // Сервер ожидает данные аутентификации
+			{
+				response = await SendCommandAsync(credentials);
+			}
+			else
+			{
+				// Если сервер не ожидает отдельной команды, отправляем сразу с данными
+				response = await SendCommandAsync($"AUTH PLAIN {credentials}");
+			}
+
+			if (response.Code == 235)
+			{
+				Console.WriteLine($"[SMTP] Аутентификация успешна");
+			}
+
+			return response;
+		}
+
+		// Аутентификация LOGIN методом
+		public async Task<SmtpResponse> AuthenticateLoginAsync(string username, string password)
+		{
+			var response = await SendCommandAsync("AUTH LOGIN");
+
+			if (response.Code == 334 && response.Message.Contains("Username"))
+			{
+				string encodedUsername = Convert.ToBase64String(Encoding.UTF8.GetBytes(username));
+				response = await SendCommandAsync(encodedUsername);
+			}
+
+			if (response.Code == 334 && response.Message.Contains("Password"))
+			{
+				string encodedPassword = Convert.ToBase64String(Encoding.UTF8.GetBytes(password));
+				response = await SendCommandAsync(encodedPassword);
+			}
+
+			if (response.Code == 235)
+			{
+				Console.WriteLine($"[SMTP] Аутентификация успешна");
+			}
+
+			return response;
+		}
+
+		// Указание отправителя
+		public async Task<SmtpResponse> MailFromAsync(string fromAddress)
+		{
+			return await SendCommandAsync($"MAIL FROM:<{fromAddress}>");
+		}
+
+		// Указание получателя
+		public async Task<SmtpResponse> RcptToAsync(string toAddress)
+		{
+			return await SendCommandAsync($"RCPT TO:<{toAddress}>");
+		}
+
+		// Начало передачи данных письма
+		public async Task<SmtpResponse> DataAsync()
+		{
+			return await SendCommandAsync("DATA");
+		}
+
+		// Отправка содержимого письма
+		public async Task<SmtpResponse> SendEmailDataAsync(string emailContent)
+		{
+			Console.WriteLine($"[SMTP →] (начало данных письма)");
+
+			// Добавляем точку в конце для обозначения конца данных
+			await _writer.WriteLineAsync(emailContent);
+			await _writer.WriteLineAsync(".");
+
+			return await ReadResponseAsync();
+		}
+
+		// Сброс текущей транзакции
+		public async Task<SmtpResponse> ResetAsync()
+		{
+			return await SendCommandAsync("RSET");
+		}
+
+		// Завершение сессии
+		public async Task<SmtpResponse> QuitAsync()
+		{
+			return await SendCommandAsync("QUIT");
+		}
+
+		// Отправка письма целиком
+		public async Task<SmtpResponse> SendEmailAsync(
+			string from,
+			string to,
+			string subject,
+			string body,
+			string username = null,
+			string password = null)
+		{
+			Console.WriteLine($"[SMTP] Отправка письма:");
+			Console.WriteLine($"  От: {from}");
+			Console.WriteLine($"  Кому: {to}");
+			Console.WriteLine($"  Тема: {subject}");
+
+			// 1. Аутентификация (если указаны логин/пароль)
+			if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+			{
+				var authResponse = await AuthenticatePlainAsync(username, password);
+				if (!authResponse.IsSuccess)
 				{
-					Console.WriteLine($"    Запрос {i + 1} быстрее первого на {firstRequestTime - stopwatches[i].ElapsedMilliseconds} мс (возможно, переиспользовано соединение)");
+					authResponse = await AuthenticateLoginAsync(username, password);
+				}
+
+				if (authResponse.IsError)
+				{
+					return authResponse;
 				}
 			}
+
+			// 2. Указание отправителя
+			var mailFromResponse = await MailFromAsync(from);
+			if (mailFromResponse.IsError)
+				return mailFromResponse;
+
+			// 3. Указание получателя
+			var rcptToResponse = await RcptToAsync(to);
+			if (rcptToResponse.IsError)
+				return rcptToResponse;
+
+			// 4. Начало передачи данных
+			var dataResponse = await DataAsync();
+			if (dataResponse.IsError)
+				return dataResponse;
+
+			// 5. Формирование письма
+			string emailData = BuildEmailData(from, to, subject, body);
+
+			// 6. Отправка данных письма
+			var sendResponse = await SendEmailDataAsync(emailData);
+
+			return sendResponse;
 		}
 
-		public async Task DemonstrateErrorHandling()
+		private string BuildEmailData(string from, string to, string subject, string body)
 		{
-			Console.WriteLine("\n=== ОБРАБОТКА ОШИБОК HTTPS ===\n");
+			var emailBuilder = new StringBuilder();
 
-			// Тестовые URL для демонстрации разных ошибок
-			var testCases = new[]
-			{
-				new { Url = "https://expired.badssl.com/", Description = "Просроченный сертификат" },
-				new { Url = "https://wrong.host.badssl.com/", Description = "Несоответствие имени хоста" },
-				new { Url = "https://self-signed.badssl.com/", Description = "Самоподписанный сертификат" },
-				new { Url = "https://untrusted-root.badssl.com/", Description = "Недоверенный корневой сертификат" },
-				new { Url = "https://httpbin.org/status/500", Description = "HTTP ошибка 500" },
-				new { Url = "https://httpbin.org/status/404", Description = "HTTP ошибка 404" }
-			};
+			// Заголовки письма
+			emailBuilder.AppendLine($"From: {from}");
+			emailBuilder.AppendLine($"To: {to}");
+			emailBuilder.AppendLine($"Subject: {subject}");
+			emailBuilder.AppendLine($"Date: {DateTime.Now:R}");
+			emailBuilder.AppendLine($"MIME-Version: 1.0");
+			emailBuilder.AppendLine($"Content-Type: text/plain; charset=utf-8");
+			emailBuilder.AppendLine($"Content-Transfer-Encoding: 7bit");
+			emailBuilder.AppendLine(); // Пустая строка разделяет заголовки и тело
 
-			foreach (var testCase in testCases)
-			{
-				Console.WriteLine($"\n  Тест: {testCase.Description}");
-				Console.WriteLine($"    URL: {testCase.Url}");
+			// Тело письма
+			emailBuilder.AppendLine(body);
 
-				try
-				{
-					// Используем отдельный HttpClient для каждого теста
-					using var testClient = new HttpClient(new HttpClientHandler());
-					testClient.Timeout = TimeSpan.FromSeconds(10);
-
-					var response = await testClient.GetAsync(testCase.Url);
-
-					Console.WriteLine($"    Результат: HTTP {(int)response.StatusCode} {response.StatusCode}");
-					Console.WriteLine($"    IsSuccessStatusCode: {response.IsSuccessStatusCode}");
-
-					if (!response.IsSuccessStatusCode)
-					{
-						string errorContent = await response.Content.ReadAsStringAsync();
-						Console.WriteLine($"    Тело ошибки: {errorContent.Substring(0, Math.Min(200, errorContent.Length))}...");
-					}
-				}
-				catch (HttpRequestException ex)
-				{
-					Console.WriteLine($"    ОШИБКА: HttpRequestException");
-					Console.WriteLine($"      Сообщение: {ex.Message}");
-
-					// Анализ вложенных исключений
-					Exception inner = ex.InnerException;
-					int depth = 0;
-
-					while (inner != null && depth < 3)
-					{
-						Console.WriteLine($"      InnerException[{depth}]: {inner.GetType().Name} - {inner.Message}");
-						inner = inner.InnerException;
-						depth++;
-					}
-				}
-				catch (AuthenticationException ex)
-				{
-					Console.WriteLine($"    ОШИБКА: AuthenticationException (TLS)");
-					Console.WriteLine($"      Сообщение: {ex.Message}");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"    ОШИБКА: {ex.GetType().Name}");
-					Console.WriteLine($"      Сообщение: {ex.Message}");
-				}
-			}
+			return emailBuilder.ToString();
 		}
 
-		public void DemonstrateClientConfiguration()
+		// Демонстрация всего SMTP диалога
+		public async Task DemonstrateSmtpDialogAsync(string username, string password)
 		{
-			Console.WriteLine("\n=== КОНФИГУРАЦИЯ HTTPS-CLIENT ===\n");
-
-			// Демонстрация разных конфигураций
-			Console.WriteLine("1. БАЗОВАЯ КОНФИГУРАЦИЯ:");
-
-			var basicConfig = new HttpClientHandler
-			{
-				AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-				UseCookies = true,
-				CookieContainer = new CookieContainer(),
-				AllowAutoRedirect = true,
-				MaxAutomaticRedirections = 5,
-				UseProxy = true,
-				Proxy = null, // Использует системные настройки
-				DefaultProxyCredentials = null
-			};
-
-			Console.WriteLine($"   AutomaticDecompression: {basicConfig.AutomaticDecompression}");
-			Console.WriteLine($"   AllowAutoRedirect: {basicConfig.AllowAutoRedirect}");
-			Console.WriteLine($"   MaxAutomaticRedirections: {basicConfig.MaxAutomaticRedirections}");
-			Console.WriteLine($"   UseCookies: {basicConfig.UseCookies}");
-
-			// 2. Конфигурация для высоконагруженных систем
-			Console.WriteLine("\n2. КОНФИГУРАЦИЯ ДЛЯ ВЫСОКОНАГРУЖЕННЫХ СИСТЕМ:");
-
-			var highPerfConfig = new HttpClientHandler
-			{
-				MaxConnectionsPerServer = 100,
-				MaxResponseHeadersLength = 128, // KB
-				UseProxy = false,
-				AllowAutoRedirect = false, // Управление редиректами вручную
-				AutomaticDecompression = DecompressionMethods.All,
-				UseCookies = false // Отключаем куки если не нужны
-			};
-
-			Console.WriteLine($"   MaxConnectionsPerServer: {highPerfConfig.MaxConnectionsPerServer}");
-			Console.WriteLine($"   MaxResponseHeadersLength: {highPerfConfig.MaxResponseHeadersLength} KB");
-
-			// 3. Конфигурация для строгой безопасности
-			Console.WriteLine("\n3. КОНФИГУРАЦИЯ СТРОГОЙ БЕЗОПАСНОСТИ:");
-
-			var secureConfig = new HttpClientHandler
-			{
-				SslProtocols = SslProtocols.Tls13, // Только TLS 1.3
-				CheckCertificateRevocationList = true,
-				ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
-				{
-					// Дополнительные проверки
-					if (errors != SslPolicyErrors.None)
-						return false;
-
-					// Проверка минимальной длины ключа
-					if (cert?.GetRSAPublicKey()?.KeySize < 2048)
-						return false;
-
-					// Проверка алгоритма подписи
-					if (!cert.SignatureAlgorithm.FriendlyName?.Contains("sha256") == true)
-						return false;
-
-					return true;
-				}
-			};
-
-			Console.WriteLine($"   SslProtocols: {secureConfig.SslProtocols}");
-			Console.WriteLine($"   CheckCertificateRevocationList: {secureConfig.CheckCertificateRevocationList}");
-
-			basicConfig.Dispose();
-			highPerfConfig.Dispose();
-			secureConfig.Dispose();
-		}
-
-		public async Task DemonstrateRealWorldScenario()
-		{
-			Console.WriteLine("\n=== РЕАЛЬНЫЙ СЦЕНАРИЙ ИСПОЛЬЗОВАНИЯ ===\n");
-
-			// Симуляция работы с API
-			Console.WriteLine("  Симуляция работы с защищённым API:");
-
-			var apiClient = new HttpClient(new HttpClientHandler
-			{
-				AutomaticDecompression = DecompressionMethods.All,
-				MaxConnectionsPerServer = 20
-			})
-			{
-				BaseAddress = new Uri("https://jsonplaceholder.typicode.com/"),
-				Timeout = TimeSpan.FromSeconds(15)
-			};
-
-			apiClient.DefaultRequestHeaders.Add("Accept", "application/json");
-			apiClient.DefaultRequestHeaders.Add("User-Agent", "MyApiClient/1.0");
-
 			try
 			{
-				// 1. Получение данных
-				Console.WriteLine("\n  1. Получение списка пользователей:");
-				var usersResponse = await apiClient.GetAsync("users");
+				Console.WriteLine($"\n=== ПОЛНЫЙ SMTP ДИАЛОГ ===\n");
 
-				if (usersResponse.IsSuccessStatusCode)
+				// 1. Подключение
+				await ConnectAsync();
+
+				// 2. Приветствие сервера и идентификация клиента
+				await EhloAsync("smtp-client.demo");
+
+				// 3. STARTTLS (если порт 587)
+				if (_smtpPort == SUBMISSION_PORT)
 				{
-					string usersJson = await usersResponse.Content.ReadAsStringAsync();
-					Console.WriteLine($"    ✓ Получено {usersJson.Length} байт");
-					Console.WriteLine($"    Status Code: {(int)usersResponse.StatusCode}");
-
-					// Проверка безопасности
-					if (usersResponse.Headers.TryGetValues("Strict-Transport-Security", out var hsts))
-					{
-						Console.WriteLine($"    HSTS: {string.Join(", ", hsts)}");
-					}
+					await StartTlsAsync();
 				}
 
-				// 2. Отправка данных
-				Console.WriteLine("\n  2. Создание нового поста:");
+				// 4. Аутентификация
+				await AuthenticatePlainAsync(username, password);
 
-				var postData = new
-				{
-					title = "HTTPS Client Test",
-					body = "Testing HTTPS client implementation",
-					userId = 1
-				};
+				// 5. Отправка тестового письма
+				string testFrom = username;
+				string testTo = username; // Отправляем самому себе
+				string testSubject = "Тестовое письмо через SMTP";
+				string testBody = "Это тестовое письмо, отправленное через низкоуровневый SMTP клиент.\n\n" +
+								"SMTP - это текстовый протокол, который работает по принципу диалога.";
 
-				var jsonContent = new StringContent(
-					System.Text.Json.JsonSerializer.Serialize(postData),
-					Encoding.UTF8,
-					"application/json"
-				);
+				var sendResult = await SendEmailAsync(testFrom, testTo, testSubject, testBody);
 
-				var postResponse = await apiClient.PostAsync("posts", jsonContent);
+				Console.WriteLine($"\nРезультат отправки: {sendResult}");
 
-				Console.WriteLine($"    Status Code: {(int)postResponse.StatusCode}");
-
-				if (postResponse.IsSuccessStatusCode)
-				{
-					string postResult = await postResponse.Content.ReadAsStringAsync();
-					Console.WriteLine($"    ✓ Пост создан, ответ: {postResult.Length} байт");
-				}
-
-				// 3. Параллельные запросы
-				Console.WriteLine("\n  3. Параллельные запросы:");
-
-				var parallelTasks = new[]
-				{
-					apiClient.GetAsync("posts/1"),
-					apiClient.GetAsync("comments/1"),
-					apiClient.GetAsync("albums/1")
-				};
-
-				var results = await Task.WhenAll(parallelTasks);
-
-				foreach (var response in results)
-				{
-					Console.WriteLine($"    {response.RequestMessage.RequestUri.PathAndQuery}: {(int)response.StatusCode}");
-				}
-
+				// 6. Завершение сессии
+				await QuitAsync();
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"  Ошибка: {ex.GetType().Name}: {ex.Message}");
-			}
-			finally
-			{
-				apiClient.Dispose();
+				Console.WriteLine($"Ошибка SMTP: {ex.Message}");
 			}
 		}
 
 		public void Dispose()
 		{
-			_httpClient?.Dispose();
-			_httpClientHandler?.Dispose();
+			_writer?.Dispose();
+			_reader?.Dispose();
+			_sslStream?.Dispose();
+			_networkStream?.Dispose();
+			_tcpClient?.Dispose();
+		}
+	}
 
-			Console.WriteLine($"\n  HttpClient и ресурсы освобождены");
-			Console.WriteLine($"  Закрыты все HTTPS-соединения");
+	// Высокоуровневая обёртка с использованием System.Net.Mail
+	public class HighLevelSmtpDemo
+	{
+		public static void SendEmailWithSmtpClient(
+			string smtpServer,
+			int port,
+			string username,
+			string password,
+			string from,
+			string to,
+			string subject,
+			string body)
+		{
+			Console.WriteLine($"\n=== ОТПРАВКА ЧЕРЕЗ System.Net.Mail.SmtpClient ===\n");
+
+			try
+			{
+				using (var smtpClient = new SmtpClient(smtpServer, port))
+				{
+					smtpClient.Credentials = new NetworkCredential(username, password);
+					smtpClient.EnableSsl = true;
+					smtpClient.Timeout = 10000;
+
+					Console.WriteLine($"Параметры SMTP:");
+					Console.WriteLine($"  Сервер: {smtpClient.Host}:{smtpClient.Port}");
+					Console.WriteLine($"  SSL: {smtpClient.EnableSsl}");
+					Console.WriteLine($"  Таймаут: {smtpClient.Timeout} мс");
+
+					var mailMessage = new MailMessage(from, to, subject, body)
+					{
+						IsBodyHtml = false
+					};
+
+					Console.WriteLine($"\nОтправка письма...");
+
+					// Асинхронная отправка
+					smtpClient.Send(mailMessage);
+
+					Console.WriteLine($"✓ Письмо отправлено успешно");
+					Console.WriteLine($"  От: {from}");
+					Console.WriteLine($"  Кому: {to}");
+					Console.WriteLine($"  Тема: {subject}");
+				}
+			}
+			catch (SmtpException ex)
+			{
+				Console.WriteLine($"✗ SMTP ошибка: {ex.StatusCode} - {ex.Message}");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"✗ Общая ошибка: {ex.Message}");
+			}
+		}
+	}
+
+	// Демонстрация DNS MX-записей
+	public class DnsMxLookup
+	{
+		public static void DemonstrateMxLookup(string domain)
+		{
+			Console.WriteLine($"\n=== DNS MX-ЗАПИСИ ДЛЯ {domain} ===\n");
+
+			try
+			{
+				var mxRecords = System.Net.Dns.GetHostAddresses(domain);
+
+				Console.WriteLine($"DNS записи для {domain}:");
+				foreach (var record in mxRecords)
+				{
+					Console.WriteLine($"  - {record}");
+				}
+
+				// В реальном приложении для MX-записей нужна отдельная библиотека
+				// System.Net.Dns не имеет встроенной поддержки MX записей
+				Console.WriteLine($"\nПримечание: System.Net.Dns.GetHostAddresses() возвращает A-записи.");
+				Console.WriteLine($"Для MX-записей требуется использовать стороннюю библиотеку или DNS-клиент.");
+
+				Console.WriteLine($"\nПроцесс маршрутизации SMTP:");
+				Console.WriteLine($"  1. Клиент получает домен из email (после @)");
+				Console.WriteLine($"  2. Делает DNS MX запрос для этого домена");
+				Console.WriteLine($"  3. Получает приоритет и имя почтового сервера");
+				Console.WriteLine($"  4. Подключается к серверу с наивысшим приоритетом");
+				Console.WriteLine($"  5. Если сервер недоступен, пробует следующий по приоритету");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка DNS: {ex.Message}");
+			}
+		}
+	}
+
+	// Конфигурация из .env файла
+	public class EmailConfiguration
+	{
+		public string Sender { get; set; }
+		public string Password { get; set; }
+		public string Recipient { get; set; }
+		public string SmtpServer { get; set; }
+		public int SmtpPort { get; set; }
+
+		public static EmailConfiguration FromEnvironment()
+		{
+			// В реальном приложении здесь читался бы .env файл
+			// Для демонстрации используем константы
+
+			return new EmailConfiguration
+			{
+				Sender = "efimov.matvey23@yandex.ru",
+				Password = "vkxfywedeecchzrv",
+				Recipient = "pznb@yandex.ru",
+				SmtpServer = "smtp.yandex.ru",
+				SmtpPort = 587
+			};
 		}
 	}
 
@@ -567,32 +533,91 @@ namespace HttpsClientImplementation
 	{
 		static async Task Main(string[] args)
 		{
-			Console.WriteLine("HTTPS-CLIENT В C#: РЕАЛИЗАЦИЯ И ПРАКТИКА");
-			Console.WriteLine("=========================================\n");
+			Console.WriteLine("SMTP - ПРОТОКОЛ ОТПРАВКИ ЭЛЕКТРОННОЙ ПОЧТЫ");
+			Console.WriteLine("==========================================\n");
 
-			using (var demo = new HttpsClientDemonstration())
+			// Получаем конфигурацию
+			var config = EmailConfiguration.FromEnvironment();
+
+			Console.WriteLine("Конфигурация из .env:");
+			Console.WriteLine($"  Отправитель: {config.Sender}");
+			Console.WriteLine($"  Получатель: {config.Recipient}");
+			Console.WriteLine($"  SMTP сервер: {config.SmtpServer}");
+			Console.WriteLine($"  SMTP порт: {config.SmtpPort}");
+			Console.WriteLine($"  Пароль приложения: {new string('*', config.Password.Length)}");
+
+			// Часть 1: Низкоуровневый SMTP диалог
+			Console.WriteLine("\n\n1. НИЗКОУРОВНЕВЫЙ SMTP ДИАЛОГ:");
+			using (var rawSmtp = new RawSmtpClient(config.SmtpServer, config.SmtpPort))
 			{
-				// Демонстрация работы HTTPS-клиента
-				await demo.DemonstrateHttpsRequest();
-
-				// Демонстрация проверки сертификатов
-				demo.DemonstrateCertificateValidation();
-
-				// Демонстрация SSL/TLS протоколов
-				demo.DemonstrateSslProtocols();
-
-				// Демонстрация переиспользования соединений
-				await demo.DemonstrateConnectionReuse();
-
-				// Демонстрация обработки ошибок
-				await demo.DemonstrateErrorHandling();
-
-				// Демонстрация конфигурации
-				demo.DemonstrateClientConfiguration();
-
-				// Реальный сценарий использования
-				await demo.DemonstrateRealWorldScenario();
+				// Для демонстрации отправляем письмо самому себе
+				await rawSmtp.DemonstrateSmtpDialogAsync(config.Sender, config.Password);
 			}
+
+			// Часть 2: Высокоуровневая отправка
+			Console.WriteLine("\n\n2. ВЫСОКОУРОВНЕВАЯ ОТПРАВКА:");
+			HighLevelSmtpDemo.SendEmailWithSmtpClient(
+				config.SmtpServer,
+				config.SmtpPort,
+				config.Sender,
+				config.Password,
+				config.Sender,
+				config.Recipient,
+				"Тестовое письмо с курса",
+				"Это письмо отправлено через высокоуровневый SmtpClient.\n\n" +
+				"System.Net.Mail скрывает низкоуровневые детали SMTP протокола,\n" +
+				"но внутри всё равно происходит тот же самый диалог с сервером."
+			);
+
+			// Часть 3: DNS и маршрутизация
+			Console.WriteLine("\n\n3. DNS И МАРШРУТИЗАЦИЯ ПОЧТЫ:");
+			string domain = config.Sender.Substring(config.Sender.IndexOf('@') + 1);
+			DnsMxLookup.DemonstrateMxLookup(domain);
+
+			// Часть 4: Теория SMTP протокола
+			Console.WriteLine("\n\n4. КЛЮЧЕВЫЕ АСПЕКТЫ SMTP:");
+			PrintSmtpTheory();
+		}
+
+		static void PrintSmtpTheory()
+		{
+			Console.WriteLine("Ключевые аспекты SMTP протокола:");
+			Console.WriteLine();
+			Console.WriteLine("1. ТЕКСТОВЫЙ ПРОТОКОЛ:");
+			Console.WriteLine("   • Команды и ответы в читаемом формате");
+			Console.WriteLine("   • Каждая команда начинается с 4-буквенного кода");
+			Console.WriteLine("   • Ответы начинаются с 3-значного кода");
+			Console.WriteLine();
+			Console.WriteLine("2. ДИАЛОГОВЫЙ ФОРМАТ:");
+			Console.WriteLine("   • Клиент отправляет команду");
+			Console.WriteLine("   • Сервер отвечает кодом и сообщением");
+			Console.WriteLine("   • Код определяет успешность операции");
+			Console.WriteLine();
+			Console.WriteLine("3. ПОСЛЕДОВАТЕЛЬНОСТЬ КОМАНД:");
+			Console.WriteLine("   • EHLO/HELO - приветствие сервера");
+			Console.WriteLine("   • STARTTLS - переход на шифрование (опционально)");
+			Console.WriteLine("   • AUTH - аутентификация");
+			Console.WriteLine("   • MAIL FROM - указание отправителя");
+			Console.WriteLine("   • RCPT TO - указание получателя");
+			Console.WriteLine("   • DATA - начало передачи письма");
+			Console.WriteLine("   • . (точка) - конец письма");
+			Console.WriteLine("   • QUIT - завершение сессии");
+			Console.WriteLine();
+			Console.WriteLine("4. КОДЫ ОТВЕТОВ:");
+			Console.WriteLine("   • 2xx - успех");
+			Console.WriteLine("   • 3xx - промежуточный успех");
+			Console.WriteLine("   • 4xx - временная ошибка");
+			Console.WriteLine("   • 5xx - постоянная ошибка");
+			Console.WriteLine();
+			Console.WriteLine("5. БЕЗОПАСНОСТЬ:");
+			Console.WriteLine("   • Порт 25 - без шифрования (обычно блокируется)");
+			Console.WriteLine("   • Порт 587 - STARTTLS (шифрование по запросу)");
+			Console.WriteLine("   • Порт 465 - SSL/TLS (шифрование сразу)");
+			Console.WriteLine();
+			Console.WriteLine("6. DNS И MX-ЗАПИСИ:");
+			Console.WriteLine("   • Для маршрутизации почты используются MX-записи");
+			Console.WriteLine("   • MX-запись указывает на почтовый сервер домена");
+			Console.WriteLine("   • Приоритет определяет порядок попыток доставки");
 		}
 	}
 }
