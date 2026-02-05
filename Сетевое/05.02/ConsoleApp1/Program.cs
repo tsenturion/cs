@@ -1,623 +1,1334 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Net.Security;
-using System.Net.Mail;
 using System.Text;
-using System.Threading;
 using System.IO;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
+using System.Threading;
+using System.Collections.Generic;
+using System.Security.Cryptography;
 
-namespace SmtpFundamentals
+namespace FtpProtocolDemo
 {
-	// Низкоуровневая демонстрация SMTP протокола
-	public class RawSmtpClient : IDisposable
+	// Модель для хранения состояния FTP сессии
+	public class FtpSessionState
 	{
-		private TcpClient _tcpClient;
-		private NetworkStream _networkStream;
-		private SslStream _sslStream;
-		private StreamReader _reader;
-		private StreamWriter _writer;
-		private bool _useSsl;
-		private string _smtpServer;
-		private int _smtpPort;
+		public bool IsAuthenticated { get; set; }
+		public string CurrentDirectory { get; set; } = "/";
+		public string Username { get; set; }
+		public TransferMode TransferMode { get; set; } = TransferMode.Binary;
+		public DataConnectionMode DataConnectionMode { get; set; } = DataConnectionMode.Passive;
+		public Encoding Encoding { get; set; } = Encoding.ASCII;
+		public DateTime SessionStart { get; set; } = DateTime.Now;
 
-		// Константы SMTP
-		private const int DEFAULT_SMTP_PORT = 25;
-		private const int SSL_SMTP_PORT = 465;
-		private const int SUBMISSION_PORT = 587;
+		// Для пассивного режима
+		public IPEndPoint PassiveEndpoint { get; set; }
+		public TcpListener PassiveListener { get; set; }
 
-		// Коды ответов SMTP
-		public class SmtpResponse
+		// Для активного режима
+		public IPEndPoint ActiveEndpoint { get; set; }
+	}
+
+	public enum TransferMode
+	{
+		ASCII,
+		Binary
+	}
+
+	public enum DataConnectionMode
+	{
+		Active,
+		Passive
+	}
+
+	// Базовый FTP сервер для демонстрации протокола
+	public class SimpleFtpServer : IDisposable
+	{
+		private TcpListener _controlListener;
+		private bool _isRunning;
+		private readonly int _port;
+		private readonly string _rootDirectory;
+		private readonly Dictionary<TcpClient, FtpSessionState> _sessions = new();
+		private readonly Dictionary<string, string> _users; // Простая имитация базы пользователей
+
+		// Статистика сервера
+		public int ActiveSessions => _sessions.Count;
+		public long TotalConnections { get; private set; }
+		public long FilesTransferred { get; private set; }
+
+		public SimpleFtpServer(int port = 21, string rootDirectory = null)
 		{
-			public int Code { get; set; }
-			public string Message { get; set; }
-			public bool IsSuccess => Code >= 200 && Code < 400;
-			public bool IsError => Code >= 400;
+			_port = port;
+			_rootDirectory = rootDirectory ?? Path.Combine(Environment.CurrentDirectory, "ftp_root");
 
-			public override string ToString() => $"{Code} {Message}";
-		}
-
-		public RawSmtpClient(string smtpServer, int port = 587)
-		{
-			_smtpServer = smtpServer ?? throw new ArgumentNullException(nameof(smtpServer));
-			_smtpPort = port;
-			_useSsl = port == SSL_SMTP_PORT;
-		}
-
-		// Подключение к SMTP серверу
-		public async Task<SmtpResponse> ConnectAsync()
-		{
-			Console.WriteLine($"[SMTP] Установка TCP-соединения с {_smtpServer}:{_smtpPort}");
-
-			_tcpClient = new TcpClient();
-			await _tcpClient.ConnectAsync(_smtpServer, _smtpPort);
-
-			_networkStream = _tcpClient.GetStream();
-
-			if (_useSsl)
+			// Создаём корневую директорию, если не существует
+			if (!Directory.Exists(_rootDirectory))
 			{
-				Console.WriteLine($"[SMTP] Установка SSL-соединения");
-				_sslStream = new SslStream(_networkStream, false, ValidateServerCertificate);
-				await _sslStream.AuthenticateAsClientAsync(_smtpServer);
-
-				_reader = new StreamReader(_sslStream);
-				_writer = new StreamWriter(_sslStream) { AutoFlush = true };
-			}
-			else
-			{
-				_reader = new StreamReader(_networkStream);
-				_writer = new StreamWriter(_networkStream) { AutoFlush = true };
+				Directory.CreateDirectory(_rootDirectory);
 			}
 
-			// Чтение приветственного сообщения сервера
-			var welcomeResponse = await ReadResponseAsync();
-			Console.WriteLine($"[SMTP] Сервер ответил: {welcomeResponse}");
-
-			if (welcomeResponse.Code != 220)
+			// Простая база пользователей для демонстрации
+			_users = new Dictionary<string, string>
 			{
-				throw new SmtpException($"Сервер не готов: {welcomeResponse}");
-			}
-
-			return welcomeResponse;
+				["anonymous"] = "", // Анонимный доступ
+				["user1"] = "password1",
+				["admin"] = "admin123"
+			};
 		}
 
-		private bool ValidateServerCertificate(object sender, X509Certificate certificate,
-			X509Chain chain, SslPolicyErrors sslPolicyErrors)
+		public void Start()
 		{
-			// В реальном приложении здесь была бы более строгая проверка
-			Console.WriteLine($"[SSL] Сертификат: {certificate.Subject}");
-			Console.WriteLine($"[SSL] Ошибки SSL: {sslPolicyErrors}");
-			return sslPolicyErrors == SslPolicyErrors.None;
+			_isRunning = true;
+			_controlListener = new TcpListener(IPAddress.Any, _port);
+			_controlListener.Start();
+
+			Console.WriteLine($"=== FTP СЕРВЕР ЗАПУЩЕН ===");
+			Console.WriteLine($"Порт: {_port}");
+			Console.WriteLine($"Корневая директория: {_rootDirectory}");
+			Console.WriteLine($"Доступные пользователи: anonymous, user1, admin");
+			Console.WriteLine($"================================\n");
+
+			// Запуск асинхронного приёма подключений
+			ThreadPool.QueueUserWorkItem(AcceptConnections);
 		}
 
-		// Отправка команды и чтение ответа
-		private async Task<SmtpResponse> SendCommandAsync(string command)
+		private void AcceptConnections(object state)
 		{
-			Console.WriteLine($"[SMTP →] {command}");
-			await _writer.WriteLineAsync(command);
-
-			return await ReadResponseAsync();
-		}
-
-		// Чтение ответа сервера
-		private async Task<SmtpResponse> ReadResponseAsync()
-		{
-			StringBuilder responseBuilder = new StringBuilder();
-			SmtpResponse finalResponse = null;
-
-			while (true)
+			while (_isRunning)
 			{
-				string line = await _reader.ReadLineAsync();
-
-				if (string.IsNullOrEmpty(line))
+				try
 				{
-					Console.WriteLine($"[SMTP ←] (пустой ответ)");
-					continue;
+					// Блокирующее ожидание подключения
+					TcpClient client = _controlListener.AcceptTcpClient();
+					TotalConnections++;
+
+					Console.WriteLine($"[FTP] Новое подключение: {client.Client.RemoteEndPoint}");
+
+					// Создаём состояние сессии для клиента
+					var sessionState = new FtpSessionState();
+					_sessions[client] = sessionState;
+
+					// Запускаем обработку клиента в отдельном потоке
+					ThreadPool.QueueUserWorkItem(HandleClient, client);
 				}
-
-				Console.WriteLine($"[SMTP ←] {line}");
-
-				// SMTP ответы начинаются с 3-значного кода
-				if (line.Length >= 4 && int.TryParse(line.Substring(0, 3), out int code))
+				catch (SocketException) when (!_isRunning)
 				{
-					responseBuilder.AppendLine(line.Substring(4));
-
-					// Если 4-й символ не дефис, значит это последняя строка ответа
-					if (line[3] != '-')
-					{
-						finalResponse = new SmtpResponse
-						{
-							Code = code,
-							Message = responseBuilder.ToString().Trim()
-						};
-						break;
-					}
-					else
-					{
-						responseBuilder.AppendLine(line.Substring(4));
-					}
+					break;
 				}
-				else
+				catch (Exception ex)
 				{
-					responseBuilder.AppendLine(line);
+					Console.WriteLine($"[FTP] Ошибка при приёме подключения: {ex.Message}");
 				}
 			}
-
-			return finalResponse;
 		}
 
-		// Команда EHLO - идентификация клиента
-		public async Task<SmtpResponse> EhloAsync(string clientName = "localhost")
+		private void HandleClient(object state)
 		{
-			var response = await SendCommandAsync($"EHLO {clientName}");
+			TcpClient client = (TcpClient)state;
+			NetworkStream stream = client.GetStream();
+			StreamReader reader = new StreamReader(stream, Encoding.ASCII);
+			StreamWriter writer = new StreamWriter(stream, Encoding.ASCII) { AutoFlush = true };
 
-			if (response.Code == 250)
-			{
-				Console.WriteLine($"[SMTP] Сервер поддерживает расширения:");
-				Console.WriteLine($"[SMTP] {response.Message}");
-			}
-			else if (response.Code == 502) // Если EHLO не поддерживается, пробуем HELO
-			{
-				Console.WriteLine($"[SMTP] EHLO не поддерживается, пробуем HELO");
-				response = await SendCommandAsync($"HELO {clientName}");
-			}
-
-			return response;
-		}
-
-		// Команда STARTTLS - переход на шифрованное соединение
-		public async Task<SmtpResponse> StartTlsAsync()
-		{
-			var response = await SendCommandAsync("STARTTLS");
-
-			if (response.Code == 220)
-			{
-				Console.WriteLine($"[SMTP] Переход на TLS...");
-
-				// Создаём SSL поток поверх существующего TCP-соединения
-				_sslStream = new SslStream(_networkStream, false, ValidateServerCertificate);
-				await _sslStream.AuthenticateAsClientAsync(_smtpServer);
-
-				// Заменяем ридеры и врайтеры для работы с SSL
-				_reader = new StreamReader(_sslStream);
-				_writer = new StreamWriter(_sslStream) { AutoFlush = true };
-
-				Console.WriteLine($"[SMTP] TLS соединение установлено");
-
-				// После STARTTLS нужно снова отправить EHLO
-				return await EhloAsync();
-			}
-
-			return response;
-		}
-
-		// Аутентификация PLAIN методом
-		public async Task<SmtpResponse> AuthenticatePlainAsync(string username, string password)
-		{
-			// Кодируем логин и пароль в Base64
-			string credentials = Convert.ToBase64String(
-				Encoding.UTF8.GetBytes($"\0{username}\0{password}"));
-
-			var response = await SendCommandAsync("AUTH PLAIN");
-
-			if (response.Code == 334) // Сервер ожидает данные аутентификации
-			{
-				response = await SendCommandAsync(credentials);
-			}
-			else
-			{
-				// Если сервер не ожидает отдельной команды, отправляем сразу с данными
-				response = await SendCommandAsync($"AUTH PLAIN {credentials}");
-			}
-
-			if (response.Code == 235)
-			{
-				Console.WriteLine($"[SMTP] Аутентификация успешна");
-			}
-
-			return response;
-		}
-
-		// Аутентификация LOGIN методом
-		public async Task<SmtpResponse> AuthenticateLoginAsync(string username, string password)
-		{
-			var response = await SendCommandAsync("AUTH LOGIN");
-
-			if (response.Code == 334 && response.Message.Contains("Username"))
-			{
-				string encodedUsername = Convert.ToBase64String(Encoding.UTF8.GetBytes(username));
-				response = await SendCommandAsync(encodedUsername);
-			}
-
-			if (response.Code == 334 && response.Message.Contains("Password"))
-			{
-				string encodedPassword = Convert.ToBase64String(Encoding.UTF8.GetBytes(password));
-				response = await SendCommandAsync(encodedPassword);
-			}
-
-			if (response.Code == 235)
-			{
-				Console.WriteLine($"[SMTP] Аутентификация успешна");
-			}
-
-			return response;
-		}
-
-		// Указание отправителя
-		public async Task<SmtpResponse> MailFromAsync(string fromAddress)
-		{
-			return await SendCommandAsync($"MAIL FROM:<{fromAddress}>");
-		}
-
-		// Указание получателя
-		public async Task<SmtpResponse> RcptToAsync(string toAddress)
-		{
-			return await SendCommandAsync($"RCPT TO:<{toAddress}>");
-		}
-
-		// Начало передачи данных письма
-		public async Task<SmtpResponse> DataAsync()
-		{
-			return await SendCommandAsync("DATA");
-		}
-
-		// Отправка содержимого письма
-		public async Task<SmtpResponse> SendEmailDataAsync(string emailContent)
-		{
-			Console.WriteLine($"[SMTP →] (начало данных письма)");
-
-			// Добавляем точку в конце для обозначения конца данных
-			await _writer.WriteLineAsync(emailContent);
-			await _writer.WriteLineAsync(".");
-
-			return await ReadResponseAsync();
-		}
-
-		// Сброс текущей транзакции
-		public async Task<SmtpResponse> ResetAsync()
-		{
-			return await SendCommandAsync("RSET");
-		}
-
-		// Завершение сессии
-		public async Task<SmtpResponse> QuitAsync()
-		{
-			return await SendCommandAsync("QUIT");
-		}
-
-		// Отправка письма целиком
-		public async Task<SmtpResponse> SendEmailAsync(
-			string from,
-			string to,
-			string subject,
-			string body,
-			string username = null,
-			string password = null)
-		{
-			Console.WriteLine($"[SMTP] Отправка письма:");
-			Console.WriteLine($"  От: {from}");
-			Console.WriteLine($"  Кому: {to}");
-			Console.WriteLine($"  Тема: {subject}");
-
-			// 1. Аутентификация (если указаны логин/пароль)
-			if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
-			{
-				var authResponse = await AuthenticatePlainAsync(username, password);
-				if (!authResponse.IsSuccess)
-				{
-					authResponse = await AuthenticateLoginAsync(username, password);
-				}
-
-				if (authResponse.IsError)
-				{
-					return authResponse;
-				}
-			}
-
-			// 2. Указание отправителя
-			var mailFromResponse = await MailFromAsync(from);
-			if (mailFromResponse.IsError)
-				return mailFromResponse;
-
-			// 3. Указание получателя
-			var rcptToResponse = await RcptToAsync(to);
-			if (rcptToResponse.IsError)
-				return rcptToResponse;
-
-			// 4. Начало передачи данных
-			var dataResponse = await DataAsync();
-			if (dataResponse.IsError)
-				return dataResponse;
-
-			// 5. Формирование письма
-			string emailData = BuildEmailData(from, to, subject, body);
-
-			// 6. Отправка данных письма
-			var sendResponse = await SendEmailDataAsync(emailData);
-
-			return sendResponse;
-		}
-
-		private string BuildEmailData(string from, string to, string subject, string body)
-		{
-			var emailBuilder = new StringBuilder();
-
-			// Заголовки письма
-			emailBuilder.AppendLine($"From: {from}");
-			emailBuilder.AppendLine($"To: {to}");
-			emailBuilder.AppendLine($"Subject: {subject}");
-			emailBuilder.AppendLine($"Date: {DateTime.Now:R}");
-			emailBuilder.AppendLine($"MIME-Version: 1.0");
-			emailBuilder.AppendLine($"Content-Type: text/plain; charset=utf-8");
-			emailBuilder.AppendLine($"Content-Transfer-Encoding: 7bit");
-			emailBuilder.AppendLine(); // Пустая строка разделяет заголовки и тело
-
-			// Тело письма
-			emailBuilder.AppendLine(body);
-
-			return emailBuilder.ToString();
-		}
-
-		// Демонстрация всего SMTP диалога
-		public async Task DemonstrateSmtpDialogAsync(string username, string password)
-		{
+			FtpSessionState session = _sessions[client];
+			string? remoteEndpoint = null;
 			try
 			{
-				Console.WriteLine($"\n=== ПОЛНЫЙ SMTP ДИАЛОГ ===\n");
+				remoteEndpoint = client.Client?.RemoteEndPoint?.ToString();
+			}
+			catch
+			{
+				remoteEndpoint = null;
+			}
 
-				// 1. Подключение
-				await ConnectAsync();
+			try
+			{
+				// Шаг 1: Отправка приветственного сообщения (код 220)
+				SendResponse(writer, 220, "Simple FTP Server Ready");
 
-				// 2. Приветствие сервера и идентификация клиента
-				await EhloAsync("smtp-client.demo");
-
-				// 3. STARTTLS (если порт 587)
-				if (_smtpPort == SUBMISSION_PORT)
+				// Цикл обработки команд
+				while (_isRunning && client.Connected)
 				{
-					await StartTlsAsync();
+					string commandLine = reader.ReadLine();
+
+					if (string.IsNullOrEmpty(commandLine))
+					{
+						Thread.Sleep(100);
+						continue;
+					}
+
+					Console.WriteLine($"[{client.Client.RemoteEndPoint}] >> {commandLine}");
+
+					// Разбор команды
+					string[] parts = commandLine.Split(' ', 2);
+					string command = parts[0].ToUpper();
+					string arguments = parts.Length > 1 ? parts[1] : string.Empty;
+
+					// Обработка команды
+					ProcessCommand(client, session, command, arguments, writer);
 				}
-
-				// 4. Аутентификация
-				await AuthenticatePlainAsync(username, password);
-
-				// 5. Отправка тестового письма
-				string testFrom = username;
-				string testTo = username; // Отправляем самому себе
-				string testSubject = "Тестовое письмо через SMTP";
-				string testBody = "Это тестовое письмо, отправленное через низкоуровневый SMTP клиент.\n\n" +
-								"SMTP - это текстовый протокол, который работает по принципу диалога.";
-
-				var sendResult = await SendEmailAsync(testFrom, testTo, testSubject, testBody);
-
-				Console.WriteLine($"\nРезультат отправки: {sendResult}");
-
-				// 6. Завершение сессии
-				await QuitAsync();
+			}
+			catch (IOException ex)
+			{
+				Console.WriteLine($"[{client.Client.RemoteEndPoint}] Соединение разорвано: {ex.Message}");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"Ошибка SMTP: {ex.Message}");
+				Console.WriteLine($"[{client.Client.RemoteEndPoint}] Ошибка: {ex.Message}");
 			}
+			finally
+			{
+				CleanupSession(session);
+				_sessions.Remove(client);
+				client.Close();
+
+				string endpoint = remoteEndpoint ?? "<unknown>";
+				Console.WriteLine($"[{endpoint}] Сессия завершена");
+			}
+		}
+
+		private void ProcessCommand(TcpClient client, FtpSessionState session,
+								   string command, string arguments, StreamWriter writer)
+		{
+			try
+			{
+				switch (command)
+				{
+					case "USER":
+						HandleUser(client, session, arguments, writer);
+						break;
+
+					case "PASS":
+						HandlePass(client, session, arguments, writer);
+						break;
+
+					case "SYST":
+						SendResponse(writer, 215, "UNIX Type: L8");
+						break;
+
+					case "FEAT":
+						SendResponse(writer, 211, "Features:");
+						writer.WriteLine(" UTF8");
+						writer.WriteLine(" PASV");
+						writer.WriteLine(" SIZE");
+						SendResponse(writer, 211, "End");
+						break;
+
+					case "PWD":
+						HandlePwd(session, writer);
+						break;
+
+					case "CWD":
+						HandleCwd(session, arguments, writer);
+						break;
+
+					case "LIST":
+						HandleList(client, session, writer);
+						break;
+
+					case "PASV":
+						HandlePasv(client, session, writer);
+						break;
+
+					case "PORT":
+						HandlePort(session, arguments, writer);
+						break;
+
+					case "TYPE":
+						HandleType(session, arguments, writer);
+						break;
+
+					case "RETR":
+						HandleRetr(client, session, arguments, writer);
+						break;
+
+					case "STOR":
+						HandleStor(client, session, arguments, writer);
+						break;
+
+					case "DELE":
+						HandleDele(session, arguments, writer);
+						break;
+
+					case "MKD":
+						HandleMkd(session, arguments, writer);
+						break;
+
+					case "RMD":
+						HandleRmd(session, arguments, writer);
+						break;
+
+					case "SIZE":
+						HandleSize(session, arguments, writer);
+						break;
+
+					case "QUIT":
+						SendResponse(writer, 221, "Goodbye");
+						client.Close();
+						break;
+
+					case "NOOP":
+						SendResponse(writer, 200, "OK");
+						break;
+
+					default:
+						SendResponse(writer, 502, "Command not implemented");
+						break;
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[Command Error] {command}: {ex.Message}");
+				SendResponse(writer, 550, $"Error: {ex.Message}");
+			}
+		}
+
+		#region Команды управления сессией
+
+		private void HandleUser(TcpClient client, FtpSessionState session, string username, StreamWriter writer)
+		{
+			session.Username = username;
+
+			if (username.ToLower() == "anonymous")
+			{
+				// Для анонимного пользователя сразу успех
+				session.IsAuthenticated = true;
+				SendResponse(writer, 230, "Anonymous login ok, send your email as password");
+			}
+			else if (_users.ContainsKey(username))
+			{
+				SendResponse(writer, 331, "Password required");
+			}
+			else
+			{
+				SendResponse(writer, 530, "User not found");
+			}
+		}
+
+		private void HandlePass(TcpClient client, FtpSessionState session, string password, StreamWriter writer)
+		{
+			if (string.IsNullOrEmpty(session.Username))
+			{
+				SendResponse(writer, 503, "Login with USER first");
+				return;
+			}
+
+			if (session.Username.ToLower() == "anonymous")
+			{
+				// Анонимный доступ - пароль игнорируется
+				session.IsAuthenticated = true;
+				SendResponse(writer, 230, "Anonymous login ok");
+				return;
+			}
+
+			if (_users.TryGetValue(session.Username, out string storedPassword) &&
+				storedPassword == password)
+			{
+				session.IsAuthenticated = true;
+				SendResponse(writer, 230, "Login successful");
+			}
+			else
+			{
+				SendResponse(writer, 530, "Login incorrect");
+			}
+		}
+
+		#endregion
+
+		#region Команды навигации
+
+		private void HandlePwd(FtpSessionState session, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			SendResponse(writer, 257, $"\"{session.CurrentDirectory}\" is current directory");
+		}
+
+		private void HandleCwd(FtpSessionState session, string directory, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				string newPath = NormalizePath(session.CurrentDirectory, directory);
+
+				// Проверяем существование директории
+				string physicalPath = MapToPhysicalPath(newPath);
+				if (!Directory.Exists(physicalPath))
+				{
+					SendResponse(writer, 550, "Directory not found");
+					return;
+				}
+
+				session.CurrentDirectory = newPath;
+				SendResponse(writer, 250, "Directory changed to " + newPath);
+			}
+			catch
+			{
+				SendResponse(writer, 550, "Failed to change directory");
+			}
+		}
+
+		#endregion
+
+		#region Команды передачи данных
+
+		private void HandlePasv(TcpClient client, FtpSessionState session, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				// Создаём пассивный слушатель на случайном порту
+				session.PassiveListener?.Stop();
+				session.PassiveListener = new TcpListener(IPAddress.Any, 0);
+				session.PassiveListener.Start();
+
+				// Получаем локальный IP и порт
+				var endpoint = (IPEndPoint)session.PassiveListener.LocalEndpoint;
+				session.PassiveEndpoint = endpoint;
+				session.DataConnectionMode = DataConnectionMode.Passive;
+
+				// Выбираем IP адрес, который действительно достижим клиентом
+				IPAddress ipAddress = endpoint.Address;
+				if (ipAddress.Equals(IPAddress.Any) || ipAddress.Equals(IPAddress.IPv6Any))
+				{
+					if (client.Client.LocalEndPoint is IPEndPoint localEndpoint)
+					{
+						ipAddress = localEndpoint.Address;
+					}
+				}
+
+				if (ipAddress.AddressFamily == AddressFamily.InterNetworkV6)
+				{
+					ipAddress = ipAddress.IsIPv4MappedToIPv6 ? ipAddress.MapToIPv4() : IPAddress.Loopback;
+				}
+
+				if (ipAddress.GetAddressBytes().Length != 4)
+				{
+					ipAddress = IPAddress.Loopback;
+				}
+
+				// Формируем ответ в формате FTP для пассивного режима
+				byte[] ipBytes = ipAddress.GetAddressBytes();
+				int port = endpoint.Port;
+				int p1 = port / 256;
+				int p2 = port % 256;
+
+				string response = string.Format(
+					"Entering Passive Mode ({0},{1},{2},{3},{4},{5})",
+					ipBytes[0], ipBytes[1], ipBytes[2], ipBytes[3],
+					p1, p2);
+
+				SendResponse(writer, 227, response);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[PASV Error] {ex.Message}");
+				SendResponse(writer, 550, "Failed to enter passive mode");
+			}
+		}
+
+		private void HandlePort(FtpSessionState session, string arguments, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				// Разбираем параметры PORT: h1,h2,h3,h4,p1,p2
+				string[] parts = arguments.Split(',');
+				if (parts.Length != 6)
+				{
+					SendResponse(writer, 501, "Invalid PORT command");
+					return;
+				}
+
+				byte[] ipBytes = new byte[4];
+				for (int i = 0; i < 4; i++)
+				{
+					ipBytes[i] = byte.Parse(parts[i]);
+				}
+
+				int port = int.Parse(parts[4]) * 256 + int.Parse(parts[5]);
+				var ipAddress = new IPAddress(ipBytes);
+
+				session.ActiveEndpoint = new IPEndPoint(ipAddress, port);
+				session.DataConnectionMode = DataConnectionMode.Active;
+
+				SendResponse(writer, 200, "PORT command successful");
+			}
+			catch
+			{
+				SendResponse(writer, 501, "Invalid PORT command");
+			}
+		}
+
+		private void HandleType(FtpSessionState session, string typeCode, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			switch (typeCode.ToUpper())
+			{
+				case "A":
+					session.TransferMode = TransferMode.ASCII;
+					SendResponse(writer, 200, "Type set to ASCII");
+					break;
+
+				case "I":
+					session.TransferMode = TransferMode.Binary;
+					SendResponse(writer, 200, "Type set to Binary");
+					break;
+
+				default:
+					SendResponse(writer, 504, "Type not supported");
+					break;
+			}
+		}
+
+		private void HandleList(TcpClient client, FtpSessionState session, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				// Устанавливаем соединение для передачи данных
+				using (var dataClient = EstablishDataConnection(session, writer))
+				{
+					if (dataClient == null) return;
+
+					SendResponse(writer, 150, "Here comes the directory listing");
+
+					string physicalPath = MapToPhysicalPath(session.CurrentDirectory);
+					var files = Directory.GetFiles(physicalPath);
+					var directories = Directory.GetDirectories(physicalPath);
+
+					using (var dataStream = dataClient.GetStream())
+					using (var dataWriter = new StreamWriter(dataStream, Encoding.ASCII))
+					{
+						// Формируем список в формате UNIX ls -l
+						foreach (var dir in directories)
+						{
+							var dirInfo = new DirectoryInfo(dir);
+							dataWriter.WriteLine($"drwxr-xr-x 1 owner group {GetDirectorySize(dir):D12} " +
+											   $"{dirInfo.LastWriteTime:MMM dd HH:mm} {dirInfo.Name}");
+						}
+
+						foreach (var file in files)
+						{
+							var fileInfo = new FileInfo(file);
+							dataWriter.WriteLine($"-rw-r--r-- 1 owner group {fileInfo.Length:D12} " +
+											   $"{fileInfo.LastWriteTime:MMM dd HH:mm} {fileInfo.Name}");
+						}
+					}
+
+					SendResponse(writer, 226, "Directory send OK");
+					FilesTransferred++;
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[LIST Error] {ex.Message}");
+				SendResponse(writer, 550, "Failed to list directory");
+			}
+		}
+
+		private void HandleRetr(TcpClient client, FtpSessionState session, string filename, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				string physicalPath = MapToPhysicalPath(session.CurrentDirectory, filename);
+
+				if (!File.Exists(physicalPath))
+				{
+					SendResponse(writer, 550, "File not found");
+					return;
+				}
+
+				// Устанавливаем соединение для передачи данных
+				using (var dataClient = EstablishDataConnection(session, writer))
+				{
+					if (dataClient == null) return;
+
+					SendResponse(writer, 150, $"Opening {session.TransferMode} mode data connection for {filename}");
+
+					using (var dataStream = dataClient.GetStream())
+					using (var fileStream = File.OpenRead(physicalPath))
+					{
+						fileStream.CopyTo(dataStream);
+					}
+
+					SendResponse(writer, 226, "Transfer complete");
+					FilesTransferred++;
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[RETR Error] {ex.Message}");
+				SendResponse(writer, 550, "Failed to retrieve file");
+			}
+		}
+
+		private void HandleStor(TcpClient client, FtpSessionState session, string filename, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				string physicalPath = MapToPhysicalPath(session.CurrentDirectory, filename);
+
+				// Устанавливаем соединение для передачи данных
+				using (var dataClient = EstablishDataConnection(session, writer))
+				{
+					if (dataClient == null) return;
+
+					SendResponse(writer, 150, $"Opening {session.TransferMode} mode data connection for {filename}");
+
+					using (var dataStream = dataClient.GetStream())
+					using (var fileStream = File.Create(physicalPath))
+					{
+						dataStream.CopyTo(fileStream);
+					}
+
+					SendResponse(writer, 226, "Transfer complete");
+					FilesTransferred++;
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[STOR Error] {ex.Message}");
+				SendResponse(writer, 550, "Failed to store file");
+			}
+		}
+
+		#endregion
+
+		#region Команды управления файлами
+
+		private void HandleDele(FtpSessionState session, string filename, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				string physicalPath = MapToPhysicalPath(session.CurrentDirectory, filename);
+
+				if (!File.Exists(physicalPath))
+				{
+					SendResponse(writer, 550, "File not found");
+					return;
+				}
+
+				File.Delete(physicalPath);
+				SendResponse(writer, 250, "File deleted successfully");
+			}
+			catch
+			{
+				SendResponse(writer, 550, "Failed to delete file");
+			}
+		}
+
+		private void HandleMkd(FtpSessionState session, string directory, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				string physicalPath = MapToPhysicalPath(session.CurrentDirectory, directory);
+				Directory.CreateDirectory(physicalPath);
+
+				string fullPath = NormalizePath(session.CurrentDirectory, directory);
+				SendResponse(writer, 257, $"\"{fullPath}\" directory created");
+			}
+			catch
+			{
+				SendResponse(writer, 550, "Failed to create directory");
+			}
+		}
+
+		private void HandleRmd(FtpSessionState session, string directory, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				string physicalPath = MapToPhysicalPath(session.CurrentDirectory, directory);
+
+				if (!Directory.Exists(physicalPath))
+				{
+					SendResponse(writer, 550, "Directory not found");
+					return;
+				}
+
+				Directory.Delete(physicalPath);
+				SendResponse(writer, 250, "Directory removed");
+			}
+			catch
+			{
+				SendResponse(writer, 550, "Failed to remove directory");
+			}
+		}
+
+		private void HandleSize(FtpSessionState session, string filename, StreamWriter writer)
+		{
+			if (!CheckAuthentication(session, writer)) return;
+
+			try
+			{
+				string physicalPath = MapToPhysicalPath(session.CurrentDirectory, filename);
+
+				if (!File.Exists(physicalPath))
+				{
+					SendResponse(writer, 550, "File not found");
+					return;
+				}
+
+				long size = new FileInfo(physicalPath).Length;
+				SendResponse(writer, 213, size.ToString());
+			}
+			catch
+			{
+				SendResponse(writer, 550, "Could not get file size");
+			}
+		}
+
+		#endregion
+
+		#region Вспомогательные методы
+
+		private bool CheckAuthentication(FtpSessionState session, StreamWriter writer)
+		{
+			if (!session.IsAuthenticated)
+			{
+				SendResponse(writer, 530, "Please login with USER and PASS");
+				return false;
+			}
+			return true;
+		}
+
+		private void SendResponse(StreamWriter writer, int code, string message)
+		{
+			string response = $"{code} {message}";
+			writer.WriteLine(response);
+			writer.Flush();
+
+			// Для демонстрации выводим в консоль
+			var frame = new System.Diagnostics.StackTrace().GetFrame(1);
+			var method = frame.GetMethod().Name;
+			Console.WriteLine($"[FTP Response] {method}: {response}");
+		}
+
+		private string MapToPhysicalPath(string virtualPath, string filename = null)
+		{
+			string fullVirtualPath = string.IsNullOrEmpty(filename)
+				? virtualPath
+				: NormalizePath(virtualPath, filename);
+
+			// Убираем начальный слеш и заменяем разделители
+			string relativePath = fullVirtualPath.TrimStart('/');
+			if (string.IsNullOrEmpty(relativePath))
+				relativePath = ".";
+
+			string physicalPath = Path.Combine(_rootDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
+
+			// Защита от выхода за пределы корневой директории
+			physicalPath = Path.GetFullPath(physicalPath);
+			if (!physicalPath.StartsWith(_rootDirectory, StringComparison.OrdinalIgnoreCase))
+			{
+				throw new UnauthorizedAccessException("Access denied");
+			}
+
+			return physicalPath;
+		}
+
+		private string NormalizePath(string current, string relative)
+		{
+			if (string.IsNullOrEmpty(relative))
+				return current;
+
+			if (relative.StartsWith("/"))
+				return relative;
+
+			// Простая нормализация пути
+			if (relative == "..")
+			{
+				int lastSlash = current.LastIndexOf('/');
+				return lastSlash > 0 ? current.Substring(0, lastSlash) : "/";
+			}
+
+			if (relative == ".")
+				return current;
+
+			return current == "/" ? $"/{relative}" : $"{current}/{relative}";
+		}
+
+		private TcpClient EstablishDataConnection(FtpSessionState session, StreamWriter writer)
+		{
+			try
+			{
+				if (session.DataConnectionMode == DataConnectionMode.Passive)
+				{
+					if (session.PassiveListener == null)
+					{
+						SendResponse(writer, 425, "Cannot open data connection");
+						return null;
+					}
+
+					// Ожидаем подключение клиента в пассивном режиме
+					var client = session.PassiveListener.AcceptTcpClient();
+
+					// Останавливаем слушатель после принятия соединения
+					session.PassiveListener.Stop();
+					session.PassiveListener = null;
+
+					return client;
+				}
+				else // Активный режим
+				{
+					if (session.ActiveEndpoint == null)
+					{
+						SendResponse(writer, 425, "Cannot open data connection");
+						return null;
+					}
+
+					var client = new TcpClient();
+					client.Connect(session.ActiveEndpoint);
+					return client;
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[Data Connection Error] {ex.Message}");
+				SendResponse(writer, 425, "Cannot open data connection");
+				return null;
+			}
+		}
+
+		private long GetDirectorySize(string directory)
+		{
+			try
+			{
+				long size = 0;
+				var files = Directory.GetFiles(directory, "*", SearchOption.AllDirectories);
+				foreach (var file in files)
+				{
+					size += new FileInfo(file).Length;
+				}
+				return size;
+			}
+			catch
+			{
+				return 0;
+			}
+		}
+
+		private void CleanupSession(FtpSessionState session)
+		{
+			try
+			{
+				session.PassiveListener?.Stop();
+			}
+			catch { }
+		}
+
+		#endregion
+
+		public void Stop()
+		{
+			_isRunning = false;
+
+			// Закрываем все активные сессии
+			foreach (var session in _sessions)
+			{
+				CleanupSession(session.Value);
+				session.Key.Close();
+			}
+			_sessions.Clear();
+
+			_controlListener?.Stop();
+
+			Console.WriteLine($"\n=== FTP СЕРВЕР ОСТАНОВЛЕН ===");
+			Console.WriteLine($"Всего подключений: {TotalConnections}");
+			Console.WriteLine($"Файлов передано: {FilesTransferred}");
 		}
 
 		public void Dispose()
 		{
-			_writer?.Dispose();
-			_reader?.Dispose();
-			_sslStream?.Dispose();
-			_networkStream?.Dispose();
-			_tcpClient?.Dispose();
+			Stop();
 		}
 	}
 
-	// Высокоуровневая обёртка с использованием System.Net.Mail
-	public class HighLevelSmtpDemo
+	// Простой FTP клиент для демонстрации взаимодействия
+	public class SimpleFtpClient : IDisposable
 	{
-		public static void SendEmailWithSmtpClient(
-			string smtpServer,
-			int port,
-			string username,
-			string password,
-			string from,
-			string to,
-			string subject,
-			string body)
+		private TcpClient _controlClient;
+		private NetworkStream _controlStream;
+		private StreamReader _reader;
+		private StreamWriter _writer;
+		private bool _isConnected;
+		private string _currentDirectory = "/";
+		private IPEndPoint? _passiveEndpoint;
+
+		public bool IsConnected => _isConnected && _controlClient?.Connected == true;
+		public string CurrentDirectory => _currentDirectory;
+
+		public void Connect(string host, int port = 21)
 		{
-			Console.WriteLine($"\n=== ОТПРАВКА ЧЕРЕЗ System.Net.Mail.SmtpClient ===\n");
+			try
+			{
+				_controlClient = new TcpClient(host, port);
+				_controlStream = _controlClient.GetStream();
+				_reader = new StreamReader(_controlStream, Encoding.ASCII);
+				_writer = new StreamWriter(_controlStream, Encoding.ASCII) { AutoFlush = true };
+
+				// Читаем приветственное сообщение сервера
+				string welcome = _reader.ReadLine();
+				Console.WriteLine($"[FTP Client] Подключено: {welcome}");
+
+				_isConnected = true;
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[FTP Client] Ошибка подключения: {ex.Message}");
+				throw;
+			}
+		}
+
+		public bool Login(string username, string password)
+		{
+			if (!IsConnected) return false;
 
 			try
 			{
-				using (var smtpClient = new SmtpClient(smtpServer, port))
+				SendCommand($"USER {username}");
+				var userResponse = ReadResponse();
+
+				SendCommand($"PASS {password}");
+				var passResponse = ReadResponse();
+
+				return passResponse.StartsWith("230");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[FTP Client] Ошибка аутентификации: {ex.Message}");
+				return false;
+			}
+		}
+
+		public void SetPassiveMode(bool passive = true)
+		{
+			if (!IsConnected) return;
+
+			if (passive)
+			{
+				SendCommand("PASV");
+				var response = ReadResponse();
+
+				if (response.StartsWith("227") && TryParsePassiveEndpoint(response, out var endpoint))
 				{
-					smtpClient.Credentials = new NetworkCredential(username, password);
-					smtpClient.EnableSsl = true;
-					smtpClient.Timeout = 10000;
+					_passiveEndpoint = endpoint;
+					Console.WriteLine($"[FTP Client] Переключен в пассивный режим: {endpoint.Address}:{endpoint.Port}");
+				}
+				else
+				{
+					throw new InvalidOperationException("Не удалось перейти в пассивный режим");
+				}
+			}
+			else
+			{
+				// Для активного режима нужен специальный обработчик
+				Console.WriteLine($"[FTP Client] Активный режим не реализован в демо");
+			}
+		}
 
-					Console.WriteLine($"Параметры SMTP:");
-					Console.WriteLine($"  Сервер: {smtpClient.Host}:{smtpClient.Port}");
-					Console.WriteLine($"  SSL: {smtpClient.EnableSsl}");
-					Console.WriteLine($"  Таймаут: {smtpClient.Timeout} мс");
+		public string[] ListDirectory()
+		{
+			if (!IsConnected) return Array.Empty<string>();
 
-					var mailMessage = new MailMessage(from, to, subject, body)
+			try
+			{
+				// Устанавливаем тип передачи
+				SendCommand("TYPE A");
+				ReadResponse();
+
+				// Переходим в пассивный режим
+				SetPassiveMode(true);
+
+				var entries = new List<string>();
+
+				// Открываем соединение данных
+				using (var dataClient = OpenDataConnection())
+				{
+					// Запрашиваем список
+					SendCommand("LIST");
+					var listResponse = ReadResponse();
+
+					if (!listResponse.StartsWith("150"))
 					{
-						IsBodyHtml = false
-					};
+						Console.WriteLine($"[FTP Client] Ошибка получения списка: {listResponse}");
+						return Array.Empty<string>();
+					}
 
-					Console.WriteLine($"\nОтправка письма...");
-
-					// Асинхронная отправка
-					smtpClient.Send(mailMessage);
-
-					Console.WriteLine($"✓ Письмо отправлено успешно");
-					Console.WriteLine($"  От: {from}");
-					Console.WriteLine($"  Кому: {to}");
-					Console.WriteLine($"  Тема: {subject}");
+					using (var dataStream = dataClient.GetStream())
+					using (var dataReader = new StreamReader(dataStream, Encoding.ASCII))
+					{
+						string line;
+						while ((line = dataReader.ReadLine()) != null)
+						{
+							entries.Add(line);
+						}
+					}
 				}
-			}
-			catch (SmtpException ex)
-			{
-				Console.WriteLine($"✗ SMTP ошибка: {ex.StatusCode} - {ex.Message}");
+
+				// Читаем завершающий ответ
+				var finalResponse = ReadResponse();
+				if (finalResponse.StartsWith("226"))
+				{
+					Console.WriteLine($"[FTP Client] Список получен успешно");
+				}
+
+				foreach (var entry in entries)
+				{
+					Console.WriteLine($"[FTP Client] LIST: {entry}");
+				}
+
+				return entries.ToArray();
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"✗ Общая ошибка: {ex.Message}");
+				Console.WriteLine($"[FTP Client] Ошибка получения списка: {ex.Message}");
+				return Array.Empty<string>();
 			}
 		}
-	}
 
-	// Демонстрация DNS MX-записей
-	public class DnsMxLookup
-	{
-		public static void DemonstrateMxLookup(string domain)
+		public void ChangeDirectory(string directory)
 		{
-			Console.WriteLine($"\n=== DNS MX-ЗАПИСИ ДЛЯ {domain} ===\n");
+			if (!IsConnected) return;
+
+			SendCommand($"CWD {directory}");
+			var response = ReadResponse();
+
+			if (response.StartsWith("250"))
+			{
+				_currentDirectory = directory;
+				Console.WriteLine($"[FTP Client] Перешел в директорию: {directory}");
+			}
+		}
+
+		public void PrintWorkingDirectory()
+		{
+			if (!IsConnected) return;
+
+			SendCommand("PWD");
+			var response = ReadResponse();
+			Console.WriteLine($"[FTP Client] Текущая директория: {response}");
+		}
+
+		public void DownloadFile(string remoteFile, string localFile)
+		{
+			if (!IsConnected) return;
+
+			Console.WriteLine($"[FTP Client] Начинаю загрузку {remoteFile} -> {localFile}");
 
 			try
 			{
-				var mxRecords = System.Net.Dns.GetHostAddresses(domain);
+				// Устанавливаем бинарный режим
+				SendCommand("TYPE I");
+				ReadResponse();
 
-				Console.WriteLine($"DNS записи для {domain}:");
-				foreach (var record in mxRecords)
+				// Переходим в пассивный режим
+				SetPassiveMode(true);
+
+				using (var dataClient = OpenDataConnection())
 				{
-					Console.WriteLine($"  - {record}");
+					// Запрашиваем файл
+					SendCommand($"RETR {remoteFile}");
+					var retrResponse = ReadResponse();
+
+					if (retrResponse.StartsWith("150"))
+					{
+						Console.WriteLine($"[FTP Client] Загрузка начата");
+
+						string fullPath = Path.GetFullPath(localFile);
+						string? dir = Path.GetDirectoryName(fullPath);
+						if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+						{
+							Directory.CreateDirectory(dir);
+						}
+
+						using (var dataStream = dataClient.GetStream())
+						using (var fileStream = File.Create(fullPath))
+						{
+							dataStream.CopyTo(fileStream);
+						}
+
+						var finalResponse = ReadResponse();
+						if (finalResponse.StartsWith("226"))
+						{
+							Console.WriteLine($"[FTP Client] Файл загружен: {localFile}");
+						}
+					}
 				}
-
-				// В реальном приложении для MX-записей нужна отдельная библиотека
-				// System.Net.Dns не имеет встроенной поддержки MX записей
-				Console.WriteLine($"\nПримечание: System.Net.Dns.GetHostAddresses() возвращает A-записи.");
-				Console.WriteLine($"Для MX-записей требуется использовать стороннюю библиотеку или DNS-клиент.");
-
-				Console.WriteLine($"\nПроцесс маршрутизации SMTP:");
-				Console.WriteLine($"  1. Клиент получает домен из email (после @)");
-				Console.WriteLine($"  2. Делает DNS MX запрос для этого домена");
-				Console.WriteLine($"  3. Получает приоритет и имя почтового сервера");
-				Console.WriteLine($"  4. Подключается к серверу с наивысшим приоритетом");
-				Console.WriteLine($"  5. Если сервер недоступен, пробует следующий по приоритету");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"Ошибка DNS: {ex.Message}");
+				Console.WriteLine($"[FTP Client] Ошибка загрузки: {ex.Message}");
 			}
 		}
-	}
 
-	// Конфигурация из .env файла
-	public class EmailConfiguration
-	{
-		public string Sender { get; set; }
-		public string Password { get; set; }
-		public string Recipient { get; set; }
-		public string SmtpServer { get; set; }
-		public int SmtpPort { get; set; }
-
-		public static EmailConfiguration FromEnvironment()
+		public void UploadFile(string localFile, string remoteFile)
 		{
-			// В реальном приложении здесь читался бы .env файл
-			// Для демонстрации используем константы
+			if (!IsConnected) return;
 
-			return new EmailConfiguration
+			Console.WriteLine($"[FTP Client] Начинаю выгрузку {localFile} -> {remoteFile}");
+
+			try
 			{
-				Sender = "efimov.matvey23@yandex.ru",
-				Password = "vkxfywedeecchzrv",
-				Recipient = "pznb@yandex.ru",
-				SmtpServer = "smtp.yandex.ru",
-				SmtpPort = 587
-			};
+				// Устанавливаем бинарный режим
+				SendCommand("TYPE I");
+				ReadResponse();
+
+				// Переходим в пассивный режим
+				SetPassiveMode(true);
+
+				string fullPath = Path.GetFullPath(localFile);
+				if (!File.Exists(fullPath))
+				{
+					File.WriteAllText(fullPath, "Demo file content for FTP upload.\r\n");
+				}
+
+				using (var dataClient = OpenDataConnection())
+				{
+					// Отправляем файл
+					SendCommand($"STOR {remoteFile}");
+					var storResponse = ReadResponse();
+
+					if (storResponse.StartsWith("150"))
+					{
+						Console.WriteLine($"[FTP Client] Выгрузка начата");
+
+						using (var dataStream = dataClient.GetStream())
+						using (var fileStream = File.OpenRead(fullPath))
+						{
+							fileStream.CopyTo(dataStream);
+						}
+
+						var finalResponse = ReadResponse();
+						if (finalResponse.StartsWith("226"))
+						{
+							Console.WriteLine($"[FTP Client] Файл выгружен: {remoteFile}");
+						}
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[FTP Client] Ошибка выгрузки: {ex.Message}");
+			}
+		}
+
+		public void DeleteFile(string filename)
+		{
+			if (!IsConnected) return;
+
+			SendCommand($"DELE {filename}");
+			var response = ReadResponse();
+
+			if (response.StartsWith("250"))
+			{
+				Console.WriteLine($"[FTP Client] Файл удален: {filename}");
+			}
+		}
+
+		public void CreateDirectory(string directory)
+		{
+			if (!IsConnected) return;
+
+			SendCommand($"MKD {directory}");
+			var response = ReadResponse();
+
+			if (response.StartsWith("257"))
+			{
+				Console.WriteLine($"[FTP Client] Директория создана: {directory}");
+			}
+		}
+
+		public void Disconnect()
+		{
+			if (IsConnected)
+			{
+				SendCommand("QUIT");
+				ReadResponse();
+			}
+
+			_isConnected = false;
+			_controlClient?.Close();
+
+			Console.WriteLine($"[FTP Client] Отключен");
+		}
+
+		private void SendCommand(string command)
+		{
+			if (!IsConnected) return;
+
+			Console.WriteLine($"[FTP Client] >> {command}");
+			_writer.WriteLine(command);
+			_writer.Flush();
+		}
+
+		private TcpClient OpenDataConnection()
+		{
+			if (_passiveEndpoint == null)
+			{
+				throw new InvalidOperationException("PASV не выполнен");
+			}
+
+			var dataClient = new TcpClient();
+			dataClient.Connect(_passiveEndpoint);
+			return dataClient;
+		}
+
+		private bool TryParsePassiveEndpoint(string response, out IPEndPoint endpoint)
+		{
+			endpoint = default!;
+
+			int start = response.IndexOf('(');
+			int end = response.IndexOf(')');
+			if (start < 0 || end <= start)
+			{
+				return false;
+			}
+
+			string data = response.Substring(start + 1, end - start - 1);
+			string[] parts = data.Split(',');
+			if (parts.Length != 6)
+			{
+				return false;
+			}
+
+			byte[] ipBytes = new byte[4];
+			for (int i = 0; i < 4; i++)
+			{
+				if (!byte.TryParse(parts[i], out ipBytes[i]))
+				{
+					return false;
+				}
+			}
+
+			if (!int.TryParse(parts[4], out int p1) || !int.TryParse(parts[5], out int p2))
+			{
+				return false;
+			}
+
+			int port = p1 * 256 + p2;
+			IPAddress ipAddress = new IPAddress(ipBytes);
+			if (ipAddress.Equals(IPAddress.Any) || ipAddress.Equals(IPAddress.None))
+			{
+				if (_controlClient?.Client?.RemoteEndPoint is IPEndPoint remote)
+				{
+					ipAddress = remote.Address;
+				}
+				else
+				{
+					ipAddress = IPAddress.Loopback;
+				}
+			}
+
+			if (ipAddress.AddressFamily == AddressFamily.InterNetworkV6)
+			{
+				ipAddress = ipAddress.IsIPv4MappedToIPv6 ? ipAddress.MapToIPv4() : IPAddress.Loopback;
+			}
+
+			endpoint = new IPEndPoint(ipAddress, port);
+			return true;
+		}
+
+		private string ReadResponse()
+		{
+			if (!IsConnected) return string.Empty;
+
+			string response = _reader.ReadLine();
+			Console.WriteLine($"[FTP Client] << {response}");
+			return response;
+		}
+
+		public void Dispose()
+		{
+			Disconnect();
 		}
 	}
 
-	// Главная программа
+	// Демонстрационная программа
 	class Program
 	{
-		static async Task Main(string[] args)
+		static void Main(string[] args)
 		{
-			Console.WriteLine("SMTP - ПРОТОКОЛ ОТПРАВКИ ЭЛЕКТРОННОЙ ПОЧТЫ");
-			Console.WriteLine("==========================================\n");
+			Console.WriteLine("=== ДЕМОНСТРАЦИЯ ПРОТОКОЛА FTP ===\n");
 
-			// Получаем конфигурацию
-			var config = EmailConfiguration.FromEnvironment();
-
-			Console.WriteLine("Конфигурация из .env:");
-			Console.WriteLine($"  Отправитель: {config.Sender}");
-			Console.WriteLine($"  Получатель: {config.Recipient}");
-			Console.WriteLine($"  SMTP сервер: {config.SmtpServer}");
-			Console.WriteLine($"  SMTP порт: {config.SmtpPort}");
-			Console.WriteLine($"  Пароль приложения: {new string('*', config.Password.Length)}");
-
-			// Часть 1: Низкоуровневый SMTP диалог
-			Console.WriteLine("\n\n1. НИЗКОУРОВНЕВЫЙ SMTP ДИАЛОГ:");
-			using (var rawSmtp = new RawSmtpClient(config.SmtpServer, config.SmtpPort))
+			// Запуск FTP сервера
+			using (var server = new SimpleFtpServer(2121)) // Используем нестандартный порт
 			{
-				// Для демонстрации отправляем письмо самому себе
-				await rawSmtp.DemonstrateSmtpDialogAsync(config.Sender, config.Password);
+				server.Start();
+
+				Thread.Sleep(1000); // Даём время серверу запуститься
+
+				// Демонстрация работы клиента
+				using (var client = new SimpleFtpClient())
+				{
+					try
+					{
+						Console.WriteLine("\n=== ДЕМОНСТРАЦИЯ FTP КЛИЕНТА ===\n");
+
+						// Подключение
+						client.Connect("localhost", 2121);
+
+						// Аутентификация
+						bool loggedIn = client.Login("user1", "password1");
+						Console.WriteLine($"Аутентификация: {(loggedIn ? "УСПЕШНО" : "ОШИБКА")}\n");
+
+						if (loggedIn)
+						{
+							// Команды навигации
+							client.PrintWorkingDirectory();
+							client.ChangeDirectory("/");
+
+							// Работа с файлами
+							client.CreateDirectory("test_dir");
+							client.ChangeDirectory("test_dir");
+
+							// Демонстрация загрузки/выгрузки (заглушки)
+							client.UploadFile("test.txt", "uploaded.txt");
+							client.DownloadFile("uploaded.txt", "downloaded.txt");
+
+							// Возврат в корень
+							client.ChangeDirectory("/");
+							client.DeleteFile("test_dir/uploaded.txt");
+
+							// Получение списка
+							client.ListDirectory();
+						}
+
+						// Отключение
+						client.Disconnect();
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"Ошибка в демонстрации: {ex.Message}");
+					}
+				}
+
+				// Даём поработать серверу
+				Thread.Sleep(2000);
+
+				Console.WriteLine($"\n=== СТАТИСТИКА FTP СЕРВЕРА ===");
+				Console.WriteLine($"Активных сессий: {server.ActiveSessions}");
+				Console.WriteLine($"Всего подключений: {server.TotalConnections}");
+				Console.WriteLine($"Файлов передано: {server.FilesTransferred}");
+
+				Console.WriteLine("\nНажмите любую клавишу для остановки сервера...");
+				Console.ReadKey();
+
+				server.Stop();
 			}
-
-			// Часть 2: Высокоуровневая отправка
-			Console.WriteLine("\n\n2. ВЫСОКОУРОВНЕВАЯ ОТПРАВКА:");
-			HighLevelSmtpDemo.SendEmailWithSmtpClient(
-				config.SmtpServer,
-				config.SmtpPort,
-				config.Sender,
-				config.Password,
-				config.Sender,
-				config.Recipient,
-				"Тестовое письмо с курса",
-				"Это письмо отправлено через высокоуровневый SmtpClient.\n\n" +
-				"System.Net.Mail скрывает низкоуровневые детали SMTP протокола,\n" +
-				"но внутри всё равно происходит тот же самый диалог с сервером."
-			);
-
-			// Часть 3: DNS и маршрутизация
-			Console.WriteLine("\n\n3. DNS И МАРШРУТИЗАЦИЯ ПОЧТЫ:");
-			string domain = config.Sender.Substring(config.Sender.IndexOf('@') + 1);
-			DnsMxLookup.DemonstrateMxLookup(domain);
-
-			// Часть 4: Теория SMTP протокола
-			Console.WriteLine("\n\n4. КЛЮЧЕВЫЕ АСПЕКТЫ SMTP:");
-			PrintSmtpTheory();
-		}
-
-		static void PrintSmtpTheory()
-		{
-			Console.WriteLine("Ключевые аспекты SMTP протокола:");
-			Console.WriteLine();
-			Console.WriteLine("1. ТЕКСТОВЫЙ ПРОТОКОЛ:");
-			Console.WriteLine("   • Команды и ответы в читаемом формате");
-			Console.WriteLine("   • Каждая команда начинается с 4-буквенного кода");
-			Console.WriteLine("   • Ответы начинаются с 3-значного кода");
-			Console.WriteLine();
-			Console.WriteLine("2. ДИАЛОГОВЫЙ ФОРМАТ:");
-			Console.WriteLine("   • Клиент отправляет команду");
-			Console.WriteLine("   • Сервер отвечает кодом и сообщением");
-			Console.WriteLine("   • Код определяет успешность операции");
-			Console.WriteLine();
-			Console.WriteLine("3. ПОСЛЕДОВАТЕЛЬНОСТЬ КОМАНД:");
-			Console.WriteLine("   • EHLO/HELO - приветствие сервера");
-			Console.WriteLine("   • STARTTLS - переход на шифрование (опционально)");
-			Console.WriteLine("   • AUTH - аутентификация");
-			Console.WriteLine("   • MAIL FROM - указание отправителя");
-			Console.WriteLine("   • RCPT TO - указание получателя");
-			Console.WriteLine("   • DATA - начало передачи письма");
-			Console.WriteLine("   • . (точка) - конец письма");
-			Console.WriteLine("   • QUIT - завершение сессии");
-			Console.WriteLine();
-			Console.WriteLine("4. КОДЫ ОТВЕТОВ:");
-			Console.WriteLine("   • 2xx - успех");
-			Console.WriteLine("   • 3xx - промежуточный успех");
-			Console.WriteLine("   • 4xx - временная ошибка");
-			Console.WriteLine("   • 5xx - постоянная ошибка");
-			Console.WriteLine();
-			Console.WriteLine("5. БЕЗОПАСНОСТЬ:");
-			Console.WriteLine("   • Порт 25 - без шифрования (обычно блокируется)");
-			Console.WriteLine("   • Порт 587 - STARTTLS (шифрование по запросу)");
-			Console.WriteLine("   • Порт 465 - SSL/TLS (шифрование сразу)");
-			Console.WriteLine();
-			Console.WriteLine("6. DNS И MX-ЗАПИСИ:");
-			Console.WriteLine("   • Для маршрутизации почты используются MX-записи");
-			Console.WriteLine("   • MX-запись указывает на почтовый сервер домена");
-			Console.WriteLine("   • Приоритет определяет порядок попыток доставки");
 		}
 	}
 }
